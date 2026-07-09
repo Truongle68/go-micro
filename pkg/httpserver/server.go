@@ -42,7 +42,7 @@ func New(l logger.Interface, opts ...Option) *Server {
 		ctx:             ctx,
 		eg:              eg,
 		Engine:          nil,
-		notify:          make(chan error),
+		notify:          make(chan error, 1),
 		address:         _defaultAddr,
 		readTimeout:     _defaulReadTimeout,
 		writeTimeout:    _defaulWriteTimeout,

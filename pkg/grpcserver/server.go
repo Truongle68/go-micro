@@ -31,7 +31,7 @@ func New(l logger.Interface, opts ...Option) *Server {
 	s := &Server{
 		ctx:     ctx,
 		eg:      eg,
-		notify:  make(chan error),
+		notify:  make(chan error, 1),
 		address: _defaultAddr,
 		logger:  l,
 	}
