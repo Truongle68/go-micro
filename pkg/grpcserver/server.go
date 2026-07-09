@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/TruongLe68/go-micro/pkg/logger"
@@ -64,7 +65,7 @@ func (s *Server) Start() {
 		return nil
 	})
 
-	s.logger.Info("grpc server - Server - Started")
+	s.logger.Info(fmt.Sprintf("grpc server - Server - Started at port: %s", s.address))
 }
 
 func (s *Server) Notify() <-chan error {
