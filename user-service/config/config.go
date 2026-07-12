@@ -9,11 +9,12 @@ import (
 
 type (
 	Config struct {
-		HTTP http
-		GRPC grpc
-		PG   pg
-		JWT  jwt
-		Log  log
+		HTTP  http
+		GRPC  grpc
+		PG    pg
+		JWT   jwt
+		Redis redis
+		Log   log
 	}
 
 	http struct {
@@ -38,6 +39,12 @@ type (
 		RefreshSecret string        `env:"JWT_REF_SECRET,required"`
 		AccessExpiry  time.Duration `env:"JWT_ACC_EXPIRY" envDefault:"15m"`
 		RefreshExpiry time.Duration `env:"JWT_REF_EXPIRY" envDefault:"7d"`
+	}
+
+	redis struct {
+		Addr     string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
+		Password string `env:"REDIS_PASSWORD" envDefault:""`
+		DB       int    `env:"REDIS_DB" envDefault:"0"`
 	}
 
 	log struct {
