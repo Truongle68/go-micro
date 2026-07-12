@@ -17,6 +17,7 @@ import (
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/postgres"
+	"github.com/TruongLe68/go-micro/pkg/redis"
 )
 
 func main() {
@@ -29,18 +30,30 @@ func main() {
 
 	// init db conn
 	pg, err := postgres.New(cfg.PG.Url)
+	if err != nil {
+		l.Fatal("failed to initialize postgres: %v", err)
+	}
+	defer pg.Close()
+
+	// init redis conn
+	redisClient, err := redis.New(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
+	if err != nil {
+		l.Fatal("failed to initialize redis: %v", err)
+	}
+	defer redisClient.Close()
 
 	// init jwt
 	jwtManager := jwt.New(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessExpiry, cfg.JWT.RefreshExpiry)
 
 	// init repo + usecase
 	userRepo := repo.NewUserRepo(pg.DB)
-	authUC := usecase.NewAuthUC(userRepo, jwtManager)
+	authUC := usecase.NewAuthUC(userRepo, jwtManager, redisClient.Client)
+	userUC := usecase.NewUserUC(userRepo, redisClient.Client)
 
 	// init server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 
-	v1Deps := v1.NewDependencies(authUC, l)
+	v1Deps := v1.NewDependencies(authUC, userUC, jwtManager, redisClient.Client, l)
 	http.NewRouter(httpserver.Engine, v1Deps)
 
 	// start server
