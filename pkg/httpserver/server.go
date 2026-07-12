@@ -89,21 +89,19 @@ func (s *Server) Notify() <-chan error {
 }
 
 func (s *Server) Shutdown() error {
-	var errs []error
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		s.logger.Error("http server - Server - Shutdown - s.httpServer.Shutdown")
-		errs = append(errs, err)
+		return err
 	}
 
 	if err := s.eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		s.logger.Error("http server - Server - Shutdown - s.eg.Wait")
-		errs = append(errs, err)
+		return err
 	}
 
 	s.logger.Info("http server - Server - Shutdown")
-
-	return errors.Join(errs...)
+	return nil
 }

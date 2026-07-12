@@ -73,14 +73,13 @@ func (s *Server) Notify() <-chan error {
 }
 
 func (s *Server) Shutdown() error {
-	var shutdownErr []error
 	s.App.GracefulStop()
 
 	if err := s.eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		s.logger.Error("grpc server - Shutdown - s.eg.Wait")
-		shutdownErr = append(shutdownErr, err)
+		return err
 	}
 
 	s.logger.Info("grpc server - Server - Shutdown")
-	return errors.Join(shutdownErr...)
+	return nil
 }

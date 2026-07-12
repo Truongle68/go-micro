@@ -4,26 +4,22 @@ import "time"
 
 type Option func(*Postgres)
 
-func MaxSizePool(size int) Option {
-	return func(p *Postgres) {
-		if size > 0 {
-			p.maxPoolSize = size
-		}
-	}
+func MaxOpenConns(size int) Option {
+	return func(p *Postgres) { p.maxOpenConns = size }
 }
 
-func ConnAttempt(attempt int) Option {
-	return func(p *Postgres) {
-		if attempt > 0 {
-			p.connAttempt = attempt
-		}
-	}
+func MaxIdleConns(size int) Option {
+	return func(p *Postgres) { p.maxIdleConns = size }
+}
+
+func ConnMaxLifetime(d time.Duration) Option {
+	return func(p *Postgres) { p.connMaxLifetime = d }
+}
+
+func ConnAttempts(attempts int) Option {
+	return func(p *Postgres) { p.connAttempt = attempts }
 }
 
 func ConnTimeout(timeout time.Duration) Option {
-	return func(p *Postgres) {
-		if timeout > 0 {
-			p.connTimeout = timeout
-		}
-	}
+	return func(p *Postgres) { p.connTimeout = timeout }
 }
