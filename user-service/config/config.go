@@ -1,0 +1,54 @@
+package config
+
+import (
+	"fmt"
+	"time"
+
+	env "github.com/TruongLe68/go-micro/pkg/config"
+)
+
+type (
+	Config struct {
+		HTTP http
+		GRPC grpc
+		PG   pg
+		JWT  jwt
+		Log  log
+	}
+
+	http struct {
+		Port string `env:"HTTP_PORT" envDefault:"4000"`
+	}
+
+	grpc struct {
+		Port     string `env:"GRPC_PORT" envDefault:"50050"`
+		Services services
+	}
+
+	services struct {
+		RewardServiceAddr string `env:"REWARD_SERVICE_ADDR" envDefault:"50051"`
+	}
+
+	pg struct {
+		Url string `env:"DB_URL,required"`
+	}
+
+	jwt struct {
+		AccessSecret  string        `env:"JWT_ACC_SECRET,required"`
+		RefreshSecret string        `env:"JWT_REF_SECRET,required"`
+		AccessExpiry  time.Duration `env:"JWT_ACC_EXPIRY" envDefault:"15m"`
+		RefreshExpiry time.Duration `env:"JWT_REF_EXPIRY" envDefault:"7d"`
+	}
+
+	log struct {
+		Level string `env:"LOG_LEVEL" envDefault:"debug"`
+	}
+)
+
+func New() (*Config, error) {
+	cfg := &Config{}
+	if err := env.Load(cfg); err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	return cfg, nil
+}
