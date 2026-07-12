@@ -3,20 +3,25 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"time"
 	"user-service/internal/domain"
 	"user-service/internal/repo"
 	"user-service/pkg/jwt"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type AuthUC struct {
-	userRepo repo.UserRepository
-	jwt      *jwt.JWT
+	userRepo    repo.UserRepository
+	jwt         *jwt.JWT
+	redisClient *redis.Client
 }
 
-func NewAuthUC(repo repo.UserRepository, jwt *jwt.JWT) *AuthUC {
+func NewAuthUC(repo repo.UserRepository, jwt *jwt.JWT, redisClient *redis.Client) *AuthUC {
 	return &AuthUC{
-		userRepo: repo,
-		jwt:      jwt,
+		userRepo:    repo,
+		jwt:         jwt,
+		redisClient: redisClient,
 	}
 }
 
@@ -112,4 +117,73 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 		RefreshToken: refreshToken,
 		UserID:       user.ID,
 	}, nil
+}
+
+func (uc *AuthUC) ForgotPassword(ctx context.Context, email string) (string, error) {
+	user, err := uc.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		return "", err
+	}
+
+	resetToken, err := uc.jwt.GenerateResetToken(user.ID)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate reset token: %w", err)
+	}
+
+	return resetToken, nil
+}
+
+func (uc *AuthUC) ResetPassword(ctx context.Context, token string, newPassword string) error {
+	claims, err := uc.jwt.VerifyResetToken(token)
+	if err != nil {
+		return domain.ErrInvalidToken
+	}
+
+	if len(newPassword) < 8 {
+		return domain.ErrWeakPassword
+	}
+
+	hash, err := domain.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	err = uc.userRepo.UpdatePassword(ctx, claims.UserID, hash)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// invalidate user profile cache on password reset
+	cacheKey := fmt.Sprintf("user:profile:%s", claims.UserID)
+	uc.redisClient.Del(ctx, cacheKey)
+
+	return nil
+}
+
+func (uc *AuthUC) Logout(ctx context.Context, accessToken string, refreshToken string) error {
+	// blacklist access token
+	accClaims, err := uc.jwt.VerifyAccessToken(accessToken)
+	if err == nil {
+		accTtl := time.Until(accClaims.ExpiresAt.Time)
+		if accTtl > 0 {
+			err = uc.redisClient.Set(ctx, "blacklist:"+accessToken, "1", accTtl).Err()
+			if err != nil {
+				return fmt.Errorf("failed to blacklist access token: %w", err)
+			}
+		}
+	}
+
+	// blacklist refresh token
+	refClaims, err := uc.jwt.VerifyRefreshToken(refreshToken)
+	if err == nil {
+		refTtl := time.Until(refClaims.ExpiresAt.Time)
+		if refTtl > 0 {
+			err = uc.redisClient.Set(ctx, "blacklist:"+refreshToken, "1", refTtl).Err()
+			if err != nil {
+				return fmt.Errorf("failed to blacklist refresh token: %w", err)
+			}
+		}
+	}
+
+	return nil
 }

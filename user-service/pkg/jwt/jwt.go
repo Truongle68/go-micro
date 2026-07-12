@@ -18,6 +18,7 @@ type TokenType string
 const (
 	AccessToken  TokenType = "access"
 	RefreshToken TokenType = "refresh"
+	ResetToken   TokenType = "reset"
 )
 
 type Claims struct {
@@ -50,6 +51,10 @@ func (j *JWT) GenerateRefreshToken(userID string) (string, error) {
 	return generate(userID, j.refreshSecret, RefreshToken, j.refreshDuration)
 }
 
+func (j *JWT) GenerateResetToken(userID string) (string, error) {
+	return generate(userID, j.accessSecret, ResetToken, 15*time.Minute)
+}
+
 func generate(userID, secret string, tokenType TokenType, expiry time.Duration) (string, error) {
 	now := time.Now()
 	claims := &Claims{
@@ -74,6 +79,10 @@ func (j *JWT) VerifyAccessToken(tokenStr string) (*Claims, error) {
 
 func (j *JWT) VerifyRefreshToken(tokenStr string) (*Claims, error) {
 	return verify(tokenStr, j.refreshSecret, RefreshToken)
+}
+
+func (j *JWT) VerifyResetToken(tokenStr string) (*Claims, error) {
+	return verify(tokenStr, j.accessSecret, ResetToken)
 }
 
 func verify(tokenStr, secret string, expectedType TokenType) (*Claims, error) {
