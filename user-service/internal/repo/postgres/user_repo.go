@@ -65,3 +65,15 @@ func (r *UserRepo) ExistsByEmail(ctx context.Context, email string) (bool, error
 	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)`, email).Scan(&exists)
 	return exists, err
 }
+
+func (r *UserRepo) UpdatePassword(ctx context.Context, id string, passwordHash string) error {
+	query := `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`
+	_, err := r.db.ExecContext(ctx, query, passwordHash, id)
+	return err
+}
+
+func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
+	query := `UPDATE users SET username = $1, email = $2, phone = $3, password_hash = $4, full_name = $5, status = $6, updated_at = $7 WHERE id = $8`
+	_, err := r.db.ExecContext(ctx, query, u.Username, u.Email, u.Phone, u.PasswordHash, u.FullName, u.Status, u.UpdatedAt, u.ID)
+	return err
+}

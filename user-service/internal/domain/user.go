@@ -38,7 +38,7 @@ func NewUser(username, email, phone, plainPassword, fullName string) (*User, err
 		return nil, ErrWeakPassword
 	}
 
-	hash, err := hashPassword(plainPassword)
+	hash, err := HashPassword(plainPassword)
 	if err != nil {
 		return nil, err
 	}

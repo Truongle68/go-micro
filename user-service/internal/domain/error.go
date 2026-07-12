@@ -10,4 +10,5 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrUserBanned         = errors.New("user account is banned")
 	ErrUserInactive       = errors.New("user account is inactive")
+	ErrInvalidToken       = errors.New("invalid or expired token")
 )
