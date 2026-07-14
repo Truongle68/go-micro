@@ -12,67 +12,118 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (r *V1) register(c *gin.Context) {
-	var req req.Register
-	if err := c.ShouldBindJSON(&req); err != nil {
-		r.l.Warn("restapi - v1 - register - ShouldBindJSON: %v", err)
+func (r *V1) requestOTP(c *gin.Context) {
+	var request req.RequestOTP
+	if err := c.ShouldBindJSON(&request); err != nil {
+		r.l.Warn("restapi - v1 - requestOTP - ShouldBindJSON: %v", err)
 		response.Error(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	if err := r.v.Struct(req); err != nil {
-		r.l.Warn("restapi - v1 - register - validate: %v", err)
+	if err := r.v.Struct(request); err != nil {
+		r.l.Warn("restapi - v1 - requestOTP - validate: %v", err)
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	out, err := r.a.Register(c.Request.Context(), usecase.RegisterInput{
-		Username: req.Username,
-		Email:    req.Email,
-		Phone:    req.Phone,
-		Password: req.Password,
-		FullName: req.FullName,
+	err := r.a.RequestOTP(c.Request.Context(), usecase.RequestOTPInput{
+		Phone:   request.Phone,
+		Purpose: request.Purpose,
 	})
 	if err != nil {
-		r.l.Error(err, "restapi - v1 - register - usecase failed")
+		r.l.Error(err, "restapi - v1 - requestOTP - usecase failed")
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "register success", res.AuthResponse{
-		AccessToken:  out.AccessToken,
-		RefreshToken: out.RefreshToken,
-		UserID:       out.UserID,
+	response.Success(c, http.StatusOK, "otp code generated", nil)
+}
+
+func (r *V1) verifyOTP(c *gin.Context) {
+	var request req.VerifyOTP
+	if err := c.ShouldBindJSON(&request); err != nil {
+		r.l.Warn("restapi - v1 - verifyOTP - ShouldBindJSON: %v", err)
+		response.Error(c, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := r.v.Struct(request); err != nil {
+		r.l.Warn("restapi - v1 - verifyOTP - validate: %v", err)
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	token, err := r.a.VerifyOTP(c.Request.Context(), usecase.VerifyOTPInput{
+		Phone:   request.Phone,
+		Code:    request.OTPCode,
+		Purpose: request.Purpose,
 	})
+	if err != nil {
+		r.l.Error(err, "restapi - v1 - verifyOTP - usecase failed")
+		r.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "otp code verified", res.ToVerifyOTPResponse(token))
+}
+
+func (r *V1) completeRegister(c *gin.Context) {
+	var request req.CompleteRegister
+	if err := c.ShouldBindJSON(&request); err != nil {
+		r.l.Warn("restapi - v1 - completeRegister - ShouldBindJSON: %v", err)
+		response.Error(c, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := r.v.Struct(request); err != nil {
+		r.l.Warn("restapi - v1 - completeRegister - validate: %v", err)
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !domain.IsConfirmMatch(request.Password, request.ConfirmedPassword) {
+		response.Error(c, http.StatusBadRequest, domain.ErrNotMatchPassword.Error())
+		return
+	}
+
+	out, err := r.a.CompleteRegister(c.Request.Context(), usecase.RegisterInput{
+		Token:    request.Token,
+		FullName: request.FullName,
+		Username: request.Username,
+		Password: request.Password,
+	})
+	if err != nil {
+		r.l.Error(err, "restapi - v1 - completeRegister - usecase failed")
+		r.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "register success", res.ToAuthResponse(out))
 }
 
 func (r *V1) login(c *gin.Context) {
-	var req req.Login
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var request req.Login
+	if err := c.ShouldBindJSON(&request); err != nil {
 		r.l.Warn("restapi - v1 - login - ShouldBindJSON: %v", err)
 		response.Error(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := r.v.Struct(req); err != nil {
+	if err := r.v.Struct(request); err != nil {
 		r.l.Warn("restapi - v1 - login - validate: %v", err)
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	out, err := r.a.Login(c.Request.Context(), usecase.LoginInput{
-		Email:    req.Email,
-		Password: req.Password,
+		Identifier: request.Identifier,
+		Password:   request.Password,
 	})
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "login success", res.AuthResponse{
-		AccessToken:  out.AccessToken,
-		RefreshToken: out.RefreshToken,
-		UserID:       out.UserID,
-	})
+	response.Success(c, http.StatusOK, "login success", res.ToAuthResponse(out))
 }
 
 func (r *V1) logout(c *gin.Context) {
@@ -94,7 +145,10 @@ func (r *V1) logout(c *gin.Context) {
 		return
 	}
 
-	err := r.a.Logout(c.Request.Context(), accessToken, request.RefreshToken)
+	err := r.a.Logout(c.Request.Context(), usecase.LogoutInput{
+		AccessToken:  accessToken,
+		RefreshToken: request.RefreshToken,
+	})
 	if err != nil {
 		r.handleError(c, err)
 		return
@@ -116,15 +170,13 @@ func (r *V1) forgotPassword(c *gin.Context) {
 		return
 	}
 
-	resetToken, err := r.a.ForgotPassword(c.Request.Context(), request.Email)
+	token, err := r.a.ForgotPassword(c.Request.Context(), request.Email)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "forgot password success", gin.H{
-		"reset_token": resetToken,
-	})
+	response.Success(c, http.StatusOK, "forgot password success", res.ToForgotPasswordResponse(token))
 }
 
 func (r *V1) resetPassword(c *gin.Context) {
@@ -140,7 +192,15 @@ func (r *V1) resetPassword(c *gin.Context) {
 		return
 	}
 
-	err := r.a.ResetPassword(c.Request.Context(), request.Token, request.NewPassword)
+	if !domain.IsConfirmMatch(request.NewPassword, request.ConfirmedPassword) {
+		response.Error(c, http.StatusBadRequest, domain.ErrNotMatchPassword.Error())
+		return
+	}
+
+	err := r.a.ResetPassword(c.Request.Context(), usecase.ResetPasswordInput{
+		Token:       request.Token,
+		NewPassword: request.NewPassword,
+	})
 	if err != nil {
 		r.handleError(c, err)
 		return
@@ -151,13 +211,13 @@ func (r *V1) resetPassword(c *gin.Context) {
 
 func (r *V1) handleError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, domain.ErrEmailAlreadyExists):
+	case errors.Is(err, domain.ErrEmailAlreadyExists), errors.Is(err, domain.ErrPhoneAlreadyExists), errors.Is(err, domain.ErrUsernameExists):
 		response.Error(c, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		response.Error(c, http.StatusUnauthorized, err.Error())
 	case errors.Is(err, domain.ErrUserBanned), errors.Is(err, domain.ErrUserInactive):
 		response.Error(c, http.StatusForbidden, err.Error())
-	case errors.Is(err, domain.ErrWeakPassword), errors.Is(err, domain.ErrEmailRequired), errors.Is(err, domain.ErrInvalidToken), errors.Is(err, domain.ErrUserNotFound):
+	case errors.Is(err, domain.ErrWeakPassword), errors.Is(err, domain.ErrEmailRequired), errors.Is(err, domain.ErrInvalidToken), errors.Is(err, domain.ErrUserNotFound), errors.Is(err, domain.ErrInvalidOTP), errors.Is(err, domain.ErrOTPExpired):
 		response.Error(c, http.StatusBadRequest, err.Error())
 	default:
 		r.l.Error(err, "auth handler unexpected error")

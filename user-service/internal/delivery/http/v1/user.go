@@ -16,21 +16,21 @@ func (r *V1) getProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := r.u.GetProfile(c.Request.Context(), userID)
+	profile, err := r.u.GetProfile(c.Request.Context(), userID)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
 	response.Success(c, http.StatusOK, "get profile success", res.ProfileResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		Email:     user.Email,
-		Phone:     user.Phone,
-		FullName:  user.FullName,
-		Status:    string(user.Status),
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+		ID:        profile.ID,
+		Username:  profile.Username,
+		Email:     profile.Email,
+		Phone:     profile.Phone,
+		FullName:  profile.FullName,
+		Status:    string(profile.Status),
+		CreatedAt: profile.CreatedAt,
+		UpdatedAt: profile.UpdatedAt,
 	})
 }
 
@@ -53,20 +53,11 @@ func (r *V1) updateProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := r.u.UpdateProfile(c.Request.Context(), userID, request.FullName, request.Phone)
+	profile, err := r.u.UpdateProfile(c.Request.Context(), userID, request.FullName, request.Phone)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "update profile success", res.ProfileResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		Email:     user.Email,
-		Phone:     user.Phone,
-		FullName:  user.FullName,
-		Status:    string(user.Status),
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	})
+	response.Success(c, http.StatusOK, "update profile success", res.ToProfileResponse(profile))
 }

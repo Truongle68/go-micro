@@ -13,6 +13,7 @@ import (
 	repo "user-service/internal/repo/postgres"
 	"user-service/internal/usecase"
 	"user-service/pkg/jwt"
+	userredis "user-service/pkg/redis"
 
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
@@ -47,8 +48,13 @@ func main() {
 
 	// init repo + usecase
 	userRepo := repo.NewUserRepo(pg.DB)
-	authUC := usecase.NewAuthUC(userRepo, jwtManager, redisClient.Client)
-	userUC := usecase.NewUserUC(userRepo, redisClient.Client)
+
+	blacklist := userredis.NewTokenBlacklist(redisClient.Client)
+	profile := userredis.NewProfileCache(redisClient.Client)
+	otpCache := userredis.NewOTPCache(redisClient.Client)
+
+	authUC := usecase.NewAuthUC(userRepo, jwtManager, blacklist, profile, otpCache)
+	userUC := usecase.NewUserUC(userRepo, profile)
 
 	// init server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))

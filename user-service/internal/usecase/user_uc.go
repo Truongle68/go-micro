@@ -7,68 +7,127 @@ import (
 	"time"
 	"user-service/internal/domain"
 	"user-service/internal/repo"
-
-	"github.com/redis/go-redis/v9"
+	"user-service/pkg/redis"
 )
 
 type UserUC struct {
-	repo        repo.UserRepository
-	redisClient *redis.Client
+	repo    repo.UserRepository
+	profile redis.ProfileCacher
 }
 
-func NewUserUC(repo repo.UserRepository, redisClient *redis.Client) *UserUC {
+func NewUserUC(repo repo.UserRepository, profile redis.ProfileCacher) *UserUC {
 	return &UserUC{
-		repo:        repo,
-		redisClient: redisClient,
+		repo:    repo,
+		profile: profile,
 	}
 }
 
-var _ UserUsecase = (*UserUC)(nil)
+var _ User = (*UserUC)(nil)
 
-func (uc *UserUC) GetProfile(ctx context.Context, id string) (*domain.User, error) {
-	cacheKey := fmt.Sprintf("user:profile:%s", id)
-
-	// getting from cache
-	val, err := uc.redisClient.Get(ctx, cacheKey).Result()
+func (uc *UserUC) GetProfile(ctx context.Context, id string) (*UserProfileDTO, error) {
+	// get from cache
+	val, err := uc.profile.GetProfile(ctx, id)
 	if err == nil {
-		var user domain.User
-		if err := json.Unmarshal([]byte(val), &user); err == nil {
-			return &user, nil
+		var dto UserProfileDTO
+		if err := json.Unmarshal([]byte(val), &dto); err == nil {
+			return &dto, nil
 		}
 	}
 
-	// fetch from DB
+	// fetch user from DB
 	user, err := uc.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	// fetch profile from DB
+	profile, err := uc.repo.FindProfileByUserID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// fetch credentials to get email & phone
+	creds, err := uc.repo.FindCredentialsByUserID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var email, phone string
+	for _, c := range creds {
+		switch c.Type {
+		case domain.CredentialTypePhone:
+			phone = c.Identifier
+		case domain.CredentialTypeEmail:
+			email = c.Identifier
+		}
+	}
+
+	dto := &UserProfileDTO{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     email,
+		Phone:     phone,
+		FullName:  profile.FullName,
+		Status:    user.Status,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
 
 	// cache in Redis
-	if data, err := json.Marshal(user); err == nil {
-		uc.redisClient.Set(ctx, cacheKey, data, 15*time.Minute)
+	if data, err := json.Marshal(dto); err == nil {
+		uc.profile.CacheProfile(ctx, id, data, 15*time.Minute)
 	}
 
-	return user, nil
+	return dto, nil
 }
 
-func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string, phone string) (*domain.User, error) {
-	user, err := uc.repo.FindByID(ctx, id)
+func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string, phone string) (*UserProfileDTO, error) {
+	// update profile fullname
+	profile, err := uc.repo.FindProfileByUserID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	user.FullName = fullName
-	user.Phone = phone
-	user.UpdatedAt = time.Now()
-
-	err = uc.repo.Update(ctx, user)
+	profile.FullName = fullName
+	profile.UpdatedAt = time.Now()
+	err = uc.repo.UpdateProfile(ctx, profile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update user profile: %w", err)
+		return nil, fmt.Errorf("updating user profile: %w", err)
+	}
+
+	// update primary phone credential
+	creds, err := uc.repo.FindCredentialsByUserID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var phoneCred *domain.UserCredential
+	for _, c := range creds {
+		if c.Type == domain.CredentialTypePhone {
+			phoneCred = c
+			break
+		}
+	}
+
+	if phoneCred != nil {
+		phoneCred.Identifier = phone
+		phoneCred.UpdatedAt = time.Now()
+		err = uc.repo.UpdateCredential(ctx, phoneCred)
+		if err != nil {
+			return nil, fmt.Errorf("updating user phone credential: %w", err)
+		}
+	}
+
+	// update general user info (updated_at)
+	user, err := uc.repo.FindByID(ctx, id)
+	if err == nil {
+		user.UpdatedAt = time.Now()
+		_ = uc.repo.Update(ctx, user)
 	}
 
 	// invalidate cache
-	cacheKey := fmt.Sprintf("user:profile:%s", id)
-	uc.redisClient.Del(ctx, cacheKey)
+	uc.profile.InvalidateProfile(ctx, id)
 
-	return user, nil
+	// return updated profile details
+	return uc.GetProfile(ctx, id)
 }

@@ -2,71 +2,136 @@ package usecase
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
+	"math/big"
 	"time"
 	"user-service/internal/domain"
 	"user-service/internal/repo"
 	"user-service/pkg/jwt"
-
-	"github.com/redis/go-redis/v9"
+	"user-service/pkg/redis"
 )
 
 type AuthUC struct {
-	userRepo    repo.UserRepository
-	jwt         *jwt.JWT
-	redisClient *redis.Client
+	userRepo  repo.UserRepository
+	tokens    jwt.TokenService
+	blacklist redis.BlacklistCacher
+	profile   redis.ProfileInvalidator
+	otp       redis.OTPCacher
 }
 
-func NewAuthUC(repo repo.UserRepository, jwt *jwt.JWT, redisClient *redis.Client) *AuthUC {
+func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, blacklist redis.BlacklistCacher, profile redis.ProfileInvalidator, otp redis.OTPCacher) *AuthUC {
 	return &AuthUC{
-		userRepo:    repo,
-		jwt:         jwt,
-		redisClient: redisClient,
+		userRepo:  repo,
+		tokens:    tokens,
+		blacklist: blacklist,
+		profile:   profile,
+		otp:       otp,
 	}
 }
 
 var _ Auth = (*AuthUC)(nil)
 
-type RegisterInput struct {
-	Username string
-	Email    string
-	Phone    string
-	Password string
-	FullName string
-}
+func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
+	if in.Phone == "" {
+		return domain.ErrEmptyPhone
+	}
 
-type AuthOutput struct {
-	AccessToken  string
-	RefreshToken string
-	UserID       string
-}
-
-func (uc *AuthUC) Register(ctx context.Context, in RegisterInput) (AuthOutput, error) {
-	exists, err := uc.userRepo.ExistsByEmail(ctx, in.Email)
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	if err != nil {
-		return AuthOutput{}, fmt.Errorf("checking existing email: %w", err)
+		return fmt.Errorf("generating random OTP: %w", err)
 	}
-	if exists {
-		return AuthOutput{}, domain.ErrEmailAlreadyExists
+	code := fmt.Sprintf("%06d", n.Int64())
+
+	err = uc.otp.SetOTP(ctx, in.Phone, in.Purpose, code, 1*time.Minute)
+	if err != nil {
+		return fmt.Errorf("caching OTP: %w", err)
 	}
 
-	user, err := domain.NewUser(in.Username, in.Email, in.Phone, in.Password, in.FullName)
+	return nil
+}
+
+func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (string, error) {
+	if in.Phone == "" {
+		return "", domain.ErrEmptyPhone
+	}
+	if in.Code == "" {
+		return "", domain.ErrInvalidOTP
+	}
+
+	cachedCode, err := uc.otp.GetOTP(ctx, in.Phone, in.Purpose)
+	if err != nil {
+		return "", domain.ErrOTPExpired
+	}
+
+	if cachedCode != in.Code {
+		return "", domain.ErrInvalidOTP
+	}
+
+	_ = uc.otp.DeleteOTP(ctx, in.Phone, in.Purpose)
+
+	token, err := uc.tokens.GenerateVerificationToken(in.Phone, in.Purpose)
+	if err != nil {
+		return "", fmt.Errorf("generating verification token: %w", err)
+	}
+
+	return token, nil
+}
+
+func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthOutput, error) {
+	claims, err := uc.tokens.VerifyVerificationToken(in.Token)
+	if err != nil {
+		return AuthOutput{}, domain.ErrInvalidToken
+	}
+
+	if claims.Purpose != string(domain.VerifyPurposeRegister) {
+		return AuthOutput{}, domain.ErrInvalidToken
+	}
+
+	// check if username exists
+	usernameExists, err := uc.userRepo.ExistsByUsername(ctx, in.Username)
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("checking username: %w", err)
+	}
+	if usernameExists {
+		return AuthOutput{}, domain.ErrUsernameExists
+	}
+
+	// check if phone exists
+	phoneExists, err := uc.userRepo.ExistsByIdentifier(ctx, claims.Phone)
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("checking phone: %w", err)
+	}
+	if phoneExists {
+		return AuthOutput{}, domain.ErrPhoneAlreadyExists
+	}
+
+	user, err := domain.NewUser(in.Username)
 	if err != nil {
 		return AuthOutput{}, err
 	}
 
-	if err := uc.userRepo.Save(ctx, user); err != nil {
-		return AuthOutput{}, fmt.Errorf("saving user: %w", err)
+	cred, err := domain.NewUserCredential(user.ID, domain.CredentialTypePhone, claims.Phone, in.Password, true, true)
+	if err != nil {
+		return AuthOutput{}, err
 	}
 
-	accessToken, err := uc.jwt.GenerateAccessToken(user.ID)
+	prof := domain.NewProfile(user.ID, in.FullName)
+
+	err = uc.userRepo.Save(ctx, user, cred, prof)
 	if err != nil {
-		return AuthOutput{}, fmt.Errorf("generate access token: %w", err)
+		return AuthOutput{}, fmt.Errorf("saving new user: %w", err)
 	}
 
-	refreshToken, err := uc.jwt.GenerateRefreshToken(user.ID)
+	accessToken, err := uc.tokens.GenerateAccessToken(user.ID)
 	if err != nil {
-		return AuthOutput{}, fmt.Errorf("generate refresh token: %w", err)
+		return AuthOutput{}, fmt.Errorf("generating access token: %w", err)
+	}
+
+	refreshToken, err := uc.tokens.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("generating refresh token: %w", err)
 	}
 
 	return AuthOutput{
@@ -76,40 +141,58 @@ func (uc *AuthUC) Register(ctx context.Context, in RegisterInput) (AuthOutput, e
 	}, nil
 }
 
-type LoginInput struct {
-	Email    string
-	Password string
-}
-
 func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) {
-	user, err := uc.userRepo.FindByEmail(ctx, in.Email)
+	var cred *domain.UserCredential
+	var err error
+
+	// finding by identifier (e.g. phone or email)
+	cred, err = uc.userRepo.FindCredentialByIdentifier(ctx, in.Identifier)
 	if err != nil {
+		if !errors.Is(err, domain.ErrUserNotFound) {
+			return AuthOutput{}, fmt.Errorf("finding credential: %w", err)
+		}
+		// if not found, check if it matches a username
+		user, uErr := uc.userRepo.FindByUsername(ctx, in.Identifier)
+		if uErr == nil {
+			// find primary credential for this user
+			creds, cErr := uc.userRepo.FindCredentialsByUserID(ctx, user.ID)
+			if cErr == nil {
+				for _, c := range creds {
+					if c.IsPrimary {
+						cred = c
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if cred == nil || !cred.CheckPassword(in.Password) {
 		return AuthOutput{}, domain.ErrInvalidCredentials
 	}
 
-	if !user.CheckPassword(in.Password) {
+	user, err := uc.userRepo.FindByID(ctx, cred.UserID)
+	if err != nil {
 		return AuthOutput{}, domain.ErrInvalidCredentials
 	}
 
 	switch user.Status {
 	case domain.UserStatusBanned:
 		return AuthOutput{}, domain.ErrUserBanned
-	case domain.UserStatusInactive:
-		return AuthOutput{}, domain.ErrUserInactive
-	case domain.UserStatusActive:
-		// OK
+	case domain.UserStatusUnverified, domain.UserStatusVerified:
+		// OK, only making order requires verified user
 	default:
 		return AuthOutput{}, fmt.Errorf("unknown user status: %s", user.Status)
 	}
 
-	accessToken, err := uc.jwt.GenerateAccessToken(user.ID)
+	accessToken, err := uc.tokens.GenerateAccessToken(user.ID)
 	if err != nil {
-		return AuthOutput{}, fmt.Errorf("generate access token: %w", err)
+		return AuthOutput{}, fmt.Errorf("generating access token: %w", err)
 	}
 
-	refreshToken, err := uc.jwt.GenerateRefreshToken(user.ID)
+	refreshToken, err := uc.tokens.GenerateRefreshToken(user.ID)
 	if err != nil {
-		return AuthOutput{}, fmt.Errorf("generate refresh token: %w", err)
+		return AuthOutput{}, fmt.Errorf("generating refresh token: %w", err)
 	}
 
 	return AuthOutput{
@@ -120,67 +203,65 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 }
 
 func (uc *AuthUC) ForgotPassword(ctx context.Context, email string) (string, error) {
-	user, err := uc.userRepo.FindByEmail(ctx, email)
+	cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, email)
 	if err != nil {
-		return "", err
+		return "", domain.ErrUserNotFound
 	}
 
-	resetToken, err := uc.jwt.GenerateResetToken(user.ID)
+	resetToken, err := uc.tokens.GenerateResetToken(cred.UserID)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate reset token: %w", err)
+		return "", fmt.Errorf("generating reset token: %w", err)
 	}
 
 	return resetToken, nil
 }
 
-func (uc *AuthUC) ResetPassword(ctx context.Context, token string, newPassword string) error {
-	claims, err := uc.jwt.VerifyResetToken(token)
+func (uc *AuthUC) ResetPassword(ctx context.Context, in ResetPasswordInput) error {
+	claims, err := uc.tokens.VerifyResetToken(in.Token)
 	if err != nil {
 		return domain.ErrInvalidToken
 	}
 
-	if len(newPassword) < 8 {
-		return domain.ErrWeakPassword
+	if err := domain.ValidatePassword(in.NewPassword); err != nil {
+		return err
 	}
 
-	hash, err := domain.HashPassword(newPassword)
+	hash, err := domain.HashPassword(in.NewPassword)
 	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
+		return fmt.Errorf("hashing password: %w", err)
 	}
 
 	err = uc.userRepo.UpdatePassword(ctx, claims.UserID, hash)
 	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
+		return fmt.Errorf("updating password: %w", err)
 	}
 
-	// invalidate user profile cache on password reset
-	cacheKey := fmt.Sprintf("user:profile:%s", claims.UserID)
-	uc.redisClient.Del(ctx, cacheKey)
+	uc.profile.InvalidateProfile(ctx, claims.UserID)
 
 	return nil
 }
 
-func (uc *AuthUC) Logout(ctx context.Context, accessToken string, refreshToken string) error {
+func (uc *AuthUC) Logout(ctx context.Context, in LogoutInput) error {
 	// blacklist access token
-	accClaims, err := uc.jwt.VerifyAccessToken(accessToken)
+	accClaims, err := uc.tokens.VerifyAccessToken(in.AccessToken)
 	if err == nil {
 		accTtl := time.Until(accClaims.ExpiresAt.Time)
 		if accTtl > 0 {
-			err = uc.redisClient.Set(ctx, "blacklist:"+accessToken, "1", accTtl).Err()
+			err = uc.blacklist.Blacklist(ctx, in.AccessToken, accTtl)
 			if err != nil {
-				return fmt.Errorf("failed to blacklist access token: %w", err)
+				return fmt.Errorf("blacklisting access token: %w", err)
 			}
 		}
 	}
 
 	// blacklist refresh token
-	refClaims, err := uc.jwt.VerifyRefreshToken(refreshToken)
+	refClaims, err := uc.tokens.VerifyRefreshToken(in.RefreshToken)
 	if err == nil {
 		refTtl := time.Until(refClaims.ExpiresAt.Time)
 		if refTtl > 0 {
-			err = uc.redisClient.Set(ctx, "blacklist:"+refreshToken, "1", refTtl).Err()
+			err = uc.blacklist.Blacklist(ctx, in.RefreshToken, refTtl)
 			if err != nil {
-				return fmt.Errorf("failed to blacklist refresh token: %w", err)
+				return fmt.Errorf("blacklisting refresh token: %w", err)
 			}
 		}
 	}

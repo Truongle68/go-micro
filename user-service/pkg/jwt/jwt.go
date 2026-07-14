@@ -16,14 +16,17 @@ var (
 type TokenType string
 
 const (
-	AccessToken  TokenType = "access"
-	RefreshToken TokenType = "refresh"
-	ResetToken   TokenType = "reset"
+	AccessToken    TokenType = "access"
+	RefreshToken   TokenType = "refresh"
+	ResetToken     TokenType = "reset"
+	VerifyOTPToken TokenType = "verify_otp"
 )
 
 type Claims struct {
-	UserID string    `json:"user_id"`
-	Type   TokenType `json:"type"`
+	UserID  string    `json:"user_id,omitempty"`
+	Phone   string    `json:"phone,omitempty"`
+	Type    TokenType `json:"type"`
+	Purpose string    `json:"purpose,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -43,23 +46,31 @@ func New(accSecret, refSecret string, accDuration, refDuration time.Duration) *J
 	}
 }
 
+var _ TokenService = (*JWT)(nil)
+
 func (j *JWT) GenerateAccessToken(userID string) (string, error) {
-	return generate(userID, j.accessSecret, AccessToken, j.accessDuration)
+	return generate(userID, "", "", j.accessSecret, AccessToken, j.accessDuration)
 }
 
 func (j *JWT) GenerateRefreshToken(userID string) (string, error) {
-	return generate(userID, j.refreshSecret, RefreshToken, j.refreshDuration)
+	return generate(userID, "", "", j.refreshSecret, RefreshToken, j.refreshDuration)
 }
 
 func (j *JWT) GenerateResetToken(userID string) (string, error) {
-	return generate(userID, j.accessSecret, ResetToken, 15*time.Minute)
+	return generate(userID, "", "", j.accessSecret, ResetToken, 15*time.Minute)
 }
 
-func generate(userID, secret string, tokenType TokenType, expiry time.Duration) (string, error) {
+func (j *JWT) GenerateVerificationToken(phone, purpose string) (string, error) {
+	return generate("", phone, purpose, j.accessSecret, VerifyOTPToken, 15*time.Minute)
+}
+
+func generate(userID, phone, purpose, secret string, tokenType TokenType, expiry time.Duration) (string, error) {
 	now := time.Now()
 	claims := &Claims{
-		UserID: userID,
-		Type:   tokenType,
+		UserID:  userID,
+		Phone:   phone,
+		Type:    tokenType,
+		Purpose: purpose,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -83,6 +94,10 @@ func (j *JWT) VerifyRefreshToken(tokenStr string) (*Claims, error) {
 
 func (j *JWT) VerifyResetToken(tokenStr string) (*Claims, error) {
 	return verify(tokenStr, j.accessSecret, ResetToken)
+}
+
+func (j *JWT) VerifyVerificationToken(tokenStr string) (*Claims, error) {
+	return verify(tokenStr, j.accessSecret, VerifyOTPToken)
 }
 
 func verify(tokenStr, secret string, expectedType TokenType) (*Claims, error) {

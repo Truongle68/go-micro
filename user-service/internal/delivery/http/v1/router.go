@@ -12,20 +12,20 @@ import (
 
 type V1 struct {
 	a usecase.Auth
-	u usecase.UserUsecase
+	u usecase.User
 	l logger.Interface
 	v *validator.Validate
 }
 
 type Dependencies struct {
 	Auth        usecase.Auth
-	User        usecase.UserUsecase
+	User        usecase.User
 	JWT         *jwt.JWT
 	RedisClient *redis.Client
 	Logger      logger.Interface
 }
 
-func NewDependencies(auth usecase.Auth, user usecase.UserUsecase, jwt *jwt.JWT, redisClient *redis.Client, l logger.Interface) *Dependencies {
+func NewDependencies(auth usecase.Auth, user usecase.User, jwt *jwt.JWT, redisClient *redis.Client, l logger.Interface) *Dependencies {
 	return &Dependencies{
 		Auth:        auth,
 		User:        user,
@@ -45,7 +45,9 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 
 	// public routes
 	auth := apiV1Group.Group("/auth")
-	auth.POST("/register", r.register)
+	auth.POST("/register/request-otp", r.requestOTP)
+	auth.POST("/register/verify-otp", r.verifyOTP)
+	auth.POST("/register/complete", r.completeRegister)
 	auth.POST("/login", r.login)
 	auth.POST("/forgot-password", r.forgotPassword)
 	auth.POST("/reset-password", r.resetPassword)

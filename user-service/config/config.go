@@ -38,7 +38,7 @@ type (
 		AccessSecret  string        `env:"JWT_ACC_SECRET,required"`
 		RefreshSecret string        `env:"JWT_REF_SECRET,required"`
 		AccessExpiry  time.Duration `env:"JWT_ACC_EXPIRY" envDefault:"15m"`
-		RefreshExpiry time.Duration `env:"JWT_REF_EXPIRY" envDefault:"7d"`
+		RefreshExpiry time.Duration `env:"JWT_REF_EXPIRY" envDefault:"168h"`
 	}
 
 	redis struct {

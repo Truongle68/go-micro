@@ -1,0 +1,39 @@
+services:
+  identity-db:
+    container_name: identity-db
+    image: postgres:18-alpine
+    volumes:
+      - identity-data:/var/lib/postgresql
+    environment:
+      - POSTGRES_USER=${IDENTITY_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${IDENTITY_POSTGRES_PW}
+      - POSTGRES_DB=${IDENTITY_POSTGRES_DB}
+    ports:
+      - "5433:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: redis
+    image: redis:8-alpine
+    # command forces redis to log changes to dist instantly (Append-Only File)
+    command: redis-server --appendonly yes --requirepass ${REDIS_PW:-secretredispass}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PW:-secretredispass}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  
+volumes:
+  identity-data:
+  redis-data:
+

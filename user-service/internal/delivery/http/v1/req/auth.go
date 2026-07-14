@@ -5,8 +5,9 @@ type ForgotPassword struct {
 }
 
 type ResetPassword struct {
-	Token       string `json:"token" validate:"required"`
-	NewPassword string `json:"new_password" validate:"required,min=8"`
+	Token             string `json:"token" validate:"required"`
+	NewPassword       string `json:"new_password" validate:"required,min=8"`
+	ConfirmedPassword string `json:"confirmed_password" validate:"required"`
 }
 
 type Logout struct {
