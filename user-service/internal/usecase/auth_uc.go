@@ -10,20 +10,30 @@ import (
 	"user-service/internal/domain"
 	"user-service/internal/repo"
 	"user-service/pkg/jwt"
+	"user-service/pkg/mailer"
+	"user-service/pkg/postgres"
 	"user-service/pkg/redis"
+
+	"github.com/TruongLe68/go-micro/pkg/logger"
 )
 
 type AuthUC struct {
-	userRepo repo.UserRepository
-	tokens   jwt.TokenService
-	cache    redis.IdentityCacher
+	userRepo   repo.UserRepository
+	tokens     jwt.TokenService
+	cache      redis.IdentityCacher
+	transactor postgres.Transactor
+	mailer     mailer.Mailer
+	logger     logger.Interface
 }
 
-func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, cache redis.IdentityCacher) *AuthUC {
+func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, cache redis.IdentityCacher, transactor postgres.Transactor, mailer mailer.Mailer, logger logger.Interface) *AuthUC {
 	return &AuthUC{
-		userRepo: repo,
-		tokens:   tokens,
-		cache:    cache,
+		userRepo:   repo,
+		tokens:     tokens,
+		cache:      cache,
+		transactor: transactor,
+		mailer:     mailer,
+		logger:     logger,
 	}
 }
 
@@ -117,9 +127,16 @@ func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthO
 
 	prof := domain.NewProfile(user.ID, in.FullName)
 
-	err = uc.userRepo.Save(ctx, user, cred, prof)
+	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		err := uc.userRepo.Save(txCtx, user, cred, prof)
+		if err != nil {
+			return fmt.Errorf("saving new user: %w", err)
+		}
+		return nil
+	})
+
 	if err != nil {
-		return AuthOutput{}, fmt.Errorf("saving new user: %w", err)
+		return AuthOutput{}, fmt.Errorf("register user transaction: %w", err)
 	}
 
 	accessToken, err := uc.tokens.GenerateAccessToken(user.ID, string(user.Role))
@@ -218,6 +235,34 @@ func (uc *AuthUC) ForgotPassword(ctx context.Context, email string) (string, err
 	if err != nil {
 		return "", fmt.Errorf("generating reset token: %w", err)
 	}
+
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// protect against panics in the goroutine
+		defer func() {
+			if r := recover(); r != nil {
+				uc.logger.Error("panic occurred in ForgotPassword email sending goroutine: %v", r)
+			}
+		}()
+
+		// define email template later
+		subject := "Reset Your Password"
+		body := fmt.Sprintf(
+			"<p>You requested a password reset. Please use the following token to reset your password:</p>"+
+				"<p><strong>%s</strong></p>"+
+				"<p>Or click this link: <a href=\"http://localhost:3000/reset-password?token=%s\">Reset Password</a></p>",
+			resetToken, resetToken,
+		)
+
+		err := uc.mailer.Send(bgCtx, email, subject, body)
+		if err != nil {
+			uc.logger.Error("failed to send reset password email to %s: %v", email, err)
+		} else {
+			uc.logger.Info("sent reset password email to %s", email)
+		}
+	}()
 
 	return resetToken, nil
 }

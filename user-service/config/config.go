@@ -15,10 +15,19 @@ type (
 		JWT   jwt
 		Redis redis
 		Log   log
+		Email email
 	}
 
 	http struct {
 		Port string `env:"HTTP_PORT" envDefault:"4000"`
+	}
+
+	email struct {
+		SMTPHost     string `env:"SMTP_HOST" envDefault:""`
+		SMTPPort     int    `env:"SMTP_PORT" envDefault:"587"`
+		SMTPUser     string `env:"SMTP_USER" envDefault:""`
+		SMTPPassword string `env:"SMTP_PASSWORD" envDefault:""`
+		SenderEmail  string `env:"SENDER_EMAIL" envDefault:"no-reply@example.com"`
 	}
 
 	grpc struct {

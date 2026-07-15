@@ -13,6 +13,8 @@ import (
 	repo "user-service/internal/repo/postgres"
 	"user-service/internal/usecase"
 	"user-service/pkg/jwt"
+	"user-service/pkg/mailer"
+	userpg "user-service/pkg/postgres"
 	userredis "user-service/pkg/redis"
 
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
@@ -29,12 +31,13 @@ func main() {
 
 	l := logger.New(cfg.Log.Level)
 
-	// init db conn
+	// init db conn, transactor
 	pg, err := postgres.New(cfg.PG.Url)
 	if err != nil {
 		l.Fatal("failed to initialize postgres: %v", err)
 	}
 	defer pg.Close()
+	transactor := userpg.NewPostgresTransactor(pg.DB)
 
 	// init redis conn
 	redisClient, err := redis.New(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
@@ -51,8 +54,11 @@ func main() {
 
 	cache := userredis.NewIdentityCache(redisClient.Client)
 
-	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache)
-	userUC := usecase.NewUserUC(userRepo, cache.ProfileCache)
+	// init mailer
+	emailMailer := mailer.New(cfg.Email.SMTPHost, cfg.Email.SMTPPort, cfg.Email.SMTPUser, cfg.Email.SMTPPassword, cfg.Email.SenderEmail, l)
+
+	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache, transactor, emailMailer, l)
+	userUC := usecase.NewUserUC(userRepo, cache.ProfileCache, transactor)
 
 	// init server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
