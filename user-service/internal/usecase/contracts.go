@@ -67,7 +67,7 @@ type LogoutInput struct {
 
 type Auth interface {
 	RequestOTP(ctx context.Context, in RequestOTPInput) error
-	VerifyOTP(ctx context.Context, in VerifyOTPInput) (string, error)
+	VerifyOTP(ctx context.Context, in VerifyOTPInput) (token string, exists bool, username string, err error)
 	CheckUsernameAvailable(ctx context.Context, username string) (bool, error)
 	CompleteRegister(ctx context.Context, in RegisterInput) (AuthOutput, error)
 	Login(ctx context.Context, in LoginInput) (AuthOutput, error)

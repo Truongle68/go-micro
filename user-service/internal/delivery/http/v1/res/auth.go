@@ -18,11 +18,15 @@ func ToAuthResponse(res usecase.AuthOutput) AuthResponse {
 
 type VerifyOTPResponse struct {
 	VerifyOTPToken string `json:"verify_otp_token"`
+	UserExists     bool   `json:"user_exists"`
+	Username       string `json:"username,omitempty"`
 }
 
-func ToVerifyOTPResponse(token string) VerifyOTPResponse {
+func ToVerifyOTPResponse(token string, exists bool, username string) VerifyOTPResponse {
 	return VerifyOTPResponse{
 		VerifyOTPToken: token,
+		UserExists:     exists,
+		Username:       username,
 	}
 }
 

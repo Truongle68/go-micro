@@ -131,6 +131,17 @@ func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string,
 			}
 		}
 
+		// check if phone already exists for another user if changing
+		if phone != "" && phoneCred != nil && phoneCred.Identifier != phone {
+			exists, err := uc.repo.ExistsByIdentifier(ctx, phone)
+			if err != nil {
+				return fmt.Errorf("checking phone existence: %w", err)
+			}
+			if exists {
+				return domain.ErrPhoneAlreadyExists
+			}
+		}
+
 		if phoneCred != nil {
 			phoneCred.Identifier = phone
 			phoneCred.UpdatedAt = time.Now()

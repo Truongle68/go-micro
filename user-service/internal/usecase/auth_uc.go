@@ -60,31 +60,41 @@ func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
 	return nil
 }
 
-func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (string, error) {
+func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token string, exists bool, username string, err error) {
 	if in.Phone == "" {
-		return "", domain.ErrEmptyPhone
+		return "", false, "", domain.ErrEmptyPhone
 	}
 	if in.Code == "" {
-		return "", domain.ErrInvalidOTP
+		return "", false, "", domain.ErrInvalidOTP
 	}
 
 	cachedCode, err := uc.cache.GetOTP(ctx, in.Phone, in.Purpose)
 	if err != nil {
-		return "", domain.ErrOTPExpired
+		return "", false, "", domain.ErrOTPExpired
 	}
 
 	if cachedCode != in.Code {
-		return "", domain.ErrInvalidOTP
+		return "", false, "", domain.ErrInvalidOTP
 	}
 
 	_ = uc.cache.DeleteOTP(ctx, in.Phone, in.Purpose)
 
-	token, err := uc.tokens.GenerateVerificationToken(in.Phone, in.Purpose)
+	token, err = uc.tokens.GenerateVerificationToken(in.Phone, in.Purpose)
 	if err != nil {
-		return "", fmt.Errorf("generating verification token: %w", err)
+		return "", false, "", fmt.Errorf("generating verification token: %w", err)
 	}
 
-	return token, nil
+	// Check if user exists with this phone number
+	cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, in.Phone)
+	if err == nil && cred != nil {
+		exists = true
+		user, err := uc.userRepo.FindByID(ctx, cred.UserID)
+		if err == nil && user != nil {
+			username = user.Username
+		}
+	}
+
+	return token, exists, username, nil
 }
 
 func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthOutput, error) {

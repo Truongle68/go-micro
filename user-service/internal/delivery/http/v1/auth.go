@@ -54,7 +54,7 @@ func (r *V1) verifyOTP(c *gin.Context) {
 		return
 	}
 
-	token, err := r.a.VerifyOTP(c.Request.Context(), usecase.VerifyOTPInput{
+	token, exists, username, err := r.a.VerifyOTP(c.Request.Context(), usecase.VerifyOTPInput{
 		Phone:   request.Phone,
 		Code:    request.OTPCode,
 		Purpose: request.Purpose,
@@ -65,7 +65,7 @@ func (r *V1) verifyOTP(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, "otp code verified", res.ToVerifyOTPResponse(token))
+	response.Success(c, http.StatusOK, "otp code verified", res.ToVerifyOTPResponse(token, exists, username))
 }
 
 func (r *V1) completeRegister(c *gin.Context) {
