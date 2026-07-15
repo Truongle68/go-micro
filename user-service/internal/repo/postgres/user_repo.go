@@ -182,6 +182,16 @@ func (r *UserRepo) UpdateCredential(ctx context.Context, c *domain.UserCredentia
 	return err
 }
 
+func (r *UserRepo) SaveCredential(ctx context.Context, c *domain.UserCredential) error {
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `INSERT INTO user_credentials (user_id, type, identifier, secret_hash, is_verified, is_primary, created_at, updated_at)
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+	err := executor.QueryRowContext(ctx, query,
+		c.UserID, c.Type, c.Identifier, c.SecretHash, c.IsVerified, c.IsPrimary, c.CreatedAt, c.UpdatedAt,
+	).Scan(&c.ID)
+	return err
+}
+
 func (r *UserRepo) UpdatePassword(ctx context.Context, userID string, passwordHash string) error {
 	executor := postgres.GetExecutor(ctx, r.db)
 	query := `UPDATE user_credentials SET secret_hash = $1, updated_at = NOW()

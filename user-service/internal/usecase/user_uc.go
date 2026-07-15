@@ -85,7 +85,7 @@ func (uc *UserUC) GetProfile(ctx context.Context, id string) (*UserProfileDTO, e
 	return dto, nil
 }
 
-func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string, phone string) (*UserProfileDTO, error) {
+func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string, phone string, email string) (*UserProfileDTO, error) {
 	err := uc.transactor.WithTransaction(ctx, func(ctx context.Context) error {
 
 		// update profile fullname
@@ -101,17 +101,33 @@ func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string,
 			return fmt.Errorf("updating user profile: %w", err)
 		}
 
-		// update primary phone credential
+		// update primary phone credential & email credential
 		creds, err := uc.repo.FindCredentialsByUserID(ctx, id)
 		if err != nil {
 			return err
 		}
 
 		var phoneCred *domain.UserCredential
+		var emailCred *domain.UserCredential
 		for _, c := range creds {
-			if c.Type == domain.CredentialTypePhone {
+			switch c.Type {
+			case domain.CredentialTypePhone:
 				phoneCred = c
-				break
+			case domain.CredentialTypeEmail:
+				emailCred = c
+
+			}
+
+		}
+
+		// check if email already exists for another user if changing or new
+		if email != "" && (emailCred == nil || emailCred.Identifier != email) {
+			exists, err := uc.repo.ExistsByIdentifier(ctx, email)
+			if err != nil {
+				return fmt.Errorf("checking email existence: %w", err)
+			}
+			if exists {
+				return domain.ErrEmailAlreadyExists
 			}
 		}
 
@@ -121,6 +137,35 @@ func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string,
 			err = uc.repo.UpdateCredential(ctx, phoneCred)
 			if err != nil {
 				return fmt.Errorf("updating user phone credential: %w", err)
+			}
+		}
+
+		if emailCred != nil {
+			emailCred.Identifier = email
+			emailCred.UpdatedAt = time.Now()
+			err = uc.repo.UpdateCredential(ctx, emailCred)
+			if err != nil {
+				return fmt.Errorf("updating user email credential: %w", err)
+			}
+		} else if email != "" {
+			var passwordHash string
+			if phoneCred != nil {
+				passwordHash = phoneCred.SecretHash
+			}
+
+			newEmailCred := &domain.UserCredential{
+				UserID:     id,
+				Type:       domain.CredentialTypeEmail,
+				Identifier: email,
+				SecretHash: passwordHash,
+				IsVerified: true,
+				IsPrimary:  false,
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			}
+			err = uc.repo.SaveCredential(ctx, newEmailCred)
+			if err != nil {
+				return fmt.Errorf("saving user email credential: %w", err)
 			}
 		}
 

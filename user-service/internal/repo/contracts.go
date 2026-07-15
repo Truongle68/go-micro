@@ -16,6 +16,7 @@ type UserRepository interface {
 	FindCredentialByIdentifier(ctx context.Context, identifier string) (*domain.UserCredential, error)
 	FindCredentialsByUserID(ctx context.Context, userID string) ([]*domain.UserCredential, error)
 	UpdateCredential(ctx context.Context, cred *domain.UserCredential) error
+	SaveCredential(ctx context.Context, cred *domain.UserCredential) error
 	
 	// Profiles
 	FindProfileByUserID(ctx context.Context, userID string) (*domain.Profile, error)

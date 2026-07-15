@@ -23,7 +23,7 @@ type UpdatedProfileInput struct {
 
 type User interface {
 	GetProfile(ctx context.Context, id string) (*UserProfileDTO, error)
-	UpdateProfile(ctx context.Context, id string, fullName string, phone string) (*UserProfileDTO, error)
+	UpdateProfile(ctx context.Context, id string, fullName string, phone string, email string) (*UserProfileDTO, error)
 }
 
 type RegisterInput struct {

@@ -54,7 +54,7 @@ func (r *V1) updateProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := r.u.UpdateProfile(c.Request.Context(), userID, request.FullName, request.Phone)
+	profile, err := r.u.UpdateProfile(c.Request.Context(), userID, request.FullName, request.Phone, request.Email)
 	if err != nil {
 		r.handleError(c, err)
 		return
