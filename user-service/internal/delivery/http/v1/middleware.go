@@ -4,19 +4,21 @@ import (
 	"net/http"
 	"strings"
 	"user-service/pkg/jwt"
+	"user-service/pkg/redis"
 
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
+	_ "github.com/redis/go-redis/v9"
 )
 
 const (
 	authorizationHeader = "Authorization"
 	userCtx             = "userId"
+	userRoleCtx         = "userRole"
 	tokenCtx            = "token"
 )
 
-func authMiddleware(jwtService *jwt.JWT, redisClient *redis.Client) gin.HandlerFunc {
+func authMiddleware(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(authorizationHeader)
 		if authHeader == "" {
@@ -35,8 +37,14 @@ func authMiddleware(jwtService *jwt.JWT, redisClient *redis.Client) gin.HandlerF
 		tokenStr := headerParts[1]
 
 		// check if token is blacklisted in Redis
-		exists, err := redisClient.Exists(c, "blacklist:"+tokenStr).Result()
-		if err == nil && exists > 0 {
+		inBlacklist, err := bl.IsBlacklisted(c, tokenStr)
+		if err != nil {
+			response.Error(c, http.StatusUnauthorized, err.Error())
+			c.Abort()
+			return
+		}
+
+		if inBlacklist {
 			response.Error(c, http.StatusUnauthorized, "token has been logged out")
 			c.Abort()
 			return
@@ -50,9 +58,19 @@ func authMiddleware(jwtService *jwt.JWT, redisClient *redis.Client) gin.HandlerF
 		}
 
 		c.Set(userCtx, claims.UserID)
+		c.Set(userRoleCtx, claims.Role)
 		c.Set(tokenCtx, tokenStr)
 		c.Next()
 	}
+}
+
+func getRole(c *gin.Context) (string, bool) {
+	role, exists := c.Get(userRoleCtx)
+	if !exists {
+		return "", false
+	}
+	roleStr, ok := role.(string)
+	return roleStr, ok
 }
 
 func (r *V1) getUserId(c *gin.Context) (string, bool) {

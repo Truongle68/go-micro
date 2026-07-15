@@ -28,10 +28,10 @@ func (r *UserRepo) Save(ctx context.Context, u *domain.User, cred *domain.UserCr
 	defer tx.Rollback()
 
 	// 1. Insert into users
-	queryUser := `INSERT INTO users (username, username_updated_at, status, created_at, updated_at)
-	              VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	queryUser := `INSERT INTO users (username, username_updated_at, status, role, created_at, updated_at)
+	              VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 	err = tx.QueryRowContext(ctx, queryUser,
-		u.Username, u.UsernameUpdatedAt, u.Status, u.CreatedAt, u.UpdatedAt,
+		u.Username, u.UsernameUpdatedAt, u.Status, u.Role, u.CreatedAt, u.UpdatedAt,
 	).Scan(&u.ID)
 	if err != nil {
 		return err
@@ -66,10 +66,10 @@ func (r *UserRepo) Save(ctx context.Context, u *domain.User, cred *domain.UserCr
 
 func (r *UserRepo) FindByID(ctx context.Context, id string) (*domain.User, error) {
 	var u domain.User
-	query := `SELECT id, username, username_updated_at, status, created_at, updated_at
+	query := `SELECT id, username, username_updated_at, status, role, created_at, updated_at
 	          FROM users WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&u.ID, &u.Username, &u.UsernameUpdatedAt, &u.Status, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &u.Username, &u.UsernameUpdatedAt, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrUserNotFound
@@ -82,10 +82,10 @@ func (r *UserRepo) FindByID(ctx context.Context, id string) (*domain.User, error
 
 func (r *UserRepo) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
 	var u domain.User
-	query := `SELECT id, username, username_updated_at, status, created_at, updated_at
+	query := `SELECT id, username, username_updated_at, status, role, created_at, updated_at
 	          FROM users WHERE username = $1`
 	err := r.db.QueryRowContext(ctx, query, username).Scan(
-		&u.ID, &u.Username, &u.UsernameUpdatedAt, &u.Status, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &u.Username, &u.UsernameUpdatedAt, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrUserNotFound
@@ -187,8 +187,8 @@ func (r *UserRepo) UpdatePassword(ctx context.Context, userID string, passwordHa
 }
 
 func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
-	query := `UPDATE users SET username = $1, username_updated_at = $2, status = $3, updated_at = $4
-	          WHERE id = $5`
-	_, err := r.db.ExecContext(ctx, query, u.Username, u.UsernameUpdatedAt, u.Status, u.UpdatedAt, u.ID)
+	query := `UPDATE users SET username = $1, username_updated_at = $2, status = $3, role = $4, updated_at = $5
+	          WHERE id = $6`
+	_, err := r.db.ExecContext(ctx, query, u.Username, u.UsernameUpdatedAt, u.Status, u.Role, u.UpdatedAt, u.ID)
 	return err
 }

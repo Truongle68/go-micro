@@ -14,20 +14,16 @@ import (
 )
 
 type AuthUC struct {
-	userRepo  repo.UserRepository
-	tokens    jwt.TokenService
-	blacklist redis.BlacklistCacher
-	profile   redis.ProfileInvalidator
-	otp       redis.OTPCacher
+	userRepo repo.UserRepository
+	tokens   jwt.TokenService
+	cache    redis.IdentityCacher
 }
 
-func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, blacklist redis.BlacklistCacher, profile redis.ProfileInvalidator, otp redis.OTPCacher) *AuthUC {
+func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, cache redis.IdentityCacher) *AuthUC {
 	return &AuthUC{
-		userRepo:  repo,
-		tokens:    tokens,
-		blacklist: blacklist,
-		profile:   profile,
-		otp:       otp,
+		userRepo: repo,
+		tokens:   tokens,
+		cache:    cache,
 	}
 }
 
@@ -44,7 +40,9 @@ func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
 	}
 	code := fmt.Sprintf("%06d", n.Int64())
 
-	err = uc.otp.SetOTP(ctx, in.Phone, in.Purpose, code, 1*time.Minute)
+	fmt.Printf(" [OTP DEBUG] Generated OTP for %s (%s): %s\n", in.Phone, in.Purpose, code)
+
+	err = uc.cache.SetOTP(ctx, in.Phone, in.Purpose, code, 1*time.Minute)
 	if err != nil {
 		return fmt.Errorf("caching OTP: %w", err)
 	}
@@ -60,7 +58,7 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (string, err
 		return "", domain.ErrInvalidOTP
 	}
 
-	cachedCode, err := uc.otp.GetOTP(ctx, in.Phone, in.Purpose)
+	cachedCode, err := uc.cache.GetOTP(ctx, in.Phone, in.Purpose)
 	if err != nil {
 		return "", domain.ErrOTPExpired
 	}
@@ -69,7 +67,7 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (string, err
 		return "", domain.ErrInvalidOTP
 	}
 
-	_ = uc.otp.DeleteOTP(ctx, in.Phone, in.Purpose)
+	_ = uc.cache.DeleteOTP(ctx, in.Phone, in.Purpose)
 
 	token, err := uc.tokens.GenerateVerificationToken(in.Phone, in.Purpose)
 	if err != nil {
@@ -124,7 +122,7 @@ func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthO
 		return AuthOutput{}, fmt.Errorf("saving new user: %w", err)
 	}
 
-	accessToken, err := uc.tokens.GenerateAccessToken(user.ID)
+	accessToken, err := uc.tokens.GenerateAccessToken(user.ID, string(user.Role))
 	if err != nil {
 		return AuthOutput{}, fmt.Errorf("generating access token: %w", err)
 	}
@@ -139,6 +137,14 @@ func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthO
 		RefreshToken: refreshToken,
 		UserID:       user.ID,
 	}, nil
+}
+
+func (uc *AuthUC) CheckUsernameAvailable(ctx context.Context, username string) (bool, error) {
+	exists, err := uc.userRepo.ExistsByUsername(ctx, username)
+	if err != nil {
+		return false, fmt.Errorf("checking username: %w", err)
+	}
+	return !exists, nil
 }
 
 func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) {
@@ -185,7 +191,7 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 		return AuthOutput{}, fmt.Errorf("unknown user status: %s", user.Status)
 	}
 
-	accessToken, err := uc.tokens.GenerateAccessToken(user.ID)
+	accessToken, err := uc.tokens.GenerateAccessToken(user.ID, string(user.Role))
 	if err != nil {
 		return AuthOutput{}, fmt.Errorf("generating access token: %w", err)
 	}
@@ -236,7 +242,7 @@ func (uc *AuthUC) ResetPassword(ctx context.Context, in ResetPasswordInput) erro
 		return fmt.Errorf("updating password: %w", err)
 	}
 
-	uc.profile.InvalidateProfile(ctx, claims.UserID)
+	uc.cache.InvalidateProfile(ctx, claims.UserID)
 
 	return nil
 }
@@ -247,7 +253,7 @@ func (uc *AuthUC) Logout(ctx context.Context, in LogoutInput) error {
 	if err == nil {
 		accTtl := time.Until(accClaims.ExpiresAt.Time)
 		if accTtl > 0 {
-			err = uc.blacklist.Blacklist(ctx, in.AccessToken, accTtl)
+			err = uc.cache.Blacklist(ctx, in.AccessToken, accTtl)
 			if err != nil {
 				return fmt.Errorf("blacklisting access token: %w", err)
 			}
@@ -259,7 +265,7 @@ func (uc *AuthUC) Logout(ctx context.Context, in LogoutInput) error {
 	if err == nil {
 		refTtl := time.Until(refClaims.ExpiresAt.Time)
 		if refTtl > 0 {
-			err = uc.blacklist.Blacklist(ctx, in.RefreshToken, refTtl)
+			err = uc.cache.Blacklist(ctx, in.RefreshToken, refTtl)
 			if err != nil {
 				return fmt.Errorf("blacklisting refresh token: %w", err)
 			}

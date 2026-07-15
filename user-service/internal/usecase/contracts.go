@@ -26,10 +26,10 @@ type User interface {
 }
 
 type RegisterInput struct {
-	Token             string
-	FullName          string
-	Username          string
-	Password          string
+	Token    string
+	FullName string
+	Username string
+	Password string
 }
 
 type AuthOutput struct {
@@ -55,8 +55,8 @@ type VerifyOTPInput struct {
 }
 
 type ResetPasswordInput struct {
-	Token             string
-	NewPassword       string
+	Token       string
+	NewPassword string
 }
 
 type LogoutInput struct {
@@ -67,6 +67,7 @@ type LogoutInput struct {
 type Auth interface {
 	RequestOTP(ctx context.Context, in RequestOTPInput) error
 	VerifyOTP(ctx context.Context, in VerifyOTPInput) (string, error)
+	CheckUsernameAvailable(ctx context.Context, username string) (bool, error)
 	CompleteRegister(ctx context.Context, in RegisterInput) (AuthOutput, error)
 	Login(ctx context.Context, in LoginInput) (AuthOutput, error)
 	ForgotPassword(ctx context.Context, email string) (string, error)

@@ -3,6 +3,7 @@ package v1
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"user-service/internal/delivery/http/v1/req"
 	"user-service/internal/delivery/http/v1/res"
 	"user-service/internal/domain"
@@ -99,6 +100,24 @@ func (r *V1) completeRegister(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "register success", res.ToAuthResponse(out))
+}
+
+func (r *V1) checkAvailableUsername(c *gin.Context) {
+	username := c.Query("username")
+	trimU := strings.TrimSpace(username)
+	if len(trimU) < 3 {
+		response.Error(c, http.StatusBadRequest, "username must have at least 3 characters")
+		return
+	}
+
+	available, err := r.a.CheckUsernameAvailable(c.Request.Context(), username)
+	if err != nil {
+		r.l.Error(err, "restapi - v1 - checkAvailableUsername - usecase failed")
+		r.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "check username success", res.ToCheckUsernameResponse(available))
 }
 
 func (r *V1) login(c *gin.Context) {

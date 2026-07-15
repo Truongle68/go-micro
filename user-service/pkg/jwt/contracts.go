@@ -1,7 +1,7 @@
 package jwt
 
 type TokenService interface {
-	GenerateAccessToken(userID string) (string, error)
+	GenerateAccessToken(userID, role string) (string, error)
 	GenerateRefreshToken(userID string) (string, error)
 	GenerateResetToken(userID string) (string, error)
 	GenerateVerificationToken(phone, purpose string) (string, error)

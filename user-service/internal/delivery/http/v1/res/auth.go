@@ -35,3 +35,14 @@ func ToForgotPasswordResponse(token string) ForgotPasswordResponse {
 		ResetToken: token,
 	}
 }
+
+type CheckUsernameResponse struct {
+	Available bool `json:"available"`
+}
+
+func ToCheckUsernameResponse(available bool) CheckUsernameResponse {
+	return CheckUsernameResponse{
+		Available: available,
+	}
+}
+

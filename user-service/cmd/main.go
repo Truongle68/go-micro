@@ -49,17 +49,15 @@ func main() {
 	// init repo + usecase
 	userRepo := repo.NewUserRepo(pg.DB)
 
-	blacklist := userredis.NewTokenBlacklist(redisClient.Client)
-	profile := userredis.NewProfileCache(redisClient.Client)
-	otpCache := userredis.NewOTPCache(redisClient.Client)
+	cache := userredis.NewIdentityCache(redisClient.Client)
 
-	authUC := usecase.NewAuthUC(userRepo, jwtManager, blacklist, profile, otpCache)
-	userUC := usecase.NewUserUC(userRepo, profile)
+	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache)
+	userUC := usecase.NewUserUC(userRepo, cache.ProfileCache)
 
 	// init server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 
-	v1Deps := v1.NewDependencies(authUC, userUC, jwtManager, redisClient.Client, l)
+	v1Deps := v1.NewDependencies(authUC, userUC, jwtManager, cache.TokenBlacklist, l)
 	http.NewRouter(httpserver.Engine, v1Deps)
 
 	// start server

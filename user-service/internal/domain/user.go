@@ -1,16 +1,7 @@
 package domain
 
 import (
-	"errors"
 	"time"
-)
-
-var (
-	ErrEmptyUsername      = errors.New("username cannot be empty")
-	ErrEmptyEmail         = errors.New("email cannot be empty")
-	ErrEmptyPhone         = errors.New("phone cannot be empty")
-	ErrUsernameExists     = errors.New("username already exists")
-	ErrPhoneAlreadyExists = errors.New("phone number already registered")
 )
 
 type UserStatus string
@@ -37,11 +28,19 @@ const (
 	VerifyPurposeResetPassword VerifyPurpose = "reset_password"
 )
 
+type UserRole string
+
+const (
+	UserRoleAdmin    UserRole = "admin"
+	UserRoleCustomer UserRole = "customer"
+)
+
 type User struct {
 	ID                string     `json:"id"`
 	Username          string     `json:"username"`
 	UsernameUpdatedAt time.Time  `json:"username_updated_at"`
 	Status            UserStatus `json:"status"`
+	Role              UserRole   `json:"role"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
@@ -77,18 +76,25 @@ func (c *UserCredential) CheckPassword(pass string) bool {
 	return checkPassword(pass, c.SecretHash)
 }
 
-func NewUser(username string) (*User, error) {
+func NewUser(username string, opts ...UserOption) (*User, error) {
 	if username == "" {
 		return nil, ErrEmptyUsername
 	}
 	now := time.Now()
-	return &User{
+	u := &User{
 		Username:          username,
 		UsernameUpdatedAt: now,
 		Status:            UserStatusVerified,
+		Role:              UserRoleCustomer,
 		CreatedAt:         now,
 		UpdatedAt:         now,
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(u)
+	}
+
+	return u, nil
 }
 
 func NewUserCredential(userID string, credType CredentialType, identifier, plainPassword string, isVerified, isPrimary bool) (*UserCredential, error) {

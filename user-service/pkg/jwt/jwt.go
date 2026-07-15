@@ -24,6 +24,7 @@ const (
 
 type Claims struct {
 	UserID  string    `json:"user_id,omitempty"`
+	Role    string    `json:"role,omitempty"`
 	Phone   string    `json:"phone,omitempty"`
 	Type    TokenType `json:"type"`
 	Purpose string    `json:"purpose,omitempty"`
@@ -48,26 +49,27 @@ func New(accSecret, refSecret string, accDuration, refDuration time.Duration) *J
 
 var _ TokenService = (*JWT)(nil)
 
-func (j *JWT) GenerateAccessToken(userID string) (string, error) {
-	return generate(userID, "", "", j.accessSecret, AccessToken, j.accessDuration)
+func (j *JWT) GenerateAccessToken(userID, role string) (string, error) {
+	return generate(userID, role, "", "", j.accessSecret, AccessToken, j.accessDuration)
 }
 
 func (j *JWT) GenerateRefreshToken(userID string) (string, error) {
-	return generate(userID, "", "", j.refreshSecret, RefreshToken, j.refreshDuration)
+	return generate(userID, "", "", "", j.refreshSecret, RefreshToken, j.refreshDuration)
 }
 
 func (j *JWT) GenerateResetToken(userID string) (string, error) {
-	return generate(userID, "", "", j.accessSecret, ResetToken, 15*time.Minute)
+	return generate(userID, "", "", "", j.accessSecret, ResetToken, 15*time.Minute)
 }
 
 func (j *JWT) GenerateVerificationToken(phone, purpose string) (string, error) {
-	return generate("", phone, purpose, j.accessSecret, VerifyOTPToken, 15*time.Minute)
+	return generate("", "", phone, purpose, j.accessSecret, VerifyOTPToken, 15*time.Minute)
 }
 
-func generate(userID, phone, purpose, secret string, tokenType TokenType, expiry time.Duration) (string, error) {
+func generate(userID, role, phone, purpose, secret string, tokenType TokenType, expiry time.Duration) (string, error) {
 	now := time.Now()
 	claims := &Claims{
 		UserID:  userID,
+		Role:    role,
 		Phone:   phone,
 		Type:    tokenType,
 		Purpose: purpose,
@@ -118,8 +120,8 @@ func verify(tokenStr, secret string, expectedType TokenType) (*Claims, error) {
 	}
 
 	if claims.Type != expectedType {
-		return nil, fmt.Errorf("jwt - verify - expected %q token, got %q: %w", expectedType, claims.Type, err)
+		return nil, fmt.Errorf("jwt - verify - expected %q token, got %q", expectedType, claims.Type)
 	}
 
-	return claims, err
+	return claims, nil
 }
