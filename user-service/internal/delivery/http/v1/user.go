@@ -28,6 +28,7 @@ func (r *V1) getProfile(c *gin.Context) {
 		Email:     profile.Email,
 		Phone:     profile.Phone,
 		FullName:  profile.FullName,
+		Role:      profile.Role,
 		Status:    string(profile.Status),
 		CreatedAt: profile.CreatedAt,
 		UpdatedAt: profile.UpdatedAt,

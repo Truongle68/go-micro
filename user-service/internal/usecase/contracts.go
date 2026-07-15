@@ -12,6 +12,7 @@ type UserProfileDTO struct {
 	Email     string            `json:"email"`
 	Phone     string            `json:"phone"`
 	FullName  string            `json:"full_name"`
+	Role      string            `json:"role"`
 	Status    domain.UserStatus `json:"status"`
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`

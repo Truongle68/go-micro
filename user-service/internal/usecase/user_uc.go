@@ -71,6 +71,7 @@ func (uc *UserUC) GetProfile(ctx context.Context, id string) (*UserProfileDTO, e
 		Email:     email,
 		Phone:     phone,
 		FullName:  profile.FullName,
+		Role:      string(user.Role),
 		Status:    user.Status,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,

@@ -11,6 +11,7 @@ type ProfileResponse struct {
 	Email     string    `json:"email"`
 	Phone     string    `json:"phone"`
 	FullName  string    `json:"full_name"`
+	Role      string    `json:"role"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -23,6 +24,7 @@ func ToProfileResponse(res *usecase.UserProfileDTO) ProfileResponse {
 		Email:     res.Email,
 		Phone:     res.Phone,
 		FullName:  res.FullName,
+		Role:      res.Role,
 		Status:    string(res.Status),
 		CreatedAt: res.CreatedAt,
 		UpdatedAt: res.UpdatedAt,
