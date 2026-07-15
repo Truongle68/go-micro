@@ -7,18 +7,21 @@ import (
 	"time"
 	"user-service/internal/domain"
 	"user-service/internal/repo"
+	"user-service/pkg/postgres"
 	"user-service/pkg/redis"
 )
 
 type UserUC struct {
-	repo    repo.UserRepository
-	profile redis.ProfileCacher
+	repo       repo.UserRepository
+	profile    redis.ProfileCacher
+	transactor postgres.Transactor
 }
 
-func NewUserUC(repo repo.UserRepository, profile redis.ProfileCacher) *UserUC {
+func NewUserUC(repo repo.UserRepository, profile redis.ProfileCacher, transactor postgres.Transactor) *UserUC {
 	return &UserUC{
-		repo:    repo,
-		profile: profile,
+		repo:       repo,
+		profile:    profile,
+		transactor: transactor,
 	}
 }
 
@@ -82,47 +85,55 @@ func (uc *UserUC) GetProfile(ctx context.Context, id string) (*UserProfileDTO, e
 }
 
 func (uc *UserUC) UpdateProfile(ctx context.Context, id string, fullName string, phone string) (*UserProfileDTO, error) {
-	// update profile fullname
-	profile, err := uc.repo.FindProfileByUserID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
+	err := uc.transactor.WithTransaction(ctx, func(ctx context.Context) error {
 
-	profile.FullName = fullName
-	profile.UpdatedAt = time.Now()
-	err = uc.repo.UpdateProfile(ctx, profile)
-	if err != nil {
-		return nil, fmt.Errorf("updating user profile: %w", err)
-	}
-
-	// update primary phone credential
-	creds, err := uc.repo.FindCredentialsByUserID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	var phoneCred *domain.UserCredential
-	for _, c := range creds {
-		if c.Type == domain.CredentialTypePhone {
-			phoneCred = c
-			break
-		}
-	}
-
-	if phoneCred != nil {
-		phoneCred.Identifier = phone
-		phoneCred.UpdatedAt = time.Now()
-		err = uc.repo.UpdateCredential(ctx, phoneCred)
+		// update profile fullname
+		profile, err := uc.repo.FindProfileByUserID(ctx, id)
 		if err != nil {
-			return nil, fmt.Errorf("updating user phone credential: %w", err)
+			return err
 		}
-	}
 
-	// update general user info (updated_at)
-	user, err := uc.repo.FindByID(ctx, id)
-	if err == nil {
-		user.UpdatedAt = time.Now()
-		_ = uc.repo.Update(ctx, user)
+		profile.FullName = fullName
+		profile.UpdatedAt = time.Now()
+		err = uc.repo.UpdateProfile(ctx, profile)
+		if err != nil {
+			return fmt.Errorf("updating user profile: %w", err)
+		}
+
+		// update primary phone credential
+		creds, err := uc.repo.FindCredentialsByUserID(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		var phoneCred *domain.UserCredential
+		for _, c := range creds {
+			if c.Type == domain.CredentialTypePhone {
+				phoneCred = c
+				break
+			}
+		}
+
+		if phoneCred != nil {
+			phoneCred.Identifier = phone
+			phoneCred.UpdatedAt = time.Now()
+			err = uc.repo.UpdateCredential(ctx, phoneCred)
+			if err != nil {
+				return fmt.Errorf("updating user phone credential: %w", err)
+			}
+		}
+
+		// update general user info (updated_at)
+		user, err := uc.repo.FindByID(ctx, id)
+		if err == nil {
+			user.UpdatedAt = time.Now()
+			_ = uc.repo.Update(ctx, user)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	// invalidate cache
