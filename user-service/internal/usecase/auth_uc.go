@@ -2,17 +2,16 @@ package usecase
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
+	"slices"
 	"time"
 	"user-service/internal/domain"
 	"user-service/internal/repo"
 	"user-service/pkg/jwt"
-	"user-service/pkg/mailer"
 	"user-service/pkg/postgres"
 	"user-service/pkg/redis"
+	"user-service/worker"
 
 	"github.com/TruongLe68/go-micro/pkg/logger"
 )
@@ -22,17 +21,17 @@ type AuthUC struct {
 	tokens     jwt.TokenService
 	cache      redis.IdentityCacher
 	transactor postgres.Transactor
-	mailer     mailer.Mailer
+	email      worker.EmailDispatcher
 	logger     logger.Interface
 }
 
-func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, cache redis.IdentityCacher, transactor postgres.Transactor, mailer mailer.Mailer, logger logger.Interface) *AuthUC {
+func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, cache redis.IdentityCacher, transactor postgres.Transactor, email worker.EmailDispatcher, logger logger.Interface) *AuthUC {
 	return &AuthUC{
 		userRepo:   repo,
 		tokens:     tokens,
 		cache:      cache,
 		transactor: transactor,
-		mailer:     mailer,
+		email:      email,
 		logger:     logger,
 	}
 }
@@ -44,13 +43,12 @@ func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
 		return domain.ErrEmptyPhone
 	}
 
-	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	code, err := redis.GenOTPCode()
 	if err != nil {
-		return fmt.Errorf("generating random OTP: %w", err)
+		return err
 	}
-	code := fmt.Sprintf("%06d", n.Int64())
 
-	fmt.Printf(" [OTP DEBUG] Generated OTP for %s (%s): %s\n", in.Phone, in.Purpose, code)
+	uc.logger.Info(" [OTP DEBUG] Generated OTP for %s (%s): %s\n", in.Phone, in.Purpose, code)
 
 	err = uc.cache.SetOTP(ctx, in.Phone, in.Purpose, code, 1*time.Minute)
 	if err != nil {
@@ -130,7 +128,7 @@ func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthO
 		return AuthOutput{}, err
 	}
 
-	cred, err := domain.NewUserCredential(user.ID, domain.CredentialTypePhone, claims.Phone, in.Password, true, true)
+	cred, err := domain.NewCredential(user.ID, domain.CredentialTypePhone, claims.Phone, in.Password, true, true)
 	if err != nil {
 		return AuthOutput{}, err
 	}
@@ -149,7 +147,7 @@ func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthO
 		return AuthOutput{}, fmt.Errorf("register user transaction: %w", err)
 	}
 
-	accessToken, err := uc.tokens.GenerateAccessToken(user.ID, string(user.Role))
+	accessToken, err := uc.tokens.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
 		return AuthOutput{}, fmt.Errorf("generating access token: %w", err)
 	}
@@ -209,6 +207,12 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 		return AuthOutput{}, domain.ErrInvalidCredentials
 	}
 
+	if len(in.RequiredRoles) > 0 {
+		if isAuthorized := slices.Contains(in.RequiredRoles, user.Role); !isAuthorized {
+			return AuthOutput{}, domain.ErrUnauthorizedUser
+		}
+	}
+
 	switch user.Status {
 	case domain.UserStatusBanned:
 		return AuthOutput{}, domain.ErrUserBanned
@@ -218,7 +222,7 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 		return AuthOutput{}, fmt.Errorf("unknown user status: %s", user.Status)
 	}
 
-	accessToken, err := uc.tokens.GenerateAccessToken(user.ID, string(user.Role))
+	accessToken, err := uc.tokens.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
 		return AuthOutput{}, fmt.Errorf("generating access token: %w", err)
 	}
@@ -246,33 +250,16 @@ func (uc *AuthUC) ForgotPassword(ctx context.Context, email string) (string, err
 		return "", fmt.Errorf("generating reset token: %w", err)
 	}
 
-	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+	resetLink := fmt.Sprintf("http://localhost:3000/reset-password?token=%s", resetToken)
 
-		// protect against panics in the goroutine
-		defer func() {
-			if r := recover(); r != nil {
-				uc.logger.Error("panic occurred in ForgotPassword email sending goroutine: %v", r)
-			}
-		}()
-
-		// define email template later
-		subject := "Reset Your Password"
-		body := fmt.Sprintf(
-			"<p>You requested a password reset. Please use the following token to reset your password:</p>"+
-				"<p><strong>%s</strong></p>"+
-				"<p>Or click this link: <a href=\"http://localhost:3000/reset-password?token=%s\">Reset Password</a></p>",
-			resetToken, resetToken,
-		)
-
-		err := uc.mailer.Send(bgCtx, email, subject, body)
-		if err != nil {
-			uc.logger.Error("failed to send reset password email to %s: %v", email, err)
-		} else {
-			uc.logger.Info("sent reset password email to %s", email)
-		}
-	}()
+	uc.email.Dispatch(worker.EmailJob{
+		Template: "forgot_password",
+		Subject:  "Reset Your Password",
+		To:       email,
+		Data: struct{ ResetLink string }{
+			ResetLink: resetLink,
+		},
+	})
 
 	return resetToken, nil
 }
@@ -328,4 +315,26 @@ func (uc *AuthUC) Logout(ctx context.Context, in LogoutInput) error {
 	}
 
 	return nil
+}
+
+func (uc *AuthUC) GetRoleByIdentifier(ctx context.Context, identifier string) (domain.UserRole, error) {
+	u, err := uc.getUserByIdentifier(ctx, identifier)
+	if err != nil {
+		return "", err
+	}
+	return u.Role, nil
+}
+
+func (uc *AuthUC) getUserByIdentifier(ctx context.Context, identifier string) (*domain.User, error) {
+	u, err := uc.userRepo.FindByIdentifier(ctx, identifier)
+	if err != nil {
+		if !errors.Is(err, domain.ErrUserNotFound) {
+			return nil, fmt.Errorf("finding by identifier: %w", err)
+		}
+		u, err = uc.userRepo.FindByUsername(ctx, identifier)
+		if err != nil {
+			return nil, fmt.Errorf("finding by username: %w", err)
+		}
+	}
+	return u, nil
 }

@@ -49,4 +49,3 @@ func ToCheckUsernameResponse(available bool) CheckUsernameResponse {
 		Available: available,
 	}
 }
-

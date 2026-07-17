@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"user-service/internal/domain"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -16,10 +17,12 @@ var (
 type TokenType string
 
 const (
-	AccessToken    TokenType = "access"
-	RefreshToken   TokenType = "refresh"
-	ResetToken     TokenType = "reset"
-	VerifyOTPToken TokenType = "verify_otp"
+	AccessToken      TokenType = "access"
+	RefreshToken     TokenType = "refresh"
+	ResetToken       TokenType = "reset"
+	VerifyOTPToken   TokenType = "verify_otp"
+	ChangeEmailToken TokenType = "change_email"
+	ChangePhoneToken TokenType = "change_phone"
 )
 
 type Claims struct {
@@ -49,30 +52,38 @@ func New(accSecret, refSecret string, accDuration, refDuration time.Duration) *J
 
 var _ TokenService = (*JWT)(nil)
 
-func (j *JWT) GenerateAccessToken(userID, role string) (string, error) {
-	return generate(userID, role, "", "", j.accessSecret, AccessToken, j.accessDuration)
+func (j *JWT) GenerateAccessToken(userID string, role domain.UserRole) (string, error) {
+	return generate(userID, "", j.accessSecret, "", role, AccessToken, j.accessDuration)
 }
 
 func (j *JWT) GenerateRefreshToken(userID string) (string, error) {
-	return generate(userID, "", "", "", j.refreshSecret, RefreshToken, j.refreshDuration)
+	return generate(userID, "", j.refreshSecret, "", "", RefreshToken, j.refreshDuration)
 }
 
 func (j *JWT) GenerateResetToken(userID string) (string, error) {
-	return generate(userID, "", "", "", j.accessSecret, ResetToken, 15*time.Minute)
+	return generate(userID, "", j.accessSecret, "", "", ResetToken, 15*time.Minute)
 }
 
-func (j *JWT) GenerateVerificationToken(phone, purpose string) (string, error) {
-	return generate("", "", phone, purpose, j.accessSecret, VerifyOTPToken, 15*time.Minute)
+func (j *JWT) GenerateVerificationToken(phone string, purpose domain.VerifyPurpose) (string, error) {
+	return generate("", phone, j.accessSecret, purpose, "", VerifyOTPToken, 15*time.Minute)
 }
 
-func generate(userID, role, phone, purpose, secret string, tokenType TokenType, expiry time.Duration) (string, error) {
+func (j *JWT) GenerateChangeEmailToken(userID string) (string, error) {
+	return generate(userID, "", j.accessSecret, "", "", ChangeEmailToken, 15*time.Minute)
+}
+
+func (j *JWT) GenerateChangePhoneToken(userID string) (string, error) {
+	return generate(userID, "", j.accessSecret, "", "", ChangePhoneToken, 15*time.Minute)
+}
+
+func generate(userID, phone, secret string, purpose domain.VerifyPurpose, role domain.UserRole, tokenType TokenType, expiry time.Duration) (string, error) {
 	now := time.Now()
 	claims := &Claims{
 		UserID:  userID,
-		Role:    role,
+		Role:    string(role),
 		Phone:   phone,
 		Type:    tokenType,
-		Purpose: purpose,
+		Purpose: string(purpose),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -100,6 +111,14 @@ func (j *JWT) VerifyResetToken(tokenStr string) (*Claims, error) {
 
 func (j *JWT) VerifyVerificationToken(tokenStr string) (*Claims, error) {
 	return verify(tokenStr, j.accessSecret, VerifyOTPToken)
+}
+
+func (j *JWT) VerifyChangeEmailToken(tokenStr string) (*Claims, error) {
+	return verify(tokenStr, j.accessSecret, ChangeEmailToken)
+}
+
+func (j *JWT) VerifyChangePhoneToken(tokenStr string) (*Claims, error) {
+	return verify(tokenStr, j.accessSecret, ChangePhoneToken)
 }
 
 func verify(tokenStr, secret string, expectedType TokenType) (*Claims, error) {
