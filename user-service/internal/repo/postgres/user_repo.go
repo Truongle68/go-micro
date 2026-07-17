@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"user-service/internal/domain"
 	"user-service/internal/repo"
 	"user-service/pkg/postgres"
@@ -52,7 +53,7 @@ func (r *UserRepo) Save(ctx context.Context, u *domain.User, cred *domain.UserCr
 	queryProfile := `INSERT INTO profiles (user_id, full_name, avatar_url, gender, dob, updated_at)
 	                 VALUES ($1, $2, $3, $4, $5, $6)`
 	_, err = executor.ExecContext(ctx, queryProfile,
-		profile.UserID, profile.FullName, profile.AvatarURL, profile.Gender, profile.DOB, profile.UpdatedAt,
+		profile.UserID, profile.FullName, profile.AvatarURL, string(profile.Gender), profile.DOB, profile.UpdatedAt,
 	)
 
 	return err
@@ -81,6 +82,26 @@ func (r *UserRepo) FindByUsername(ctx context.Context, username string) (*domain
 	query := `SELECT id, username, username_updated_at, status, role, created_at, updated_at
 	          FROM users WHERE username = $1`
 	err := executor.QueryRowContext(ctx, query, username).Scan(
+		&u.ID, &u.Username, &u.UsernameUpdatedAt, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, domain.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) FindByIdentifier(ctx context.Context, identifier string) (*domain.User, error) {
+	var u domain.User
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `SELECT u.id, u.username, u.username_updated_at, u.status, u.role, u.created_at, u.updated_at
+			FROM users u
+			LEFT JOIN user_credentials uc 
+			ON u.id = uc.user_id 
+			WHERE uc.identifier = $1`
+	err := executor.QueryRowContext(ctx, query, identifier).Scan(
 		&u.ID, &u.Username, &u.UsernameUpdatedAt, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -151,18 +172,27 @@ func (r *UserRepo) FindCredentialsByUserID(ctx context.Context, userID string) (
 
 func (r *UserRepo) FindProfileByUserID(ctx context.Context, userID string) (*domain.Profile, error) {
 	var p domain.Profile
+	var genderStr string
 	executor := postgres.GetExecutor(ctx, r.db)
 	query := `SELECT user_id, full_name, avatar_url, gender, dob, updated_at
 	          FROM profiles WHERE user_id = $1`
 	err := executor.QueryRowContext(ctx, query, userID).Scan(
-		&p.UserID, &p.FullName, &p.AvatarURL, &p.Gender, &p.DOB, &p.UpdatedAt,
+		&p.UserID, &p.FullName, &p.AvatarURL, &genderStr, &p.DOB, &p.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrUserNotFound
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
+	gender := domain.Gender(genderStr)
+	if !gender.IsValid() {
+		return nil, fmt.Errorf("invalid gender value from database: %s", genderStr)
+	}
+	p.Gender = gender
+
 	return &p, nil
 }
 
@@ -170,7 +200,7 @@ func (r *UserRepo) UpdateProfile(ctx context.Context, p *domain.Profile) error {
 	executor := postgres.GetExecutor(ctx, r.db)
 	query := `UPDATE profiles SET full_name = $1, avatar_url = $2, gender = $3, dob = $4, updated_at = $5
 	          WHERE user_id = $6`
-	_, err := executor.ExecContext(ctx, query, p.FullName, p.AvatarURL, p.Gender, p.DOB, p.UpdatedAt, p.UserID)
+	_, err := executor.ExecContext(ctx, query, p.FullName, p.AvatarURL, string(p.Gender), p.DOB, p.UpdatedAt, p.UserID)
 	return err
 }
 

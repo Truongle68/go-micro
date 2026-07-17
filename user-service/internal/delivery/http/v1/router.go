@@ -45,11 +45,12 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 
 	// public routes
 	auth := apiV1Group.Group("/auth")
-	auth.POST("/register/request-otp", r.requestOTP)
-	auth.POST("/register/verify-otp", r.verifyOTP)
+	auth.POST("/register/request-otp", r.requestRegisterOTP)
+	auth.POST("/register/verify-otp", r.verifyRegisterOTP)
 	auth.POST("/register/complete", r.completeRegister)
 	auth.GET("/check-username", r.checkAvailableUsername)
 	auth.POST("/login", r.login)
+	auth.POST("/portal/login", r.portalLogin)
 	auth.POST("/forgot-password", r.forgotPassword)
 	auth.POST("/reset-password", r.resetPassword)
 
@@ -62,4 +63,11 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	users := protected.Group("/users")
 	users.GET("/profile", r.getProfile)
 	users.PUT("/profile", r.updateProfile)
+	users.POST("/profile/change-email/request", r.requestChangeEmail)
+	users.POST("/profile/change-email/verify", r.verifyChangeEmail)
+	users.POST("/profile/change-email/complete", r.completeChangeEmail)
+	users.POST("/profile/change-phone/request", r.requestChangePhone)
+
+	// public route for completing change phone
+	apiV1Group.POST("/users/profile/change-phone/complete", r.completeChangePhone)
 }

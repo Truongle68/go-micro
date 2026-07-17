@@ -11,6 +11,8 @@ type ProfileResponse struct {
 	Email     string    `json:"email"`
 	Phone     string    `json:"phone"`
 	FullName  string    `json:"full_name"`
+	Gender    string    `json:"gender"`
+	DOB       string    `json:"dob"`
 	Role      string    `json:"role"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
@@ -24,9 +26,15 @@ func ToProfileResponse(res *usecase.UserProfileDTO) ProfileResponse {
 		Email:     res.Email,
 		Phone:     res.Phone,
 		FullName:  res.FullName,
-		Role:      res.Role,
+		Gender:    string(res.Gender),
+		DOB:       res.DOB,
+		Role:      string(res.Role),
 		Status:    string(res.Status),
 		CreatedAt: res.CreatedAt,
 		UpdatedAt: res.UpdatedAt,
 	}
+}
+
+type VerifyChangePhoneResponse struct {
+	Token string `json:"token"`
 }

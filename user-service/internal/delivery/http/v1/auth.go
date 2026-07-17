@@ -1,19 +1,17 @@
 package v1
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 	"user-service/internal/delivery/http/v1/req"
 	"user-service/internal/delivery/http/v1/res"
 	"user-service/internal/domain"
-	"user-service/internal/usecase"
 
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
-func (r *V1) requestOTP(c *gin.Context) {
+func (r *V1) requestOTP(c *gin.Context, purpose domain.VerifyPurpose) {
 	var request req.RequestOTP
 	if err := c.ShouldBindJSON(&request); err != nil {
 		r.l.Warn("restapi - v1 - requestOTP - ShouldBindJSON: %v", err)
@@ -27,10 +25,7 @@ func (r *V1) requestOTP(c *gin.Context) {
 		return
 	}
 
-	err := r.a.RequestOTP(c.Request.Context(), usecase.RequestOTPInput{
-		Phone:   request.Phone,
-		Purpose: request.Purpose,
-	})
+	err := r.a.RequestOTP(c.Request.Context(), request.ToRequestOTPInput(purpose))
 	if err != nil {
 		r.l.Error(err, "restapi - v1 - requestOTP - usecase failed")
 		r.handleError(c, err)
@@ -40,7 +35,11 @@ func (r *V1) requestOTP(c *gin.Context) {
 	response.Success(c, http.StatusOK, "otp code generated", nil)
 }
 
-func (r *V1) verifyOTP(c *gin.Context) {
+func (r *V1) requestRegisterOTP(c *gin.Context) {
+	r.requestOTP(c, domain.VerifyPurposeRegister)
+}
+
+func (r *V1) verifyOTP(c *gin.Context, purpose domain.VerifyPurpose) {
 	var request req.VerifyOTP
 	if err := c.ShouldBindJSON(&request); err != nil {
 		r.l.Warn("restapi - v1 - verifyOTP - ShouldBindJSON: %v", err)
@@ -54,11 +53,7 @@ func (r *V1) verifyOTP(c *gin.Context) {
 		return
 	}
 
-	token, exists, username, err := r.a.VerifyOTP(c.Request.Context(), usecase.VerifyOTPInput{
-		Phone:   request.Phone,
-		Code:    request.OTPCode,
-		Purpose: request.Purpose,
-	})
+	token, exists, username, err := r.a.VerifyOTP(c.Request.Context(), request.ToVerifyOTPInput(purpose))
 	if err != nil {
 		r.l.Error(err, "restapi - v1 - verifyOTP - usecase failed")
 		r.handleError(c, err)
@@ -66,6 +61,10 @@ func (r *V1) verifyOTP(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "otp code verified", res.ToVerifyOTPResponse(token, exists, username))
+}
+
+func (r *V1) verifyRegisterOTP(c *gin.Context) {
+	r.verifyOTP(c, domain.VerifyPurposeRegister)
 }
 
 func (r *V1) completeRegister(c *gin.Context) {
@@ -87,12 +86,7 @@ func (r *V1) completeRegister(c *gin.Context) {
 		return
 	}
 
-	out, err := r.a.CompleteRegister(c.Request.Context(), usecase.RegisterInput{
-		Token:    request.Token,
-		FullName: request.FullName,
-		Username: request.Username,
-		Password: request.Password,
-	})
+	out, err := r.a.CompleteRegister(c.Request.Context(), request.ToRegisterInput())
 	if err != nil {
 		r.l.Error(err, "restapi - v1 - completeRegister - usecase failed")
 		r.handleError(c, err)
@@ -121,22 +115,27 @@ func (r *V1) checkAvailableUsername(c *gin.Context) {
 }
 
 func (r *V1) login(c *gin.Context) {
+	r.executeLoginFlow(c, "customer", []domain.UserRole{domain.UserRoleUser})
+}
+
+func (r *V1) portalLogin(c *gin.Context) {
+	r.executeLoginFlow(c, "portal", domain.PortalRole)
+}
+
+func (r *V1) executeLoginFlow(c *gin.Context, contextTag string, requiredRoles []domain.UserRole) {
 	var request req.Login
 	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - login - ShouldBindJSON: %v", err)
+		r.l.Warn("restapi - v1 - %s - ShouldBindJSON: %v", contextTag, err)
 		response.Error(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - login - validate: %v", err)
+		r.l.Warn("restapi - v1 - %s - validate: %v", contextTag, err)
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	out, err := r.a.Login(c.Request.Context(), usecase.LoginInput{
-		Identifier: request.Identifier,
-		Password:   request.Password,
-	})
+	out, err := r.a.Login(c.Request.Context(), request.ToLoginInput(requiredRoles))
 	if err != nil {
 		r.handleError(c, err)
 		return
@@ -164,10 +163,7 @@ func (r *V1) logout(c *gin.Context) {
 		return
 	}
 
-	err := r.a.Logout(c.Request.Context(), usecase.LogoutInput{
-		AccessToken:  accessToken,
-		RefreshToken: request.RefreshToken,
-	})
+	err := r.a.Logout(c.Request.Context(), request.ToLogoutInput(accessToken))
 	if err != nil {
 		r.handleError(c, err)
 		return
@@ -216,30 +212,11 @@ func (r *V1) resetPassword(c *gin.Context) {
 		return
 	}
 
-	err := r.a.ResetPassword(c.Request.Context(), usecase.ResetPasswordInput{
-		Token:       request.Token,
-		NewPassword: request.NewPassword,
-	})
+	err := r.a.ResetPassword(c.Request.Context(), request.ToResetPasswordInput())
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
 	response.Success(c, http.StatusOK, "reset password success", nil)
-}
-
-func (r *V1) handleError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, domain.ErrEmailAlreadyExists), errors.Is(err, domain.ErrPhoneAlreadyExists), errors.Is(err, domain.ErrUsernameExists):
-		response.Error(c, http.StatusConflict, err.Error())
-	case errors.Is(err, domain.ErrInvalidCredentials):
-		response.Error(c, http.StatusUnauthorized, err.Error())
-	case errors.Is(err, domain.ErrUserBanned), errors.Is(err, domain.ErrUserInactive):
-		response.Error(c, http.StatusForbidden, err.Error())
-	case errors.Is(err, domain.ErrWeakPassword), errors.Is(err, domain.ErrEmailRequired), errors.Is(err, domain.ErrInvalidToken), errors.Is(err, domain.ErrUserNotFound), errors.Is(err, domain.ErrInvalidOTP), errors.Is(err, domain.ErrOTPExpired):
-		response.Error(c, http.StatusBadRequest, err.Error())
-	default:
-		r.l.Error(err, "auth handler unexpected error")
-		response.Error(c, http.StatusInternalServerError, "internal server error")
-	}
 }

@@ -12,18 +12,45 @@ type UserProfileDTO struct {
 	Email     string            `json:"email"`
 	Phone     string            `json:"phone"`
 	FullName  string            `json:"full_name"`
-	Role      string            `json:"role"`
+	Gender    domain.Gender     `json:"gender"`
+	DOB       string            `json:"dob"`
+	Role      domain.UserRole   `json:"role"`
 	Status    domain.UserStatus `json:"status"`
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 type UpdatedProfileInput struct {
+	UserID   string
+	FullName *string
+	Gender   *domain.Gender
+	Dob      *string
+}
+
+type VerifyChangeEmailInput struct {
+	UserID string
+	Code   string
+}
+
+type CompleteChangeEmailInput struct {
+	UserID   string
+	Token    string
+	NewEmail string
+}
+
+type CompleteChangePhoneInput struct {
+	Token    string
+	NewPhone string
 }
 
 type User interface {
 	GetProfile(ctx context.Context, id string) (*UserProfileDTO, error)
-	UpdateProfile(ctx context.Context, id string, fullName string, phone string, email string) (*UserProfileDTO, error)
+	UpdateProfile(ctx context.Context, in UpdatedProfileInput) (*UserProfileDTO, error)
+	RequestChangeEmailOTP(ctx context.Context, userID string) error
+	VerifyChangeEmailOTP(ctx context.Context, in VerifyChangeEmailInput) (token string, err error)
+	CompleteChangeEmail(ctx context.Context, in CompleteChangeEmailInput) error
+	RequestChangePhoneLink(ctx context.Context, userID string) error
+	CompleteChangePhone(ctx context.Context, in CompleteChangePhoneInput) error
 }
 
 type RegisterInput struct {
@@ -40,19 +67,20 @@ type AuthOutput struct {
 }
 
 type LoginInput struct {
-	Identifier string // can be email, phone or username
-	Password   string
+	Identifier    string // can be email, phone or username
+	Password      string
+	RequiredRoles []domain.UserRole
 }
 
 type RequestOTPInput struct {
 	Phone   string
-	Purpose string
+	Purpose domain.VerifyPurpose
 }
 
 type VerifyOTPInput struct {
 	Phone   string
 	Code    string
-	Purpose string
+	Purpose domain.VerifyPurpose
 }
 
 type ResetPasswordInput struct {

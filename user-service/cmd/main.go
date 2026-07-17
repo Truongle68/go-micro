@@ -16,6 +16,7 @@ import (
 	"user-service/pkg/mailer"
 	userpg "user-service/pkg/postgres"
 	userredis "user-service/pkg/redis"
+	"user-service/worker"
 
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
@@ -49,16 +50,17 @@ func main() {
 	// init jwt
 	jwtManager := jwt.New(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessExpiry, cfg.JWT.RefreshExpiry)
 
-	// init repo + usecase
+	// init repo, usecase
 	userRepo := repo.NewUserRepo(pg.DB)
 
 	cache := userredis.NewIdentityCache(redisClient.Client)
 
-	// init mailer
+	// init mailer, worker
 	emailMailer := mailer.New(cfg.Email.SMTPHost, cfg.Email.SMTPPort, cfg.Email.SMTPUser, cfg.Email.SMTPPassword, cfg.Email.SenderEmail, l)
+	emailWorker := worker.NewEmailWorker(emailMailer, l)
 
-	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache, transactor, emailMailer, l)
-	userUC := usecase.NewUserUC(userRepo, cache.ProfileCache, transactor)
+	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache, transactor, emailWorker, l)
+	userUC := usecase.NewUserUC(userRepo, jwtManager, cache, transactor, emailWorker, l)
 
 	// init server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))

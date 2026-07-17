@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"time"
+	"user-service/internal/domain"
 )
 
 type IdentityCacher interface {
@@ -35,7 +36,7 @@ type ProfileCacher interface {
 }
 
 type OTPCacher interface {
-	SetOTP(ctx context.Context, phone, purpose string, code string, ttl time.Duration) error
-	GetOTP(ctx context.Context, phone, purpose string) (string, error)
-	DeleteOTP(ctx context.Context, phone, purpose string) error
+	SetOTP(ctx context.Context, phone string, purpose domain.VerifyPurpose, code string, ttl time.Duration) error
+	GetOTP(ctx context.Context, phone string, purpose domain.VerifyPurpose) (string, error)
+	DeleteOTP(ctx context.Context, phone string, purpose domain.VerifyPurpose) error
 }
