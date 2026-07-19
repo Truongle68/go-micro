@@ -237,3 +237,107 @@ func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
 	_, err := executor.ExecContext(ctx, query, u.Username, u.UsernameUpdatedAt, u.Status, u.Role, u.UpdatedAt, u.ID)
 	return err
 }
+
+func (r *UserRepo) SaveAddress(ctx context.Context, a *domain.Address) error {
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `INSERT INTO addresses (user_id, label, address_line, ward, district, city, lat, lng, is_default, created_at, updated_at)
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`
+	err := executor.QueryRowContext(ctx, query,
+		a.UserID, string(a.Label), a.AddressLine, a.Ward, a.District, a.City, a.Lat, a.Lng, a.IsDefault, a.CreatedAt, a.UpdatedAt,
+	).Scan(&a.ID)
+	return err
+}
+
+func (r *UserRepo) FindAddressByID(ctx context.Context, id string) (*domain.Address, error) {
+	var a domain.Address
+	var labelStr string
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `SELECT id, user_id, label, address_line, ward, district, city, lat, lng, is_default, created_at, updated_at
+	          FROM addresses WHERE id = $1`
+	err := executor.QueryRowContext(ctx, query, id).Scan(
+		&a.ID, &a.UserID, &labelStr, &a.AddressLine, &a.Ward, &a.District, &a.City, &a.Lat, &a.Lng, &a.IsDefault, &a.CreatedAt, &a.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, domain.ErrAddressNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	a.Label = domain.AddressLabel(labelStr)
+	return &a, nil
+}
+
+func (r *UserRepo) FindAddressesByUserID(ctx context.Context, userID string) ([]*domain.Address, error) {
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `SELECT id, user_id, label, address_line, ward, district, city, lat, lng, is_default, created_at, updated_at
+	          FROM addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC`
+	rows, err := executor.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var addresses []*domain.Address
+	for rows.Next() {
+		var a domain.Address
+		var labelStr string
+		err := rows.Scan(
+			&a.ID, &a.UserID, &labelStr, &a.AddressLine, &a.Ward, &a.District, &a.City, &a.Lat, &a.Lng, &a.IsDefault, &a.CreatedAt, &a.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		a.Label = domain.AddressLabel(labelStr)
+		addresses = append(addresses, &a)
+	}
+	return addresses, nil
+}
+
+func (r *UserRepo) UpdateAddress(ctx context.Context, a *domain.Address) error {
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `UPDATE addresses SET label = $1, address_line = $2, ward = $3, district = $4, city = $5, lat = $6, lng = $7, is_default = $8, updated_at = $9
+	          WHERE id = $10`
+	_, err := executor.ExecContext(ctx, query, string(a.Label), a.AddressLine, a.Ward, a.District, a.City, a.Lat, a.Lng, a.IsDefault, a.UpdatedAt, a.ID)
+	return err
+}
+
+func (r *UserRepo) SetDefaultAddress(ctx context.Context, userID string, addressID string) error {
+	executor := postgres.GetExecutor(ctx, r.db)
+	// unset all default addresses for this user
+	queryUnset := `UPDATE addresses SET is_default = false WHERE user_id = $1`
+	_, err := executor.ExecContext(ctx, queryUnset, userID)
+	if err != nil {
+		return err
+	}
+	// set the target address as default
+	querySet := `UPDATE addresses SET is_default = true WHERE id = $1 AND user_id = $2`
+	res, err := executor.ExecContext(ctx, querySet, addressID, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrAddressNotFound
+	}
+	return nil
+}
+
+func (r *UserRepo) DeleteAddress(ctx context.Context, userID string, addressID string) error {
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `DELETE FROM addresses WHERE id = $1 AND user_id = $2`
+	res, err := executor.ExecContext(ctx, query, addressID, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrAddressNotFound
+	}
+	return nil
+}

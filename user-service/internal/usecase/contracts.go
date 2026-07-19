@@ -43,6 +43,44 @@ type CompleteChangePhoneInput struct {
 	NewPhone string
 }
 
+type AddressDTO struct {
+	ID          string              `json:"id"`
+	UserID      string              `json:"user_id"`
+	Label       domain.AddressLabel `json:"label"`
+	AddressLine string              `json:"address_line"`
+	Ward        string              `json:"ward"`
+	District    string              `json:"district"`
+	City        string              `json:"city"`
+	Lat         float64             `json:"lat"`
+	Lng         float64             `json:"lng"`
+	IsDefault   bool                `json:"is_default"`
+	CreatedAt   time.Time           `json:"created_at"`
+	UpdatedAt   time.Time           `json:"updated_at"`
+}
+
+type CreateAddressInput struct {
+	UserID      string
+	Label       domain.AddressLabel
+	AddressLine string
+	Ward        string
+	District    string
+	City        string
+	Lat         float64
+	Lng         float64
+}
+
+type UpdateAddressInput struct {
+	ID          string
+	UserID      string
+	Label       *domain.AddressLabel
+	AddressLine *string
+	Ward        *string
+	District    *string
+	City        *string
+	Lat         *float64
+	Lng         *float64
+}
+
 type User interface {
 	GetProfile(ctx context.Context, id string) (*UserProfileDTO, error)
 	UpdateProfile(ctx context.Context, in UpdatedProfileInput) (*UserProfileDTO, error)
@@ -51,6 +89,17 @@ type User interface {
 	CompleteChangeEmail(ctx context.Context, in CompleteChangeEmailInput) error
 	RequestChangePhoneLink(ctx context.Context, userID string) error
 	CompleteChangePhone(ctx context.Context, in CompleteChangePhoneInput) error
+	GetAddressList(ctx context.Context, userID string) ([]*AddressDTO, error)
+	CreateAddress(ctx context.Context, in CreateAddressInput) (*AddressDTO, error)
+	UpdateAddress(ctx context.Context, in UpdateAddressInput) (*AddressDTO, error)
+	SetDefaultAddress(ctx context.Context, userID string, addressID string) error
+	DeleteAddress(ctx context.Context, userID string, addressID string) error
+}
+
+type InitOTPInput struct {
+	Identifier string
+	Channel    domain.OTPChannel
+	Purpose    domain.VerifyPurpose
 }
 
 type RegisterInput struct {

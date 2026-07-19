@@ -61,13 +61,22 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	protected.POST("/auth/logout", r.logout)
 
 	users := protected.Group("/users")
-	users.GET("/profile", r.getProfile)
-	users.PUT("/profile", r.updateProfile)
-	users.POST("/profile/change-email/request", r.requestChangeEmail)
-	users.POST("/profile/change-email/verify", r.verifyChangeEmail)
-	users.POST("/profile/change-email/complete", r.completeChangeEmail)
-	users.POST("/profile/change-phone/request", r.requestChangePhone)
+	// profile
+	users.GET("/get-profile", r.getProfile)
+	users.POST("/update-profile", r.updateProfile)
+	users.POST("/request-change-email", r.requestChangeEmail)
+	users.POST("/verify-change-email", r.verifyChangeEmail)
+	users.POST("/complete-change-email", r.completeChangeEmail)
+	users.POST("/request-change-phone", r.requestChangePhone)
+
+	// address
+	address := users.Group("/address")
+	address.GET("/get-address-list", r.getAddressList)
+	address.POST("/create-address", r.addAddress)
+	address.POST("/set-default-address", r.setDefaultAddress)
+	address.POST("/update-address", r.updateAddress)
+	address.POST("/delete-address", r.deleteAddress)
 
 	// public route for completing change phone
-	apiV1Group.POST("/users/profile/change-phone/complete", r.completeChangePhone)
+	apiV1Group.POST("/users/complete-change-phone", r.completeChangePhone)
 }

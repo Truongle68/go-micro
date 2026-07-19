@@ -22,6 +22,7 @@ type UserUC struct {
 	tokens     jwt.TokenService
 	email      worker.EmailDispatcher
 	logger     logger.Interface
+	baseURL    string
 }
 
 func NewUserUC(
@@ -31,6 +32,7 @@ func NewUserUC(
 	transactor postgres.Transactor,
 	email worker.EmailDispatcher,
 	logger logger.Interface,
+	baseURL string,
 ) *UserUC {
 	return &UserUC{
 		repo:       repo,
@@ -39,6 +41,7 @@ func NewUserUC(
 		tokens:     tokens,
 		email:      email,
 		logger:     logger,
+		baseURL:    baseURL,
 	}
 }
 
@@ -316,7 +319,7 @@ func (uc *UserUC) RequestChangePhoneLink(ctx context.Context, userID string) err
 		return fmt.Errorf("generating change phone token: %w", err)
 	}
 
-	resetLink := fmt.Sprintf("http://localhost:3000/profile/change-phone?token=%s", token)
+	resetLink := fmt.Sprintf("%s/profile/change-phone?token=%s", uc.baseURL, token)
 
 	uc.email.Dispatch(worker.EmailJob{
 		Template: "change_phone",
@@ -408,4 +411,177 @@ func (uc *UserUC) CompleteChangePhone(ctx context.Context, in CompleteChangePhon
 	// invalidate cache
 	uc.cache.InvalidateProfile(ctx, userID)
 	return nil
+}
+
+func (uc *UserUC) GetAddressList(ctx context.Context, userID string) ([]*AddressDTO, error) {
+	_, err := uc.repo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	addresses, err := uc.repo.FindAddressesByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	dtos := make([]*AddressDTO, len(addresses))
+	for i, a := range addresses {
+		dtos[i] = &AddressDTO{
+			ID:          a.ID,
+			UserID:      a.UserID,
+			Label:       a.Label,
+			AddressLine: a.AddressLine,
+			Ward:        a.Ward,
+			District:    a.District,
+			City:        a.City,
+			Lat:         a.Lat,
+			Lng:         a.Lng,
+			IsDefault:   a.IsDefault,
+			CreatedAt:   a.CreatedAt,
+			UpdatedAt:   a.UpdatedAt,
+		}
+	}
+	return dtos, nil
+}
+
+func (uc *UserUC) CreateAddress(ctx context.Context, in CreateAddressInput) (*AddressDTO, error) {
+	_, err := uc.repo.FindByID(ctx, in.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := uc.repo.FindAddressesByUserID(ctx, in.UserID)
+	if err != nil {
+		return nil, err
+	}
+	isFirst := len(existing) == 0
+
+	opts := []domain.AddressOption{
+		domain.Coordinates(in.Lat, in.Lng),
+	}
+	if in.Ward != "" {
+		opts = append(opts, func(a *domain.Address) { a.Ward = in.Ward })
+	}
+	if in.District != "" {
+		opts = append(opts, func(a *domain.Address) { a.District = in.District })
+	}
+
+	address, err := domain.NewAddress(in.UserID, in.AddressLine, in.City, in.Label, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if isFirst {
+		address.IsDefault = true
+	}
+
+	err = uc.repo.SaveAddress(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AddressDTO{
+		ID:          address.ID,
+		UserID:      address.UserID,
+		Label:       address.Label,
+		AddressLine: address.AddressLine,
+		Ward:        address.Ward,
+		District:    address.District,
+		City:        address.City,
+		Lat:         address.Lat,
+		Lng:         address.Lng,
+		IsDefault:   address.IsDefault,
+		CreatedAt:   address.CreatedAt,
+		UpdatedAt:   address.UpdatedAt,
+	}, nil
+}
+
+func (uc *UserUC) UpdateAddress(ctx context.Context, in UpdateAddressInput) (*AddressDTO, error) {
+	address, err := uc.repo.FindAddressByID(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if address.UserID != in.UserID {
+		return nil, domain.ErrUnauthorizedUser
+	}
+
+	params := domain.UpdateAddressParams{
+		Label:       in.Label,
+		AddressLine: in.AddressLine,
+		Ward:        in.Ward,
+		District:    in.District,
+		City:        in.City,
+		Lat:         in.Lat,
+		Lng:         in.Lng,
+	}
+
+	if err := address.ApplyUpdate(params); err != nil {
+		return nil, err
+	}
+
+	err = uc.repo.UpdateAddress(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AddressDTO{
+		ID:          address.ID,
+		UserID:      address.UserID,
+		Label:       address.Label,
+		AddressLine: address.AddressLine,
+		Ward:        address.Ward,
+		District:    address.District,
+		City:        address.City,
+		Lat:         address.Lat,
+		Lng:         address.Lng,
+		IsDefault:   address.IsDefault,
+		CreatedAt:   address.CreatedAt,
+		UpdatedAt:   address.UpdatedAt,
+	}, nil
+}
+
+func (uc *UserUC) SetDefaultAddress(ctx context.Context, userID string, addressID string) error {
+	address, err := uc.repo.FindAddressByID(ctx, addressID)
+	if err != nil {
+		return err
+	}
+	if address.UserID != userID {
+		return domain.ErrUnauthorizedUser
+	}
+
+	return uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		return uc.repo.SetDefaultAddress(txCtx, userID, addressID)
+	})
+}
+
+func (uc *UserUC) DeleteAddress(ctx context.Context, userID string, addressID string) error {
+	address, err := uc.repo.FindAddressByID(ctx, addressID)
+	if err != nil {
+		return err
+	}
+	if address.UserID != userID {
+		return domain.ErrUnauthorizedUser
+	}
+
+	return uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		err := uc.repo.DeleteAddress(txCtx, userID, addressID)
+		if err != nil {
+			return err
+		}
+
+		if address.IsDefault {
+			remaining, err := uc.repo.FindAddressesByUserID(txCtx, userID)
+			if err != nil {
+				return err
+			}
+			if len(remaining) > 0 {
+				err = uc.repo.SetDefaultAddress(txCtx, userID, remaining[0].ID)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
 }

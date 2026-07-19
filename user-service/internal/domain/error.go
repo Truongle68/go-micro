@@ -30,4 +30,5 @@ var (
 	ErrInvalidGender      = errors.New("invalid gender")
 	ErrInvalidDob         = errors.New("invalid date of birth")
 	ErrNoFieldsToUpdate   = errors.New("at least 1 field is required to update")
+	ErrAddressNotFound    = errors.New("address not found")
 )

@@ -26,4 +26,12 @@ type UserRepository interface {
 	// Updates
 	UpdatePassword(ctx context.Context, userID string, passwordHash string) error
 	Update(ctx context.Context, user *domain.User) error
+
+	// Addresses
+	SaveAddress(ctx context.Context, address *domain.Address) error
+	FindAddressByID(ctx context.Context, id string) (*domain.Address, error)
+	FindAddressesByUserID(ctx context.Context, userID string) ([]*domain.Address, error)
+	UpdateAddress(ctx context.Context, address *domain.Address) error
+	SetDefaultAddress(ctx context.Context, userID string, addressID string) error
+	DeleteAddress(ctx context.Context, userID string, addressID string) error
 }

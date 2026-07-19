@@ -55,3 +55,64 @@ func (req *CompleteChangePhone) ToCompleteChangePhoneInput() usecase.CompleteCha
 		NewPhone: req.NewPhone,
 	}
 }
+
+type CreateAddress struct {
+	Label       string  `json:"label" validate:"required,oneof=home work"`
+	AddressLine string  `json:"address_line" validate:"required"`
+	Ward        string  `json:"ward"`
+	District    string  `json:"district"`
+	City        string  `json:"city" validate:"required"`
+	Lat         float64 `json:"lat"`
+	Lng         float64 `json:"lng"`
+}
+
+func (req *CreateAddress) ToCreateAddressInput(userID string) usecase.CreateAddressInput {
+	return usecase.CreateAddressInput{
+		UserID:      userID,
+		Label:       domain.AddressLabel(req.Label),
+		AddressLine: req.AddressLine,
+		Ward:        req.Ward,
+		District:    req.District,
+		City:        req.City,
+		Lat:         req.Lat,
+		Lng:         req.Lng,
+	}
+}
+
+type UpdateAddress struct {
+	ID          string   `json:"id" validate:"required"`
+	Label       *string  `json:"label" validate:"omitempty,oneof=home work"`
+	AddressLine *string  `json:"address_line"`
+	Ward        *string  `json:"ward"`
+	District    *string  `json:"district"`
+	City        *string  `json:"city"`
+	Lat         *float64 `json:"lat"`
+	Lng         *float64 `json:"lng"`
+}
+
+func (req *UpdateAddress) ToUpdateAddressInput(userID string) usecase.UpdateAddressInput {
+	var label *domain.AddressLabel
+	if req.Label != nil {
+		l := domain.AddressLabel(*req.Label)
+		label = &l
+	}
+	return usecase.UpdateAddressInput{
+		ID:          req.ID,
+		UserID:      userID,
+		Label:       label,
+		AddressLine: req.AddressLine,
+		Ward:        req.Ward,
+		District:    req.District,
+		City:        req.City,
+		Lat:         req.Lat,
+		Lng:         req.Lng,
+	}
+}
+
+type SetDefaultAddress struct {
+	ID string `json:"id" validate:"required"`
+}
+
+type DeleteAddress struct {
+	ID string `json:"id" validate:"required"`
+}

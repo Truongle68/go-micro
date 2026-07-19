@@ -19,7 +19,8 @@ type (
 	}
 
 	http struct {
-		Port string `env:"HTTP_PORT" envDefault:"4000"`
+		Port    string `env:"HTTP_PORT" envDefault:"4000"`
+		BaseURL string `env:"BASE_URL" envDefault:"http://localhost:3000"`
 	}
 
 	email struct {

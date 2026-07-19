@@ -17,7 +17,7 @@ type ResetPassword struct {
 
 func (req *ResetPassword) ToResetPasswordInput() usecase.ResetPasswordInput {
 	return usecase.ResetPasswordInput{
-		Token: req.Token,
+		Token:       req.Token,
 		NewPassword: req.NewPassword,
 	}
 }
@@ -27,7 +27,10 @@ type Logout struct {
 }
 
 func (req *Logout) ToLogoutInput(accessToken string) usecase.LogoutInput {
-	return usecase.LogoutInput{}
+	return usecase.LogoutInput{
+		AccessToken:  accessToken,
+		RefreshToken: req.RefreshToken,
+	}
 }
 
 type RequestOTP struct {

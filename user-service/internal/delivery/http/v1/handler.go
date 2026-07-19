@@ -41,7 +41,8 @@ func (r *V1) handleError(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrInvalidDob),
 		errors.Is(err, domain.ErrNoFieldsToUpdate):
 		response.Error(c, http.StatusBadRequest, err.Error())
-	case errors.Is(err, domain.ErrUserNotFound):
+	case errors.Is(err, domain.ErrUserNotFound),
+		errors.Is(err, domain.ErrAddressNotFound):
 		response.Error(c, http.StatusNotFound, err.Error())
 	default:
 		r.l.Error(err, "auth handler unexpected error")

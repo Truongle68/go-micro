@@ -14,6 +14,7 @@ import (
 	"user-service/internal/usecase"
 	"user-service/pkg/jwt"
 	"user-service/pkg/mailer"
+	"user-service/pkg/sms"
 	userpg "user-service/pkg/postgres"
 	userredis "user-service/pkg/redis"
 	"user-service/worker"
@@ -58,9 +59,12 @@ func main() {
 	// init mailer, worker
 	emailMailer := mailer.New(cfg.Email.SMTPHost, cfg.Email.SMTPPort, cfg.Email.SMTPUser, cfg.Email.SMTPPassword, cfg.Email.SenderEmail, l)
 	emailWorker := worker.NewEmailWorker(emailMailer, l)
+	smsClient := sms.NewMockSMS(l)
+	smsWorker := worker.NewSMSWorker(smsClient, l)
+	otpDispatcher := worker.NewCompositeOTPDispatcher(emailWorker, smsWorker)
 
-	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache, transactor, emailWorker, l)
-	userUC := usecase.NewUserUC(userRepo, jwtManager, cache, transactor, emailWorker, l)
+	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache, transactor, emailWorker, otpDispatcher, l, cfg.HTTP.BaseURL)
+	userUC := usecase.NewUserUC(userRepo, jwtManager, cache, transactor, emailWorker, l, cfg.HTTP.BaseURL)
 
 	// init server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))

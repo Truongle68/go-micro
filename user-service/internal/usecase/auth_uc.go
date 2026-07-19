@@ -17,22 +17,35 @@ import (
 )
 
 type AuthUC struct {
-	userRepo   repo.UserRepository
-	tokens     jwt.TokenService
-	cache      redis.IdentityCacher
-	transactor postgres.Transactor
-	email      worker.EmailDispatcher
-	logger     logger.Interface
+	userRepo      repo.UserRepository
+	tokens        jwt.TokenService
+	cache         redis.IdentityCacher
+	transactor    postgres.Transactor
+	email         worker.EmailDispatcher
+	otpDispatcher worker.OTPDispatcher
+	logger        logger.Interface
+	baseURL       string
 }
 
-func NewAuthUC(repo repo.UserRepository, tokens jwt.TokenService, cache redis.IdentityCacher, transactor postgres.Transactor, email worker.EmailDispatcher, logger logger.Interface) *AuthUC {
+func NewAuthUC(
+	repo repo.UserRepository,
+	tokens jwt.TokenService,
+	cache redis.IdentityCacher,
+	transactor postgres.Transactor,
+	email worker.EmailDispatcher,
+	otpDispatcher worker.OTPDispatcher,
+	logger logger.Interface,
+	baseURL string,
+) *AuthUC {
 	return &AuthUC{
-		userRepo:   repo,
-		tokens:     tokens,
-		cache:      cache,
-		transactor: transactor,
-		email:      email,
-		logger:     logger,
+		userRepo:      repo,
+		tokens:        tokens,
+		cache:         cache,
+		transactor:    transactor,
+		email:         email,
+		otpDispatcher: otpDispatcher,
+		logger:        logger,
+		baseURL:       baseURL,
 	}
 }
 
@@ -48,12 +61,14 @@ func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
 		return err
 	}
 
-	uc.logger.Info(" [OTP DEBUG] Generated OTP for %s (%s): %s\n", in.Phone, in.Purpose, code)
-
 	err = uc.cache.SetOTP(ctx, in.Phone, in.Purpose, code, 1*time.Minute)
 	if err != nil {
 		return fmt.Errorf("caching OTP: %w", err)
 	}
+
+	uc.logger.Info(" [OTP DEBUG] Generated OTP for %s (%s): %s\n", in.Phone, in.Purpose, code)
+	uc.otpDispatcher.DispatchOTP(domain.OTPChannelSMS, in.Phone, code)
+	uc.logger.Info("Dispatch OTP for %s (purpose: %s)", in.Phone, in.Purpose)
 
 	return nil
 }
@@ -83,13 +98,17 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token strin
 	}
 
 	// Check if user exists with this phone number
-	cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, in.Phone)
-	if err == nil && cred != nil {
+	if in.Purpose == domain.VerifyPurposeRegister {
+		cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, in.Phone)
+		if err != nil {
+			return "", false, "", fmt.Errorf("finding credential by identifier: %w", err)
+		}
 		exists = true
 		user, err := uc.userRepo.FindByID(ctx, cred.UserID)
-		if err == nil && user != nil {
-			username = user.Username
+		if err != nil {
+			return "", false, "", fmt.Errorf("finding user by id: %w", err)
 		}
+		username = user.Username
 	}
 
 	return token, exists, username, nil
@@ -250,7 +269,7 @@ func (uc *AuthUC) ForgotPassword(ctx context.Context, email string) (string, err
 		return "", fmt.Errorf("generating reset token: %w", err)
 	}
 
-	resetLink := fmt.Sprintf("http://localhost:3000/reset-password?token=%s", resetToken)
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", uc.baseURL, resetToken)
 
 	uc.email.Dispatch(worker.EmailJob{
 		Template: "forgot_password",
