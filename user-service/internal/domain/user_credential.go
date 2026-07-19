@@ -10,13 +10,6 @@ const (
 	CredentialTypeGoogle CredentialType = "google"
 )
 
-type VerifyPurpose string
-
-const (
-	VerifyPurposeRegister    VerifyPurpose = "register"
-	VerifyPurposeChangeEmail VerifyPurpose = "change_email"
-)
-
 type UserCredential struct {
 	ID         string         `json:"id"`
 	UserID     string         `json:"user_id"`
