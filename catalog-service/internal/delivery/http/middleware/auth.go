@@ -1,13 +1,13 @@
 package middleware
 
 import (
-	"catalog-service/pkg/jwt"
 	"catalog-service/pkg/redis"
 	"errors"
 	"net/http"
 	"slices"
 	"strings"
 
+	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +23,7 @@ var (
 	ErrInvalidToken            = errors.New("invalid token")
 )
 
-func Auth(tokenService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc {
+func Auth(v jwtmanager.JWTManager, bl redis.BlacklistCacher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(authorizationHeader)
 		if authHeader == "" {
@@ -55,7 +55,7 @@ func Auth(tokenService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFu
 			return
 		}
 
-		claims, err := tokenService.VerifyAccessToken(tokenStr)
+		claims, err := v.VerifyAccessToken(tokenStr)
 		if err != nil {
 			response.Error(c, http.StatusUnauthorized, err.Error())
 			c.Abort()

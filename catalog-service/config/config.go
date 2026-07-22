@@ -40,10 +40,9 @@ type (
 	}
 
 	jwt struct {
-		AccessSecret  string        `env:"JWT_ACC_SECRET,required"`
-		RefreshSecret string        `env:"JWT_REF_SECRET,required"`
-		AccessTTL     time.Duration `env:"JWT_ACC_TTL" envDefault:"15m"`
-		RefreshTTL    time.Duration `env:"JWT_REF_TTL" envDefault:"168h"`
+		PublicKey  string        `env:"PUBLIC_KEY,required"`
+		AccessTTL  time.Duration `env:"JWT_ACC_TTL" envDefault:"15m"`
+		RefreshTTL time.Duration `env:"JWT_REF_TTL" envDefault:"168h"`
 	}
 
 	redis struct {

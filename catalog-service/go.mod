@@ -6,3 +6,5 @@ require (
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/joho/godotenv v1.5.1
 )
+
+require github.com/GoProOrg/core-go-pkg v1.0.2 // indirect

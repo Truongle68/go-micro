@@ -4,7 +4,6 @@ import (
 	"catalog-service/config"
 	repo "catalog-service/internal/repo/mongodb"
 	"catalog-service/internal/usecase"
-	"catalog-service/pkg/jwt"
 	cataredis "catalog-service/pkg/redis"
 	"fmt"
 	"log"
@@ -15,6 +14,7 @@ import (
 	httpr "catalog-service/internal/delivery/http"
 	v1 "catalog-service/internal/delivery/http/v1"
 
+	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/mongo"
@@ -43,13 +43,13 @@ func initUsecases(db *mongodrv.Database) useCases {
 	}
 }
 
-func initServers(l logger.Interface, uc useCases, cfg *config.Config, tokens jwt.TokenService, cache cataredis.IdentityCacher) *servers {
+func initServers(l logger.Interface, uc useCases, cfg *config.Config, v *jwtmanager.Verifier, cache cataredis.IdentityCacher) *servers {
 	http := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 	deps := v1.Dependencies{
 		Product:  uc.product,
 		Category: uc.category,
 		Logger:   l,
-		Tokens:   tokens,
+		Verifier: v,
 		Cache:    cache,
 	}
 	httpr.NewRouter(http.Engine, deps)
@@ -94,7 +94,11 @@ func Run(cfg *config.Config) {
 	}
 	defer m.Close()
 
-	jwtManager := jwt.New(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
+	verifier, err := jwtmanager.NewVerifier(cfg.JWT.PublicKey)
+	if err != nil {
+		l.Fatal("failed to initialize jwt: %v", err)
+	}
+
 	red, err := redis.New(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
 	if err != nil {
 		l.Fatal("failed to initialize redis: %v", err)
@@ -105,7 +109,7 @@ func Run(cfg *config.Config) {
 	// init usecase
 	uc := initUsecases(m.Database)
 	// init server
-	s := initServers(l, uc, cfg, jwtManager, identityCache)
+	s := initServers(l, uc, cfg, verifier, identityCache)
 	// start server
 	s.startServer()
 	// wait for server shutdown

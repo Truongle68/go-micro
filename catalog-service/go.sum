@@ -1,3 +1,7 @@
+github.com/GoProOrg/core-go-pkg v1.0.1 h1:lrBlCaU+V9H8Z1LuuG5lqwYYy5LzsFPiwRvAEFf3TYE=
+github.com/GoProOrg/core-go-pkg v1.0.1/go.mod h1:71FWKpCisPpMCJoygExeyhvTH72JSgaHCRGxAQwUMmc=
+github.com/GoProOrg/core-go-pkg v1.0.2 h1:UnolfNhnofqgTanBHH/BxNMvbIx3Kxb3Fcn3LEBqm1M=
+github.com/GoProOrg/core-go-pkg v1.0.2/go.mod h1:71FWKpCisPpMCJoygExeyhvTH72JSgaHCRGxAQwUMmc=
 github.com/caarlos0/env/v11 v11.4.1 h1:fYwH0sWEsBSMPG7t4e/PEfTFzrWrpjyygXyUnWiSwEw=
 github.com/caarlos0/env/v11 v11.4.1/go.mod h1:qupehSf/Y0TUTsxKywqRt/vJjN5nz6vauiYEUUr8P4U=
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
