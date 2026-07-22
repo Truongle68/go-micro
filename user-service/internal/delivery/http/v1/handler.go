@@ -63,4 +63,3 @@ func (r *V1) getToken(c *gin.Context) (string, bool) {
 func (r *V1) getRole(c *gin.Context) (string, bool) {
 	return middleware.GetRole(c)
 }
-
