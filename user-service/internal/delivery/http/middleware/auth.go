@@ -1,4 +1,4 @@
-package v1
+package middleware
 
 import (
 	"net/http"
@@ -18,7 +18,7 @@ const (
 	tokenCtx            = "token"
 )
 
-func authMiddleware(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc {
+func Auth(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(authorizationHeader)
 		if authHeader == "" {
@@ -64,7 +64,7 @@ func authMiddleware(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.H
 	}
 }
 
-func getRole(c *gin.Context) (string, bool) {
+func GetRole(c *gin.Context) (string, bool) {
 	role, exists := c.Get(userRoleCtx)
 	if !exists {
 		return "", false
@@ -73,7 +73,7 @@ func getRole(c *gin.Context) (string, bool) {
 	return roleStr, ok
 }
 
-func (r *V1) getUserId(c *gin.Context) (string, bool) {
+func GetUserID(c *gin.Context) (string, bool) {
 	id, exists := c.Get(userCtx)
 	if !exists {
 		return "", false
@@ -82,7 +82,7 @@ func (r *V1) getUserId(c *gin.Context) (string, bool) {
 	return idStr, ok
 }
 
-func (r *V1) getToken(c *gin.Context) (string, bool) {
+func GetToken(c *gin.Context) (string, bool) {
 	tok, exists := c.Get(tokenCtx)
 	if !exists {
 		return "", false
@@ -90,3 +90,4 @@ func (r *V1) getToken(c *gin.Context) (string, bool) {
 	tokStr, ok := tok.(string)
 	return tokStr, ok
 }
+

@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"user-service/internal/delivery/http/middleware"
 	"user-service/internal/usecase"
 	"user-service/pkg/jwt"
 	"user-service/pkg/redis"
@@ -59,7 +60,7 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 
 	// protected routes
 	protected := apiV1Group.Group("")
-	protected.Use(authMiddleware(deps.JWT, deps.Cache))
+	protected.Use(middleware.Auth(deps.JWT, deps.Cache))
 
 	protected.POST("/auth/logout", r.logout)
 
