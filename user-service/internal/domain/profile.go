@@ -30,13 +30,14 @@ func NewProfile(userID, fullName string) *Profile {
 	return &Profile{
 		UserID:    userID,
 		FullName:  fullName,
+		Gender:    GenderUnknown,
 		UpdatedAt: time.Now(),
 	}
 }
 
 func (g Gender) IsValid() bool {
 	switch g {
-	case GenderMale, GenderFemale, GenderOther:
+	case GenderUnknown, GenderMale, GenderFemale, GenderOther:
 		return true
 	}
 	return false
@@ -60,8 +61,10 @@ func (p *Profile) ApplyUpdate(params UpdateProfileParams) error {
 		change = true
 	}
 	if params.Dob != nil {
-		if _, err := time.Parse("2026-01-02", *params.Dob); err != nil {
-			return ErrInvalidDob
+		if *params.Dob != "" {
+			if _, err := time.Parse("2006-01-02", *params.Dob); err != nil {
+				return ErrInvalidDob
+			}
 		}
 		p.DOB = *params.Dob
 		change = true
