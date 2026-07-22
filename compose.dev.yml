@@ -14,7 +14,7 @@ services:
       - "5433:5432"
     restart: always
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,11 +30,41 @@ services:
       - "6379:6379"
     restart: always
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PW:-secretredispass}", "ping"]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PW:-secretredispass}", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 3
-  
+
+  catalog-db:
+    image: mongodb/mongodb-atlas-local:8.0
+    container_name: catalog-db
+    hostname: catalog-db
+    volumes:
+      - ./catalog-service/scripts/mongo-init:/docker-entrypoint-initdb.d
+      - catalog-data:/data/db
+      - catalog-configdb:/data/configdb
+      - catalog-mongot:/data/mongot
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=${CATALOG_MONGO_USER}
+      - MONGODB_INITDB_ROOT_PASSWORD=${CATALOG_MONGO_PW}
+      - MONGO_INITDB_DATABASE=${CATALOG_MONGO_DB}
+    ports:
+      - "27018:27017"
+    restart: always
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - catalog-net
+
 volumes:
   identity-data:
+  catalog-data:
+  catalog-configdb:
+  catalog-mongot:
   redis-data:
+
+networks:
+  catalog-net:
