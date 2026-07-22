@@ -7,21 +7,23 @@ import (
 )
 
 type UserProfileDTO struct {
-	ID        string            `json:"id"`
-	Username  string            `json:"username"`
-	Email     string            `json:"email"`
-	Phone     string            `json:"phone"`
-	FullName  string            `json:"full_name"`
-	Gender    domain.Gender     `json:"gender"`
-	DOB       string            `json:"dob"`
-	Role      domain.UserRole   `json:"role"`
-	Status    domain.UserStatus `json:"status"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	ID              string            `json:"id"`
+	Username        string            `json:"username"`
+	Email           string            `json:"email"`
+	IsEmailVerified bool              `json:"is_email_verified"`
+	Phone           string            `json:"phone"`
+	FullName        string            `json:"full_name"`
+	Gender          domain.Gender     `json:"gender"`
+	DOB             string            `json:"dob"`
+	Role            domain.UserRole   `json:"role"`
+	Status          domain.UserStatus `json:"status"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
 }
 
 type UpdatedProfileInput struct {
 	UserID   string
+	Email    *string
 	FullName *string
 	Gender   *domain.Gender
 	Dob      *string
@@ -81,14 +83,31 @@ type UpdateAddressInput struct {
 	Lng         *float64
 }
 
+type RequestEmailLinkInput struct {
+	Email       string                  `json:"email"`
+	Purpose     domain.EmailLinkPurpose `json:"purpose"`
+	ActorUserID string                  `json:"actor_user_id"`
+}
+
+type ConfirmEmailLinkOutput struct {
+	Purpose          domain.EmailLinkPurpose `json:"purpose"`
+	ChangeEmailToken string                  `json:"change_email_token,omitempty"`
+}
+
 type User interface {
 	GetProfile(ctx context.Context, id string) (*UserProfileDTO, error)
 	UpdateProfile(ctx context.Context, in UpdatedProfileInput) (*UserProfileDTO, error)
-	RequestChangeEmailOTP(ctx context.Context, userID string) error
-	VerifyChangeEmailOTP(ctx context.Context, in VerifyChangeEmailInput) (token string, err error)
-	CompleteChangeEmail(ctx context.Context, in CompleteChangeEmailInput) error
-	RequestChangePhoneLink(ctx context.Context, userID string) error
-	CompleteChangePhone(ctx context.Context, in CompleteChangePhoneInput) error
+	RequestEmailLink(ctx context.Context, in RequestEmailLinkInput) error
+	ConfirmEmailLink(ctx context.Context, token string) (*ConfirmEmailLinkOutput, error)
+
+	SendChangeEmailOTP(ctx context.Context, in RequestChangeEmailOTPInput) error
+	SendChangePhoneOTP(ctx context.Context, in RequestChangePhoneOTPInput) error
+	SendPhoneVerificationOTP(ctx context.Context, userID string) error
+
+	VerifyChangeEmailOTP(ctx context.Context, in VerifyChangeEmailOTPInput) error
+	VerifyChangePhoneOTP(ctx context.Context, in VerifyChangePhoneOTPInput) error
+	VerifyPhoneVerificationOTP(ctx context.Context, in VerifyPhoneVerificationOTPInput) (string, error)
+
 	GetAddressList(ctx context.Context, userID string) ([]*AddressDTO, error)
 	CreateAddress(ctx context.Context, in CreateAddressInput) (*AddressDTO, error)
 	UpdateAddress(ctx context.Context, in UpdateAddressInput) (*AddressDTO, error)
@@ -122,14 +141,46 @@ type LoginInput struct {
 }
 
 type RequestOTPInput struct {
-	Phone   string
-	Purpose domain.VerifyPurpose
+	Identifier  string               `json:"identifier,omitempty"` // phone or email, empty in case verifying the current phone (before typing the new one), getting from credential by userID
+	Purpose     domain.VerifyPurpose `json:"purpose"`
+	ActorUserID string               `json:"actor_user_id,omitempty"`
+	ChangeToken string               `json:"change_token,omitempty"`
+}
+
+type RequestChangeEmailOTPInput struct {
+	Identifier       string `json:"identifier"`
+	ActorUserID      string `json:"actor_user_id"`
+	ChangeEmailToken string `json:"change_email_token"`
+}
+
+type RequestChangePhoneOTPInput struct {
+	Identifier       string `json:"identifier"`
+	ActorUserID      string `json:"actor_user_id"`
+	ChangePhoneToken string `json:"change_phone_token"`
 }
 
 type VerifyOTPInput struct {
-	Phone   string
-	Code    string
-	Purpose domain.VerifyPurpose
+	Identifier  string               `json:"identifier,omitempty"`
+	Code        string               `json:"code"`
+	Purpose     domain.VerifyPurpose `json:"purpose"`
+	ActorUserID string               `json:"actor_user_id"`
+}
+
+type VerifyChangeEmailOTPInput struct {
+	Identifier  string `json:"identifier"`
+	Code        string `json:"code"`
+	ActorUserID string `json:"actor_user_id"`
+}
+
+type VerifyChangePhoneOTPInput struct {
+	Identifier  string `json:"identifier"`
+	Code        string `json:"code"`
+	ActorUserID string `json:"actor_user_id"`
+}
+
+type VerifyPhoneVerificationOTPInput struct {
+	Code        string `json:"code"`
+	ActorUserID string `json:"actor_user_id"`
 }
 
 type ResetPasswordInput struct {

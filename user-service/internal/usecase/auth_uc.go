@@ -52,7 +52,13 @@ func NewAuthUC(
 var _ Auth = (*AuthUC)(nil)
 
 func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
-	if in.Phone == "" {
+	p, ok := domain.GetVerifiedOTPPolicy(in.Purpose)
+	if !ok {
+		return domain.ErrInvalidOperation
+	}
+
+	identifier := in.Identifier
+	if identifier == "" {
 		return domain.ErrEmptyPhone
 	}
 
@@ -61,27 +67,28 @@ func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
 		return err
 	}
 
-	err = uc.cache.SetOTP(ctx, in.Phone, in.Purpose, code, 1*time.Minute)
+	err = uc.cache.SetOTP(ctx, identifier, in.Purpose, code, p.OTPTTL)
 	if err != nil {
 		return fmt.Errorf("caching OTP: %w", err)
 	}
 
-	uc.logger.Info(" [OTP DEBUG] Generated OTP for %s (%s): %s\n", in.Phone, in.Purpose, code)
-	uc.otpDispatcher.DispatchOTP(domain.OTPChannelSMS, in.Phone, code)
-	uc.logger.Info("Dispatch OTP for %s (purpose: %s)", in.Phone, in.Purpose)
+	uc.logger.Info(" [OTP DEBUG] Generated OTP for %s (%s): %s\n", identifier, in.Purpose, code)
+	uc.otpDispatcher.DispatchOTP(domain.OTPChannelSMS, identifier, code)
+	uc.logger.Info("Dispatch OTP for %s (purpose: %s)", identifier, in.Purpose)
 
 	return nil
 }
 
 func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token string, exists bool, username string, err error) {
-	if in.Phone == "" {
+	identifier := in.Identifier
+	if identifier == "" {
 		return "", false, "", domain.ErrEmptyPhone
 	}
 	if in.Code == "" {
 		return "", false, "", domain.ErrInvalidOTP
 	}
 
-	cachedCode, err := uc.cache.GetOTP(ctx, in.Phone, in.Purpose)
+	cachedCode, err := uc.cache.GetOTP(ctx, identifier, in.Purpose)
 	if err != nil {
 		return "", false, "", domain.ErrOTPExpired
 	}
@@ -90,25 +97,28 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token strin
 		return "", false, "", domain.ErrInvalidOTP
 	}
 
-	_ = uc.cache.DeleteOTP(ctx, in.Phone, in.Purpose)
+	_ = uc.cache.DeleteOTP(ctx, identifier, in.Purpose)
 
-	token, err = uc.tokens.GenerateVerificationToken(in.Phone, in.Purpose)
+	token, err = uc.tokens.GenerateVerificationToken(identifier, in.Purpose)
 	if err != nil {
 		return "", false, "", fmt.Errorf("generating verification token: %w", err)
 	}
 
-	// Check if user exists with this phone number
+	// Check if user exists with this phone/identifier number
 	if in.Purpose == domain.VerifyPurposeRegister {
-		cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, in.Phone)
-		if err != nil {
+		cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, identifier)
+		if err != nil && !errors.Is(err, domain.ErrUserNotFound) {
 			return "", false, "", fmt.Errorf("finding credential by identifier: %w", err)
 		}
-		exists = true
-		user, err := uc.userRepo.FindByID(ctx, cred.UserID)
-		if err != nil {
-			return "", false, "", fmt.Errorf("finding user by id: %w", err)
+
+		if cred != nil {
+			exists = true
+			user, err := uc.userRepo.FindByID(ctx, cred.UserID)
+			if err != nil {
+				return "", false, "", fmt.Errorf("finding user by id: %w", err)
+			}
+			username = user.Username
 		}
-		username = user.Username
 	}
 
 	return token, exists, username, nil

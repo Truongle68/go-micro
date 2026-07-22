@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 	"user-service/internal/domain"
@@ -76,27 +77,30 @@ func (uc *UserUC) GetProfile(ctx context.Context, id string) (*UserProfileDTO, e
 	}
 
 	var email, phone string
+	var isEmailVerified bool
 	for _, c := range creds {
 		switch c.Type {
 		case domain.CredentialTypePhone:
 			phone = c.Identifier
 		case domain.CredentialTypeEmail:
 			email = c.Identifier
+			isEmailVerified = c.IsVerified
 		}
 	}
 
 	dto := &UserProfileDTO{
-		ID:        user.ID,
-		Username:  user.Username,
-		Email:     email,
-		Phone:     phone,
-		FullName:  profile.FullName,
-		Gender:    profile.Gender,
-		DOB:       profile.DOB,
-		Role:      user.Role,
-		Status:    user.Status,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+		ID:              user.ID,
+		Username:        user.Username,
+		Email:           email,
+		IsEmailVerified: isEmailVerified,
+		Phone:           phone,
+		FullName:        profile.FullName,
+		Gender:          profile.Gender,
+		DOB:             profile.DOB,
+		Role:            user.Role,
+		Status:          user.Status,
+		CreatedAt:       user.CreatedAt,
+		UpdatedAt:       user.UpdatedAt,
 	}
 
 	// cache in Redis
@@ -110,7 +114,69 @@ func (uc *UserUC) GetProfile(ctx context.Context, id string) (*UserProfileDTO, e
 func (uc *UserUC) UpdateProfile(ctx context.Context, in UpdatedProfileInput) (*UserProfileDTO, error) {
 	err := uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 
-		// update profile
+		// check existing credentials
+		creds, err := uc.repo.FindCredentialsByUserID(txCtx, in.UserID)
+		if err != nil {
+			return err
+		}
+
+		var emailCred *domain.UserCredential
+		var phoneCred *domain.UserCredential
+		for _, c := range creds {
+			switch c.Type {
+			case domain.CredentialTypeEmail:
+				emailCred = c
+			case domain.CredentialTypePhone:
+				phoneCred = c
+			}
+		}
+
+		// handle email update
+		if in.Email != nil && *in.Email != "" {
+			newEmail := *in.Email
+			if emailCred != nil && emailCred.IsVerified {
+				if emailCred.Identifier != newEmail {
+					return domain.ErrVerifiedEmailCannotBeUpdatedDirectly
+				}
+			} else {
+				if emailCred == nil || emailCred.Identifier != newEmail {
+					exists, err := uc.repo.ExistsByIdentifier(txCtx, newEmail)
+					if err != nil {
+						return fmt.Errorf("checking email existence: %w", err)
+					}
+					if exists {
+						return domain.ErrEmailAlreadyExists
+					}
+
+					if emailCred != nil {
+						emailCred.Identifier = newEmail
+						emailCred.IsVerified = false
+						emailCred.UpdatedAt = time.Now()
+						if err := uc.repo.UpdateCredential(txCtx, emailCred); err != nil {
+							return fmt.Errorf("updating email credential: %w", err)
+						}
+					} else {
+						var secretHash string
+						if phoneCred != nil {
+							secretHash = phoneCred.SecretHash
+						}
+						newCred := domain.NewCredentialWithHash(
+							in.UserID,
+							domain.CredentialTypeEmail,
+							newEmail,
+							secretHash,
+							false,
+							false,
+						)
+						if err := uc.repo.SaveCredential(txCtx, newCred); err != nil {
+							return fmt.Errorf("saving email credential: %w", err)
+						}
+					}
+				}
+			}
+		}
+
+		// update profile fields
 		profile, err := uc.repo.FindProfileByUserID(txCtx, in.UserID)
 		if err != nil {
 			return err
@@ -120,7 +186,7 @@ func (uc *UserUC) UpdateProfile(ctx context.Context, in UpdatedProfileInput) (*U
 			FullName: in.FullName,
 			Gender:   in.Gender,
 			Dob:      in.Dob,
-		}); err != nil {
+		}); err != nil && !errors.Is(err, domain.ErrNoFieldsToUpdate) {
 			return err
 		}
 
@@ -149,80 +215,271 @@ func (uc *UserUC) UpdateProfile(ctx context.Context, in UpdatedProfileInput) (*U
 	return uc.GetProfile(ctx, in.UserID)
 }
 
-func (uc *UserUC) RequestChangeEmailOTP(ctx context.Context, userID string) error {
-	creds, err := uc.repo.FindCredentialsByUserID(ctx, userID)
-	if err != nil {
-		return err
+func (uc *UserUC) RequestEmailLink(ctx context.Context, in RequestEmailLinkInput) error {
+	policy, ok := domain.GetEmailLinkPolicy(in.Purpose)
+	if !ok {
+		return domain.ErrInvalidOperation
 	}
 
-	var currentEmail string
-	for _, c := range creds {
-		if c.Type == domain.CredentialTypeEmail {
-			currentEmail = c.Identifier
-			break
-		}
-	}
-
-	if currentEmail == "" {
+	if in.Email == "" {
 		return domain.ErrEmailNotSet
 	}
 
-	code, err := redis.GenOTPCode()
-	if err != nil {
-		return err
+	targetEmail := in.Email
+	switch in.Purpose {
+	case domain.EmailLinkPurposeVerifyCurrent,
+		domain.EmailLinkPurposeVerifyNew:
+	default:
+		return domain.ErrInvalidOperation
 	}
 
-	uc.logger.Info(" [OTP DEBUG] Generated Change Email OTP for User %s: %s", userID, code)
-
-	err = uc.cache.SetOTP(ctx, userID, domain.VerifyPurposeChangeEmail, code, 5*time.Minute)
+	token, err := uc.tokens.GenerateEmailLinkToken(in.ActorUserID, targetEmail, in.Purpose, policy.TokenTTL)
 	if err != nil {
-		return fmt.Errorf("caching OTP: %w", err)
+		return fmt.Errorf("generating email link token: %w", err)
 	}
+
+	link := fmt.Sprintf("%s/users/verify-email/confirm?token=%s", uc.baseURL, token)
 
 	uc.email.Dispatch(worker.EmailJob{
-		Template: "change_email",
-		Subject:  "Verify your request to change email address",
-		To:       currentEmail,
-		Data: struct{ Code string }{
-			Code: code,
+		Template: "verify_email",
+		Subject:  "Verify Your Email Address",
+		To:       targetEmail,
+		Data: struct {
+			Link string
+			TTL  time.Duration
+		}{
+			Link: link,
+			TTL:  policy.TokenTTL,
 		},
 	})
 
 	return nil
 }
 
-func (uc *UserUC) VerifyChangeEmailOTP(ctx context.Context, in VerifyChangeEmailInput) (string, error) {
-	cachedCode, err := uc.cache.GetOTP(ctx, in.UserID, domain.VerifyPurposeChangeEmail)
+func (uc *UserUC) ConfirmEmailLink(ctx context.Context, token string) (*ConfirmEmailLinkOutput, error) {
+	claims, err := uc.tokens.VerifyEmailLinkToken(token)
+	if err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+
+	purpose := domain.EmailLinkPurpose(claims.Purpose)
+
+	switch purpose {
+	case domain.EmailLinkPurposeVerifyNew:
+		if err := uc.attachVerifiedEmail(ctx, claims.UserID, claims.Email); err != nil {
+			return nil, err
+		}
+		return &ConfirmEmailLinkOutput{
+			Purpose: purpose,
+		}, nil
+
+	case domain.EmailLinkPurposeVerifyCurrent:
+		changeToken, err := uc.tokens.GenerateChangeEmailToken(claims.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("generating change email token: %w", err)
+		}
+		return &ConfirmEmailLinkOutput{
+			Purpose:          purpose,
+			ChangeEmailToken: changeToken,
+		}, nil
+
+	default:
+		return nil, domain.ErrInvalidOperation
+	}
+}
+
+func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error {
+	p, ok := domain.GetVerifiedOTPPolicy(in.Purpose)
+	if !ok {
+		return domain.ErrInvalidOperation
+	}
+
+	switch in.Purpose {
+	case domain.VerifyPurposeChangeEmail:
+		if in.ChangeToken == "" {
+			return domain.ErrCurrentEmailNotVerified
+		}
+		claims, err := uc.tokens.VerifyChangeEmailToken(in.ChangeToken)
+		if err != nil || claims.UserID != in.ActorUserID {
+			return domain.ErrCurrentEmailNotVerified
+		}
+
+		if in.Identifier == "" {
+			return domain.ErrEmailRequired
+		}
+
+		exists, err := uc.repo.ExistsByIdentifier(ctx, in.Identifier)
+		if err != nil {
+			return fmt.Errorf("checking email existence: %w", err)
+		}
+		if exists {
+			return domain.ErrEmailAlreadyExists
+		}
+
+		code, err := redis.GenOTPCode()
+		if err != nil {
+			return err
+		}
+
+		if err := uc.cache.SetOTP(ctx, in.ActorUserID, in.Purpose, code, p.OTPTTL); err != nil {
+			return fmt.Errorf("caching OTP: %w", err)
+		}
+
+		uc.email.Dispatch(worker.EmailJob{
+			Template: "change_email_otp",
+			Subject:  "OTP code for changed email verification",
+			To:       in.Identifier,
+			Data: struct {
+				Code string
+				TTL  time.Duration
+			}{
+				Code: code,
+				TTL:  p.OTPTTL,
+			},
+		})
+		return nil
+	case domain.VerifyPurposeChangePhone:
+		if in.ChangeToken == "" {
+			return domain.ErrCurrentPhoneNotVerified
+		}
+
+		claims, err := uc.tokens.VerifyChangePhoneToken(in.ChangeToken)
+		if err != nil || claims.UserID != in.ActorUserID {
+			return domain.ErrCurrentPhoneNotVerified
+		}
+
+		if in.Identifier == "" {
+			return domain.ErrEmptyPhone
+		}
+
+		exists, err := uc.repo.ExistsByIdentifier(ctx, in.Identifier)
+		if err != nil {
+			return fmt.Errorf("checking phone existence: %w", err)
+		}
+		if exists {
+			return domain.ErrPhoneAlreadyExists
+		}
+
+		code, err := redis.GenOTPCode()
+		if err != nil {
+			return err
+		}
+
+		if err := uc.cache.SetOTP(ctx, in.ActorUserID, in.Purpose, code, p.OTPTTL); err != nil {
+			return fmt.Errorf("caching OTP: %w", err)
+		}
+
+		uc.logger.Info(" [OTP DEBUG] Generated Change Phone OTP for User %s (%s): %s", in.ActorUserID, in.Identifier, code)
+		return nil
+	case domain.VerifyPurposeVerifyPhone:
+		creds, err := uc.repo.FindCredentialByTypeAndUserID(ctx, domain.CredentialTypePhone, in.ActorUserID)
+		if err != nil {
+			return fmt.Errorf("finding credentials by type and userID: %w", err)
+		}
+
+		code, err := redis.GenOTPCode()
+		if err != nil {
+			return err
+		}
+
+		if err := uc.cache.SetOTP(ctx, in.ActorUserID, in.Purpose, code, p.OTPTTL); err != nil {
+			return fmt.Errorf("caching OTP: %w", err)
+		}
+
+		uc.logger.Info(" [OTP DEBUG] Generated Verified Phone OTP for User %s (%s): %s", in.ActorUserID, creds.Identifier, code)
+		return nil
+	}
+
+	return domain.ErrInvalidOperation
+}
+
+func (uc *UserUC) SendChangeEmailOTP(ctx context.Context, in RequestChangeEmailOTPInput) error {
+	return uc.sendAccountOTP(ctx, RequestOTPInput{
+		Identifier:  in.Identifier,
+		Purpose:     domain.VerifyPurposeChangeEmail,
+		ChangeToken: in.ChangeEmailToken,
+		ActorUserID: in.ActorUserID,
+	})
+}
+
+func (uc *UserUC) SendChangePhoneOTP(ctx context.Context, in RequestChangePhoneOTPInput) error {
+	return uc.sendAccountOTP(ctx, RequestOTPInput{
+		Identifier:  in.Identifier,
+		Purpose:     domain.VerifyPurposeChangePhone,
+		ChangeToken: in.ChangePhoneToken,
+		ActorUserID: in.ActorUserID,
+	})
+}
+
+func (uc *UserUC) SendPhoneVerificationOTP(ctx context.Context, userID string) error {
+	return uc.sendAccountOTP(ctx, RequestOTPInput{
+		Purpose:     domain.VerifyPurposeVerifyPhone,
+		ActorUserID: userID,
+	})
+}
+
+func (uc *UserUC) verifyAccountOTP(ctx context.Context, in VerifyOTPInput) (string, error) {
+	cachedCode, err := uc.cache.GetOTP(ctx, in.ActorUserID, in.Purpose)
 	if err != nil {
 		return "", domain.ErrOTPExpired
 	}
-
 	if cachedCode != in.Code {
 		return "", domain.ErrInvalidOTP
 	}
+	_ = uc.cache.DeleteOTP(ctx, in.ActorUserID, in.Purpose)
 
-	_ = uc.cache.DeleteOTP(ctx, in.UserID, domain.VerifyPurposeChangeEmail)
-
-	token, err := uc.tokens.GenerateChangeEmailToken(in.UserID)
-	if err != nil {
-		return "", fmt.Errorf("generating change email token: %w", err)
+	switch in.Purpose {
+	case domain.VerifyPurposeChangeEmail:
+		if err := uc.attachVerifiedEmail(ctx, in.ActorUserID, in.Identifier); err != nil {
+			return "", err
+		}
+		return "", nil
+	case domain.VerifyPurposeChangePhone:
+		if err := uc.attachVerifiedPhone(ctx, in.ActorUserID, in.Identifier); err != nil {
+			return "", err
+		}
+		return "", nil
+	case domain.VerifyPurposeVerifyPhone:
+		token, err := uc.tokens.GenerateChangePhoneToken(in.ActorUserID)
+		if err != nil {
+			return "", fmt.Errorf("generating change phone token: %w", err)
+		}
+		return token, nil
 	}
 
-	return token, nil
+	return "", domain.ErrInvalidOperation
 }
 
-func (uc *UserUC) CompleteChangeEmail(ctx context.Context, in CompleteChangeEmailInput) error {
-	claims, err := uc.tokens.VerifyChangeEmailToken(in.Token)
-	if err != nil {
-		return domain.ErrInvalidToken
-	}
+func (uc *UserUC) VerifyChangeEmailOTP(ctx context.Context, in VerifyChangeEmailOTPInput) error {
+	_, err := uc.verifyAccountOTP(ctx, VerifyOTPInput{
+		Identifier:  in.Identifier,
+		Code:        in.Code,
+		Purpose:     domain.VerifyPurposeChangeEmail,
+		ActorUserID: in.ActorUserID,
+	})
+	return err
+}
 
-	if claims.UserID != in.UserID {
-		return domain.ErrInvalidToken
-	}
+func (uc *UserUC) VerifyChangePhoneOTP(ctx context.Context, in VerifyChangePhoneOTPInput) error {
+	_, err := uc.verifyAccountOTP(ctx, VerifyOTPInput{
+		Identifier:  in.Identifier,
+		Code:        in.Code,
+		Purpose:     domain.VerifyPurposeChangePhone,
+		ActorUserID: in.ActorUserID,
+	})
+	return err
+}
 
-	// Find credentials to check if new email is different and unique
-	creds, err := uc.repo.FindCredentialsByUserID(ctx, in.UserID)
+func (uc *UserUC) VerifyPhoneVerificationOTP(ctx context.Context, in VerifyPhoneVerificationOTPInput) (string, error) {
+	return uc.verifyAccountOTP(ctx, VerifyOTPInput{
+		Code:        in.Code,
+		Purpose:     domain.VerifyPurposeVerifyPhone,
+		ActorUserID: in.ActorUserID,
+	})
+}
+
+func (uc *UserUC) attachVerifiedEmail(ctx context.Context, userID, email string) error {
+	creds, err := uc.repo.FindCredentialsByUserID(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -238,179 +495,79 @@ func (uc *UserUC) CompleteChangeEmail(ctx context.Context, in CompleteChangeEmai
 		}
 	}
 
-	if emailCred != nil && emailCred.Identifier == in.NewEmail {
-		return domain.ErrSameEmail
-	}
-
-	// Check email uniqueness
-	exists, err := uc.repo.ExistsByIdentifier(ctx, in.NewEmail)
-	if err != nil {
-		return fmt.Errorf("checking email existence: %w", err)
-	}
-	if exists {
-		return domain.ErrEmailAlreadyExists
-	}
-
-	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+	return uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		if emailCred != nil {
-			emailCred.Identifier = in.NewEmail
+			emailCred.Identifier = email
+			emailCred.IsVerified = true
 			emailCred.UpdatedAt = time.Now()
-			err = uc.repo.UpdateCredential(txCtx, emailCred)
-			if err != nil {
-				return fmt.Errorf("updating user email credential: %w", err)
+			if err := uc.repo.UpdateCredential(txCtx, emailCred); err != nil {
+				return fmt.Errorf("updating email credential: %w", err)
 			}
 		} else {
 			var secretHash string
 			if phoneCred != nil {
 				secretHash = phoneCred.SecretHash
 			}
-			newEmailCred := domain.NewCredentialWithHash(
-				in.UserID,
-				domain.CredentialTypeEmail,
-				in.NewEmail,
-				secretHash,
-				true,
-				false,
-			)
-			err = uc.repo.SaveCredential(txCtx, newEmailCred)
-			if err != nil {
-				return fmt.Errorf("saving user email credential: %w", err)
+			newCred := domain.NewCredentialWithHash(userID, domain.CredentialTypeEmail, email, secretHash, true, false)
+			if err := uc.repo.SaveCredential(txCtx, newCred); err != nil {
+				return fmt.Errorf("saving email credential: %w", err)
 			}
 		}
 
-		// update general user info (updated_at)
-		user, err := uc.repo.FindByID(txCtx, in.UserID)
+		user, err := uc.repo.FindByID(txCtx, userID)
 		if err == nil {
 			user.UpdatedAt = time.Now()
 			_ = uc.repo.Update(txCtx, user)
 		}
+		uc.cache.InvalidateProfile(ctx, userID)
 		return nil
 	})
-
-	if err != nil {
-		return err
-	}
-
-	// invalidate cache
-	uc.cache.InvalidateProfile(ctx, in.UserID)
-	return nil
 }
 
-func (uc *UserUC) RequestChangePhoneLink(ctx context.Context, userID string) error {
-	creds, err := uc.repo.FindCredentialsByUserID(ctx, userID)
-	if err != nil {
-		return err
-	}
-
-	var currentEmail string
-	for _, c := range creds {
-		if c.Type == domain.CredentialTypeEmail {
-			currentEmail = c.Identifier
-			break
-		}
-	}
-
-	if currentEmail == "" {
-		return domain.ErrEmailNotSet
-	}
-
-	token, err := uc.tokens.GenerateChangePhoneToken(userID)
-	if err != nil {
-		return fmt.Errorf("generating change phone token: %w", err)
-	}
-
-	resetLink := fmt.Sprintf("%s/profile/change-phone?token=%s", uc.baseURL, token)
-
-	uc.email.Dispatch(worker.EmailJob{
-		Template: "change_phone",
-		Subject:  "Verify your request to change phone number",
-		To:       currentEmail,
-		Data: struct{ ResetLink string }{
-			ResetLink: resetLink,
-		},
-	})
-
-	return nil
-}
-
-func (uc *UserUC) CompleteChangePhone(ctx context.Context, in CompleteChangePhoneInput) error {
-	claims, err := uc.tokens.VerifyChangePhoneToken(in.Token)
-	if err != nil {
-		return domain.ErrInvalidToken
-	}
-
-	userID := claims.UserID
-
+func (uc *UserUC) attachVerifiedPhone(ctx context.Context, userID, phone string) error {
 	creds, err := uc.repo.FindCredentialsByUserID(ctx, userID)
 	if err != nil {
 		return err
 	}
 
 	var phoneCred *domain.UserCredential
-	var hash string
+	var emailCred *domain.UserCredential
 	for _, c := range creds {
-		if hash == "" {
-			hash = c.SecretHash
-		}
-		if c.Type == domain.CredentialTypePhone {
+		switch c.Type {
+		case domain.CredentialTypePhone:
 			phoneCred = c
-			break
+		case domain.CredentialTypeEmail:
+			emailCred = c
 		}
 	}
 
-	if phoneCred != nil && phoneCred.Identifier == in.NewPhone {
-		return domain.ErrSamePhone
-	}
-
-	// Check uniqueness
-	exists, err := uc.repo.ExistsByIdentifier(ctx, in.NewPhone)
-	if err != nil {
-		return fmt.Errorf("checking phone existence: %w", err)
-	}
-	if exists {
-		return domain.ErrPhoneAlreadyExists
-	}
-
-	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+	return uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		if phoneCred != nil {
-			phoneCred.Identifier = in.NewPhone
+			phoneCred.Identifier = phone
+			phoneCred.IsVerified = true
 			phoneCred.UpdatedAt = time.Now()
-			err = uc.repo.UpdateCredential(txCtx, phoneCred)
-			if err != nil {
-				return fmt.Errorf("updating user phone credential: %w", err)
+			if err := uc.repo.UpdateCredential(txCtx, phoneCred); err != nil {
+				return fmt.Errorf("updating phone credential: %w", err)
 			}
 		} else {
-			newPhoneCred := domain.NewCredentialWithHash(
-				userID,
-				domain.CredentialTypeEmail,
-				in.NewPhone,
-				hash,
-				true,
-				false,
-			)
-
-			err = uc.repo.SaveCredential(txCtx, newPhoneCred)
-			if err != nil {
-				return fmt.Errorf("saving user phone credential: %w", err)
+			var secretHash string
+			if emailCred != nil {
+				secretHash = emailCred.SecretHash
+			}
+			newCred := domain.NewCredentialWithHash(userID, domain.CredentialTypePhone, phone, secretHash, true, false)
+			if err := uc.repo.SaveCredential(txCtx, newCred); err != nil {
+				return fmt.Errorf("saving phone credential: %w", err)
 			}
 		}
 
-		// update general user info (updated_at)
 		user, err := uc.repo.FindByID(txCtx, userID)
 		if err == nil {
 			user.UpdatedAt = time.Now()
 			_ = uc.repo.Update(txCtx, user)
 		}
+		uc.cache.InvalidateProfile(ctx, userID)
 		return nil
 	})
-
-	if err != nil {
-		return err
-	}
-
-	// invalidate cache
-	uc.cache.InvalidateProfile(ctx, userID)
-	return nil
 }
 
 func (uc *UserUC) GetAddressList(ctx context.Context, userID string) ([]*AddressDTO, error) {

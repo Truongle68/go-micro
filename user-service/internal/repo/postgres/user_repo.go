@@ -170,6 +170,29 @@ func (r *UserRepo) FindCredentialsByUserID(ctx context.Context, userID string) (
 	return creds, nil
 }
 
+func (r *UserRepo) FindCredentialByTypeAndUserID(ctx context.Context, t domain.CredentialType, userID string) (*domain.UserCredential, error) {
+	var c domain.UserCredential
+	executor := postgres.GetExecutor(ctx, r.db)
+	query := `SELECT id, user_id, type, identifier, secret_hash, is_verified, is_primary, created_at, updated_at
+			FROM user_credentials 
+			WHERE type = $1 AND user_id = $2
+			ORDER BY created_at ASC
+			LIMIT 1;`
+	err := executor.QueryRowContext(ctx, query, t, userID).Scan(
+		&c.ID, &c.UserID, &c.Type, &c.Identifier, &c.SecretHash, &c.IsVerified, &c.IsPrimary, &c.CreatedAt, &c.UpdatedAt,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, domain.ErrUserNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &c, nil
+}
+
 func (r *UserRepo) FindProfileByUserID(ctx context.Context, userID string) (*domain.Profile, error) {
 	var p domain.Profile
 	var genderStr string
@@ -188,6 +211,9 @@ func (r *UserRepo) FindProfileByUserID(ctx context.Context, userID string) (*dom
 	}
 
 	gender := domain.Gender(genderStr)
+	if gender == "" {
+		gender = domain.GenderUnknown
+	}
 	if !gender.IsValid() {
 		return nil, fmt.Errorf("invalid gender value from database: %s", genderStr)
 	}
