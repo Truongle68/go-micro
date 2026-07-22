@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"catalog-service/internal/delivery/http/middleware"
 	"catalog-service/internal/domain"
 	"errors"
 	"net/http"
@@ -24,4 +25,8 @@ func (r *V1) handleError(c *gin.Context, err error) {
 		r.l.Error(err, "catalog handler unexpected error")
 		response.Error(c, http.StatusInternalServerError, "internal server error")
 	}
+}
+
+func (r *V1) getUserID(c *gin.Context) (string, bool) {
+	return middleware.GetUserID(c)
 }

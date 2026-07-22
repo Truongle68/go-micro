@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	env "github.com/TruongLe68/go-micro/pkg/config"
 )
@@ -13,6 +14,7 @@ type (
 		MongoDB mongodb
 		Log     log
 		JWT     jwt
+		Redis   redis
 	}
 
 	http struct {
@@ -38,7 +40,16 @@ type (
 	}
 
 	jwt struct {
-		AccessSecret string `env:"JWT_ACC_SECRET,required"`
+		AccessSecret  string        `env:"JWT_ACC_SECRET,required"`
+		RefreshSecret string        `env:"JWT_REF_SECRET,required"`
+		AccessTTL     time.Duration `env:"JWT_ACC_TTL" envDefault:"15m"`
+		RefreshTTL    time.Duration `env:"JWT_REF_TTL" envDefault:"168h"`
+	}
+
+	redis struct {
+		Addr     string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
+		Password string `env:"REDIS_PASSWORD" envDefault:""`
+		DB       int    `env:"REDIS_DB" envDefault:"0"`
 	}
 )
 

@@ -2,7 +2,10 @@ package v1
 
 import (
 	"catalog-service/internal/delivery/http/middleware"
+	"catalog-service/internal/domain"
 	"catalog-service/internal/usecase"
+	"catalog-service/pkg/jwt"
+	"catalog-service/pkg/redis"
 
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -17,10 +20,11 @@ type V1 struct {
 }
 
 type Dependencies struct {
-	Product   usecase.ProductUsecase
-	Category  usecase.CategoryUsecase
-	Logger    logger.Interface
-	JWTSecret string
+	Product  usecase.ProductUsecase
+	Category usecase.CategoryUsecase
+	Logger   logger.Interface
+	Tokens   jwt.TokenService
+	Cache    redis.IdentityCacher
 }
 
 func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
@@ -31,27 +35,26 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
 		v:        validator.New(),
 	}
 
-	authMid := middleware.AuthMiddleware(deps.JWTSecret)
-	adminMid := middleware.RoleMiddleware("admin")
-	userOrAdminMid := middleware.RoleMiddleware("user", "admin")
+	authMid := middleware.Auth(deps.Tokens, deps.Cache)
+	adminMid := middleware.Role(string(domain.UserRoleAdmin))
 
 	products := apiV1Group.Group("/products")
 	{
-		products.POST("/create-product", authMid, adminMid, r.CreateProduct)
-		products.GET("/get-product/:id", authMid, userOrAdminMid, r.GetProduct)
-		products.POST("/update-product/:id", authMid, adminMid, r.UpdateProduct)
-		products.POST("/delete-product/:id", authMid, adminMid, r.DeleteProduct)
-		products.GET("/get-product-list", authMid, userOrAdminMid, r.ListProducts)
-		products.GET("/get-products-by-category/:id", authMid, userOrAdminMid, r.GetProductsByCategory)
+		products.POST("", authMid, adminMid, r.CreateProduct)
+		products.GET("/:id", authMid, r.GetProduct)
+		products.PUT("/:id", authMid, adminMid, r.UpdateProduct)
+		products.DELETE("/:id", authMid, adminMid, r.DeleteProduct)
+		products.GET("", authMid, r.ListProducts)
 	}
 
 	categories := apiV1Group.Group("/categories")
 	{
-		categories.POST("/create-category", authMid, adminMid, r.CreateCategory)
-		categories.GET("/get-category/:id", authMid, userOrAdminMid, r.GetCategory)
-		categories.GET("/get-category-children/:id", authMid, userOrAdminMid, r.GetCategoryChildren)
-		categories.POST("/update-category/:id", authMid, adminMid, r.UpdateCategory)
-		categories.POST("/delete-category/:id", authMid, adminMid, r.DeleteCategory)
-		categories.GET("/get-category-list", authMid, userOrAdminMid, r.ListCategories)
+		categories.POST("", authMid, adminMid, r.CreateCategory)
+		categories.GET("/:id", authMid, r.GetCategory)
+		categories.GET("/:id/children", authMid, r.GetCategoryChildren)
+		categories.PUT("/:id", authMid, adminMid, r.UpdateCategory)
+		categories.DELETE("/:id", authMid, adminMid, r.DeleteCategory)
+		categories.GET("", authMid, r.ListCategories)
+		categories.GET("/:id/products", authMid, r.GetProductsByCategory)
 	}
 }

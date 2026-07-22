@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"catalog-service/pkg/jwt"
+	"catalog-service/pkg/redis"
 	"errors"
 	"net/http"
 	"slices"
@@ -8,7 +10,6 @@ import (
 
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
@@ -22,14 +23,7 @@ var (
 	ErrInvalidToken            = errors.New("invalid token")
 )
 
-type Claims struct {
-	UserID string `json:"user_id,omitempty"`
-	Role   string `json:"role,omitempty"`
-	Type   string `json:"type"`
-	jwt.RegisteredClaims
-}
-
-func AuthMiddleware(accessSecret string) gin.HandlerFunc {
+func Auth(tokenService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(authorizationHeader)
 		if authHeader == "" {
@@ -47,22 +41,23 @@ func AuthMiddleware(accessSecret string) gin.HandlerFunc {
 
 		tokenStr := headerParts[1]
 
-		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, ErrUnexpectedSigningMethod
-			}
-			return []byte(accessSecret), nil
-		})
-
-		if err != nil || !token.Valid {
-			response.Error(c, http.StatusUnauthorized, "invalid token")
+		// check if token is blacklisted in Redis
+		inBlacklist, err := bl.IsBlacklisted(c, tokenStr)
+		if err != nil {
+			response.Error(c, http.StatusUnauthorized, err.Error())
 			c.Abort()
 			return
 		}
 
-		if claims.Type != "access" {
-			response.Error(c, http.StatusUnauthorized, "invalid token type")
+		if inBlacklist {
+			response.Error(c, http.StatusUnauthorized, "token has been logged out")
+			c.Abort()
+			return
+		}
+
+		claims, err := tokenService.VerifyAccessToken(tokenStr)
+		if err != nil {
+			response.Error(c, http.StatusUnauthorized, err.Error())
 			c.Abort()
 			return
 		}
@@ -73,7 +68,7 @@ func AuthMiddleware(accessSecret string) gin.HandlerFunc {
 	}
 }
 
-func RoleMiddleware(allowedRoles ...string) gin.HandlerFunc {
+func Role(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get(userRoleCtx)
 		if !exists {
@@ -97,4 +92,13 @@ func RoleMiddleware(allowedRoles ...string) gin.HandlerFunc {
 		response.Error(c, http.StatusForbidden, "forbidden: insufficient permissions")
 		c.Abort()
 	}
+}
+
+func GetUserID(c *gin.Context) (string, bool) {
+	userID, exists := c.Get(userCtx)
+	if !exists {
+		return "", false
+	}
+	userIDStr, ok := userID.(string)
+	return userIDStr, ok
 }
