@@ -14,9 +14,9 @@ import (
 	"user-service/internal/usecase"
 	"user-service/pkg/jwt"
 	"user-service/pkg/mailer"
-	"user-service/pkg/sms"
 	userpg "user-service/pkg/postgres"
 	userredis "user-service/pkg/redis"
+	"user-service/pkg/sms"
 	"user-service/worker"
 
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
@@ -49,9 +49,9 @@ func main() {
 	defer redisClient.Close()
 
 	// init jwt
-	jwtManager := jwt.New(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessExpiry, cfg.JWT.RefreshExpiry)
+	jwtManager := jwt.New(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessExpiry, cfg.JWT.RefreshExpiry, cfg.JWT.ActionExpiry)
 
-	// init repo, usecase
+	// init repo, cache
 	userRepo := repo.NewUserRepo(pg.DB)
 
 	cache := userredis.NewIdentityCache(redisClient.Client)
@@ -60,9 +60,11 @@ func main() {
 	emailMailer := mailer.New(cfg.Email.SMTPHost, cfg.Email.SMTPPort, cfg.Email.SMTPUser, cfg.Email.SMTPPassword, cfg.Email.SenderEmail, l)
 	emailWorker := worker.NewEmailWorker(emailMailer, l)
 	smsClient := sms.NewMockSMS(l)
+
 	smsWorker := worker.NewSMSWorker(smsClient, l)
 	otpDispatcher := worker.NewCompositeOTPDispatcher(emailWorker, smsWorker)
 
+	// init usecase
 	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache, transactor, emailWorker, otpDispatcher, l, cfg.HTTP.BaseURL)
 	userUC := usecase.NewUserUC(userRepo, jwtManager, cache, transactor, emailWorker, l, cfg.HTTP.BaseURL)
 

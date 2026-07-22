@@ -15,7 +15,7 @@ type ResetPassword struct {
 	ConfirmedPassword string `json:"confirmed_password" validate:"required"`
 }
 
-func (req *ResetPassword) ToResetPasswordInput() usecase.ResetPasswordInput {
+func (req *ResetPassword) ToInput() usecase.ResetPasswordInput {
 	return usecase.ResetPasswordInput{
 		Token:       req.Token,
 		NewPassword: req.NewPassword,
@@ -26,7 +26,7 @@ type Logout struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
-func (req *Logout) ToLogoutInput(accessToken string) usecase.LogoutInput {
+func (req *Logout) ToInput(accessToken string) usecase.LogoutInput {
 	return usecase.LogoutInput{
 		AccessToken:  accessToken,
 		RefreshToken: req.RefreshToken,
@@ -34,26 +34,36 @@ func (req *Logout) ToLogoutInput(accessToken string) usecase.LogoutInput {
 }
 
 type RequestOTP struct {
-	Phone string `json:"phone" validate:"required"`
+	Identifier string `json:"identifier"`
+	Phone      string `json:"phone"`
 }
 
-func (req *RequestOTP) ToRequestOTPInput(purpose domain.VerifyPurpose) usecase.RequestOTPInput {
+func (req *RequestOTP) ToInput(purpose domain.VerifyPurpose) usecase.RequestOTPInput {
+	id := req.Identifier
+	if id == "" {
+		id = req.Phone
+	}
 	return usecase.RequestOTPInput{
-		Phone:   req.Phone,
-		Purpose: purpose,
+		Identifier: id,
+		Purpose:    purpose,
 	}
 }
 
 type VerifyOTP struct {
-	Phone   string `json:"phone" validate:"required"`
-	OTPCode string `json:"otp_code" validate:"required"`
+	Identifier string `json:"identifier"`
+	Phone      string `json:"phone"`
+	OTPCode    string `json:"otp_code" validate:"required"`
 }
 
-func (req *VerifyOTP) ToVerifyOTPInput(purpose domain.VerifyPurpose) usecase.VerifyOTPInput {
+func (req *VerifyOTP) ToInput(purpose domain.VerifyPurpose) usecase.VerifyOTPInput {
+	id := req.Identifier
+	if id == "" {
+		id = req.Phone
+	}
 	return usecase.VerifyOTPInput{
-		Phone:   req.Phone,
-		Code:    req.OTPCode,
-		Purpose: purpose,
+		Identifier: id,
+		Code:       req.OTPCode,
+		Purpose:    purpose,
 	}
 }
 
@@ -65,7 +75,7 @@ type CompleteRegister struct {
 	ConfirmedPassword string `json:"confirmed_password" validate:"required"`
 }
 
-func (req *CompleteRegister) ToRegisterInput() usecase.RegisterInput {
+func (req *CompleteRegister) ToInput() usecase.RegisterInput {
 	return usecase.RegisterInput{
 		Token:    req.Token,
 		FullName: req.FullName,
@@ -79,7 +89,7 @@ type Login struct {
 	Password   string `json:"password" validate:"required,min=8"`
 }
 
-func (req *Login) ToLoginInput(requiredRoles []domain.UserRole) usecase.LoginInput {
+func (req *Login) ToInput(requiredRoles []domain.UserRole) usecase.LoginInput {
 	return usecase.LoginInput{
 		Identifier:    req.Identifier,
 		Password:      req.Password,

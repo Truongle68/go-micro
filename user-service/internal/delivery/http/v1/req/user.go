@@ -6,53 +6,99 @@ import (
 )
 
 type UpdateProfile struct {
+	Email    *string        `json:"email"`
 	FullName *string        `json:"full_name"`
 	Gender   *domain.Gender `json:"gender"`
 	DOB      *string        `json:"dob"`
 }
 
-func (req *UpdateProfile) ToUpdatedProfileInput(userID string) usecase.UpdatedProfileInput {
+func (req *UpdateProfile) ToInput(userID string) usecase.UpdatedProfileInput {
 	return usecase.UpdatedProfileInput{
 		UserID:   userID,
+		Email:    req.Email,
 		FullName: req.FullName,
 		Gender:   req.Gender,
 		Dob:      req.DOB,
 	}
 }
 
-type VerifyChangeEmail struct {
+type RequestEmailLink struct {
+	Email   string                  `json:"email" validate:"required,email"`
+	Purpose domain.EmailLinkPurpose `json:"purpose"`
+}
+
+func (req *RequestEmailLink) ToInput(actorUserID string) usecase.RequestEmailLinkInput {
+	p := req.Purpose
+	if p == "" {
+		p = domain.EmailLinkPurposeVerifyNew
+	}
+	return usecase.RequestEmailLinkInput{
+		Email:       req.Email,
+		Purpose:     p,
+		ActorUserID: actorUserID,
+	}
+}
+
+type ChangeEmail struct {
+	Identifier       string `json:"identifier" validate:"required,email"`
+	ChangeEmailToken string `json:"change_email_token" validate:"required"`
+}
+
+func (req *ChangeEmail) ToInput(actorUserID string) usecase.RequestChangeEmailOTPInput {
+	return usecase.RequestChangeEmailOTPInput{
+		Identifier:       req.Identifier,
+		ActorUserID:      actorUserID,
+		ChangeEmailToken: req.ChangeEmailToken,
+	}
+}
+
+type ChangeEmailConfirm struct {
+	Identifier string `json:"identifier" validate:"required,email"`
+	Code       string `json:"code" validate:"required"`
+}
+
+func (req *ChangeEmailConfirm) ToInput(actorUserID string) usecase.VerifyChangeEmailOTPInput {
+	return usecase.VerifyChangeEmailOTPInput{
+		Identifier:  req.Identifier,
+		Code:        req.Code,
+		ActorUserID: actorUserID,
+	}
+}
+
+type VerifyPhone struct {
 	Code string `json:"code" validate:"required"`
 }
 
-func (req *VerifyChangeEmail) ToVerifyChangeEmailInput(userID string) usecase.VerifyChangeEmailInput {
-	return usecase.VerifyChangeEmailInput{
-		UserID: userID,
-		Code:   req.Code,
+func (req *VerifyPhone) ToInput(actorUserID string) usecase.VerifyPhoneVerificationOTPInput {
+	return usecase.VerifyPhoneVerificationOTPInput{
+		Code:        req.Code,
+		ActorUserID: actorUserID,
 	}
 }
 
-type CompleteChangeEmail struct {
-	Token    string `json:"token" validate:"required"`
-	NewEmail string `json:"new_email" validate:"required,email"`
+type ChangePhone struct {
+	Phone            string `json:"phone" validate:"required"`
+	ChangePhoneToken string `json:"change_phone_token" validate:"required"`
 }
 
-func (req *CompleteChangeEmail) ToCompleteChangeEmailInput(userID string) usecase.CompleteChangeEmailInput {
-	return usecase.CompleteChangeEmailInput{
-		UserID:   userID,
-		Token:    req.Token,
-		NewEmail: req.NewEmail,
+func (req *ChangePhone) ToInput(actorUserID string) usecase.RequestChangePhoneOTPInput {
+	return usecase.RequestChangePhoneOTPInput{
+		Identifier:       req.Phone,
+		ActorUserID:      actorUserID,
+		ChangePhoneToken: req.ChangePhoneToken,
 	}
 }
 
-type CompleteChangePhone struct {
-	Token    string `json:"token" validate:"required"`
-	NewPhone string `json:"new_phone" validate:"required"`
+type ChangePhoneVerify struct {
+	Phone string `json:"phone" validate:"required"`
+	Code  string `json:"code" validate:"required"`
 }
 
-func (req *CompleteChangePhone) ToCompleteChangePhoneInput() usecase.CompleteChangePhoneInput {
-	return usecase.CompleteChangePhoneInput{
-		Token:    req.Token,
-		NewPhone: req.NewPhone,
+func (req *ChangePhoneVerify) ToInput(actorUserID string) usecase.VerifyChangePhoneOTPInput {
+	return usecase.VerifyChangePhoneOTPInput{
+		Identifier:  req.Phone,
+		Code:        req.Code,
+		ActorUserID: actorUserID,
 	}
 }
 
@@ -66,7 +112,7 @@ type CreateAddress struct {
 	Lng         float64 `json:"lng"`
 }
 
-func (req *CreateAddress) ToCreateAddressInput(userID string) usecase.CreateAddressInput {
+func (req *CreateAddress) ToInput(userID string) usecase.CreateAddressInput {
 	return usecase.CreateAddressInput{
 		UserID:      userID,
 		Label:       domain.AddressLabel(req.Label),
@@ -80,7 +126,6 @@ func (req *CreateAddress) ToCreateAddressInput(userID string) usecase.CreateAddr
 }
 
 type UpdateAddress struct {
-	ID          string   `json:"id" validate:"required"`
 	Label       *string  `json:"label" validate:"omitempty,oneof=home work"`
 	AddressLine *string  `json:"address_line"`
 	Ward        *string  `json:"ward"`
@@ -90,14 +135,14 @@ type UpdateAddress struct {
 	Lng         *float64 `json:"lng"`
 }
 
-func (req *UpdateAddress) ToUpdateAddressInput(userID string) usecase.UpdateAddressInput {
+func (req *UpdateAddress) ToInput(id, userID string) usecase.UpdateAddressInput {
 	var label *domain.AddressLabel
 	if req.Label != nil {
 		l := domain.AddressLabel(*req.Label)
 		label = &l
 	}
 	return usecase.UpdateAddressInput{
-		ID:          req.ID,
+		ID:          id,
 		UserID:      userID,
 		Label:       label,
 		AddressLine: req.AddressLine,
@@ -107,12 +152,4 @@ func (req *UpdateAddress) ToUpdateAddressInput(userID string) usecase.UpdateAddr
 		Lat:         req.Lat,
 		Lng:         req.Lng,
 	}
-}
-
-type SetDefaultAddress struct {
-	ID string `json:"id" validate:"required"`
-}
-
-type DeleteAddress struct {
-	ID string `json:"id" validate:"required"`
 }

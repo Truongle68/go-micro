@@ -13,7 +13,7 @@
 
 INSERT INTO users (id, username, status, role) VALUES 
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'admin', 'verified', 'admin'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'user1', 'verified', 'customer')
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'user1', 'verified', 'user')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO user_credentials (user_id, type, identifier, secret_hash, is_verified, is_primary) VALUES

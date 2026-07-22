@@ -25,7 +25,7 @@ func (r *V1) requestOTP(c *gin.Context, purpose domain.VerifyPurpose) {
 		return
 	}
 
-	err := r.a.RequestOTP(c.Request.Context(), request.ToRequestOTPInput(purpose))
+	err := r.a.RequestOTP(c.Request.Context(), request.ToInput(purpose))
 	if err != nil {
 		r.l.Error(err, "restapi - v1 - requestOTP - usecase failed")
 		r.handleError(c, err)
@@ -53,7 +53,7 @@ func (r *V1) verifyOTP(c *gin.Context, purpose domain.VerifyPurpose) {
 		return
 	}
 
-	token, exists, username, err := r.a.VerifyOTP(c.Request.Context(), request.ToVerifyOTPInput(purpose))
+	token, exists, username, err := r.a.VerifyOTP(c.Request.Context(), request.ToInput(purpose))
 	if err != nil {
 		r.l.Error(err, "restapi - v1 - verifyOTP - usecase failed")
 		r.handleError(c, err)
@@ -86,7 +86,7 @@ func (r *V1) completeRegister(c *gin.Context) {
 		return
 	}
 
-	out, err := r.a.CompleteRegister(c.Request.Context(), request.ToRegisterInput())
+	out, err := r.a.CompleteRegister(c.Request.Context(), request.ToInput())
 	if err != nil {
 		r.l.Error(err, "restapi - v1 - completeRegister - usecase failed")
 		r.handleError(c, err)
@@ -135,7 +135,7 @@ func (r *V1) executeLoginFlow(c *gin.Context, contextTag string, requiredRoles [
 		return
 	}
 
-	out, err := r.a.Login(c.Request.Context(), request.ToLoginInput(requiredRoles))
+	out, err := r.a.Login(c.Request.Context(), request.ToInput(requiredRoles))
 	if err != nil {
 		r.handleError(c, err)
 		return
@@ -163,7 +163,7 @@ func (r *V1) logout(c *gin.Context) {
 		return
 	}
 
-	err := r.a.Logout(c.Request.Context(), request.ToLogoutInput(accessToken))
+	err := r.a.Logout(c.Request.Context(), request.ToInput(accessToken))
 	if err != nil {
 		r.handleError(c, err)
 		return
@@ -212,7 +212,7 @@ func (r *V1) resetPassword(c *gin.Context) {
 		return
 	}
 
-	err := r.a.ResetPassword(c.Request.Context(), request.ToResetPasswordInput())
+	err := r.a.ResetPassword(c.Request.Context(), request.ToInput())
 	if err != nil {
 		r.handleError(c, err)
 		return

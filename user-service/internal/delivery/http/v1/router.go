@@ -21,7 +21,7 @@ type Dependencies struct {
 	Auth   usecase.Auth
 	User   usecase.User
 	JWT    jwt.TokenService
-	cache  redis.BlacklistCacher
+	Cache  redis.BlacklistCacher
 	Logger logger.Interface
 }
 
@@ -30,7 +30,7 @@ func NewDependencies(auth usecase.Auth, user usecase.User, jwt jwt.TokenService,
 		Auth:   auth,
 		User:   user,
 		JWT:    jwt,
-		cache:  cache,
+		Cache:  cache,
 		Logger: l,
 	}
 }
@@ -43,10 +43,10 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 		v: validator.New(),
 	}
 
-	// public routes
+	// public auth routes
 	auth := apiV1Group.Group("/auth")
-	auth.POST("/register/request-otp", r.requestRegisterOTP)
-	auth.POST("/register/verify-otp", r.verifyRegisterOTP)
+	auth.POST("/register", r.requestRegisterOTP)
+	auth.POST("/register/verify", r.verifyRegisterOTP)
 	auth.POST("/register/complete", r.completeRegister)
 	auth.GET("/check-username", r.checkAvailableUsername)
 	auth.POST("/login", r.login)
@@ -54,29 +54,34 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	auth.POST("/forgot-password", r.forgotPassword)
 	auth.POST("/reset-password", r.resetPassword)
 
-	// private/protected routes
+	// public email link confirm
+	apiV1Group.GET("/users/verify-email/confirm", r.confirmEmailLink)
+
+	// protected routes
 	protected := apiV1Group.Group("")
-	protected.Use(authMiddleware(deps.JWT, deps.cache))
+	protected.Use(authMiddleware(deps.JWT, deps.Cache))
 
 	protected.POST("/auth/logout", r.logout)
 
 	users := protected.Group("/users")
 	// profile
-	users.GET("/get-profile", r.getProfile)
-	users.POST("/update-profile", r.updateProfile)
-	users.POST("/request-change-email", r.requestChangeEmail)
-	users.POST("/verify-change-email", r.verifyChangeEmail)
-	users.POST("/complete-change-email", r.completeChangeEmail)
-	users.POST("/request-change-phone", r.requestChangePhone)
+	users.GET("/profile", r.getProfile)
+	users.PUT("/profile", r.updateProfile)
+
+	// verification & credential change
+	users.POST("/verify-email", r.requestEmailLink)
+	users.POST("/change-email", r.changeEmail)
+	users.POST("/change-email/confirm", r.changeEmailVerify)
+	users.POST("/verify-phone", r.requestPhoneVerification)
+	users.POST("/verify-phone/confirm", r.verifyPhone)
+	users.POST("/change-phone", r.changePhone)
+	users.POST("/change-phone/confirm", r.changePhoneVerify)
 
 	// address
-	address := users.Group("/address")
-	address.GET("/get-address-list", r.getAddressList)
-	address.POST("/create-address", r.addAddress)
-	address.POST("/set-default-address", r.setDefaultAddress)
-	address.POST("/update-address", r.updateAddress)
-	address.POST("/delete-address", r.deleteAddress)
-
-	// public route for completing change phone
-	apiV1Group.POST("/users/complete-change-phone", r.completeChangePhone)
+	address := users.Group("/addresses")
+	address.GET("", r.getAddressList)
+	address.POST("", r.addAddress)
+	address.POST("/:id/set-default", r.setDefaultAddress)
+	address.PUT("/:id/update", r.updateAddress)
+	address.DELETE("/:id/delete", r.deleteAddress)
 }

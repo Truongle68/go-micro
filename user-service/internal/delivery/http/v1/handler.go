@@ -39,13 +39,14 @@ func (r *V1) handleError(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrInvalidFullName),
 		errors.Is(err, domain.ErrInvalidGender),
 		errors.Is(err, domain.ErrInvalidDob),
+		errors.Is(err, domain.ErrVerifiedEmailCannotBeUpdatedDirectly),
 		errors.Is(err, domain.ErrNoFieldsToUpdate):
 		response.Error(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrUserNotFound),
 		errors.Is(err, domain.ErrAddressNotFound):
 		response.Error(c, http.StatusNotFound, err.Error())
 	default:
-		r.l.Error(err, "auth handler unexpected error")
+		r.l.Error("auth handler unexpected error: %v", err)
 		response.Error(c, http.StatusInternalServerError, "internal server error")
 	}
 }

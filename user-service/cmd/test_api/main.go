@@ -126,14 +126,13 @@ func main() {
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	// 3. Request OTP (Register)
-	fmt.Println("[Step 3] POST /auth/register/request-otp...")
+	fmt.Println("[Step 3] POST /auth/register...")
 	reqBody, _ := json.Marshal(map[string]string{
-		"phone":   testPhone,
-		"purpose": "register",
+		"phone": testPhone,
 	})
-	resp, err := client.Post(baseURL+"/auth/register/request-otp", "application/json", bytes.NewBuffer(reqBody))
+	resp, err := client.Post(baseURL+"/auth/register", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
-		fmt.Printf("FAIL: request-otp request failed: %v\n", err)
+		fmt.Printf("FAIL: register request failed: %v\n", err)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
@@ -150,15 +149,14 @@ func main() {
 	fmt.Printf("Retrieved OTP Code: %s\n", otpCode)
 
 	// 5. Verify OTP
-	fmt.Println("[Step 5] POST /auth/register/verify-otp...")
+	fmt.Println("[Step 5] POST /auth/register/verify...")
 	reqBody, _ = json.Marshal(map[string]string{
 		"phone":    testPhone,
 		"otp_code": otpCode,
-		"purpose":  "register",
 	})
-	resp, err = client.Post(baseURL+"/auth/register/verify-otp", "application/json", bytes.NewBuffer(reqBody))
+	resp, err = client.Post(baseURL+"/auth/register/verify", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
-		fmt.Printf("FAIL: verify-otp request failed: %v\n", err)
+		fmt.Printf("FAIL: register/verify request failed: %v\n", err)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
@@ -206,8 +204,8 @@ func main() {
 	fmt.Printf("Registered successfully. UserID: %s, AccessToken: (present), RefreshToken: (present)\n", authRes.UserID)
 
 	// 7. Get Profile (Success case)
-	fmt.Println("[Step 7] GET /users/profile...")
-	getReq, _ := http.NewRequest("GET", baseURL+"/users/profile", nil)
+	fmt.Println("[Step 7] GET /users/get-profile...")
+	getReq, _ := http.NewRequest("GET", baseURL+"/users/get-profile", nil)
 	getReq.Header.Set("Authorization", "Bearer "+authRes.AccessToken)
 	resp, err = client.Do(getReq)
 	if err != nil {
@@ -229,15 +227,14 @@ func main() {
 	fmt.Printf("Profile details: Username=%s, Phone=%s, FullName=%s\n", profileRes.Username, profileRes.Phone, profileRes.FullName)
 
 	// 8. Update Profile
-	fmt.Println("[Step 8] PUT /users/profile...")
+	fmt.Println("[Step 8] POST /users/update-profile...")
 	reqBody, _ = json.Marshal(map[string]string{
 		"full_name": "Updated Test User",
-		"phone":     "+84999999998",
 	})
-	putReq, _ := http.NewRequest("PUT", baseURL+"/users/profile", bytes.NewBuffer(reqBody))
-	putReq.Header.Set("Authorization", "Bearer "+authRes.AccessToken)
-	putReq.Header.Set("Content-Type", "application/json")
-	resp, err = client.Do(putReq)
+	postReq, _ := http.NewRequest("POST", baseURL+"/users/update-profile", bytes.NewBuffer(reqBody))
+	postReq.Header.Set("Authorization", "Bearer "+authRes.AccessToken)
+	postReq.Header.Set("Content-Type", "application/json")
+	resp, err = client.Do(postReq)
 	if err != nil {
 		fmt.Printf("FAIL: update-profile request failed: %v\n", err)
 		os.Exit(1)
@@ -386,8 +383,8 @@ func main() {
 	fmt.Println("Logged out successfully.")
 
 	// 15. Verify token is blacklisted
-	fmt.Println("[Step 15] Verifying access token is blacklisted (GET /users/profile should fail)...")
-	getReq, _ = http.NewRequest("GET", baseURL+"/users/profile", nil)
+	fmt.Println("[Step 15] Verifying access token is blacklisted (GET /users/get-profile should fail)...")
+	getReq, _ = http.NewRequest("GET", baseURL+"/users/get-profile", nil)
 	getReq.Header.Set("Authorization", "Bearer "+authRes.AccessToken)
 	resp, err = client.Do(getReq)
 	if err != nil {
