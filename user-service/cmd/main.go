@@ -49,7 +49,10 @@ func main() {
 	defer redisClient.Close()
 
 	// init jwt
-	jwtManager := jwt.New(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessExpiry, cfg.JWT.RefreshExpiry, cfg.JWT.ActionExpiry)
+	jwtManager, err := jwt.New(cfg.JWT.PrivateKey, cfg.JWT.PublicKey, cfg.JWT.AccessExpiry, cfg.JWT.RefreshExpiry, cfg.JWT.ActionExpiry)
+	if err != nil {
+		l.Fatal("failed to initialize jwt: %v", err)
+	}
 
 	// init repo, cache
 	userRepo := repo.NewUserRepo(pg.DB)

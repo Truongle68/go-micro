@@ -45,8 +45,8 @@ type (
 	}
 
 	jwt struct {
-		AccessSecret  string        `env:"JWT_ACC_SECRET,required"`
-		RefreshSecret string        `env:"JWT_REF_SECRET,required"`
+		PrivateKey    string        `env:"PRIVATE_KEY,required"`
+		PublicKey     string        `env:"PUBLIC_KEY,required"`
 		AccessExpiry  time.Duration `env:"JWT_ACC_EXPIRY" envDefault:"15m"`
 		RefreshExpiry time.Duration `env:"JWT_REF_EXPIRY" envDefault:"168h"`
 		ActionExpiry  time.Duration `env:"JWT_ACT_EXPIRY" envDefault:"15m"`
