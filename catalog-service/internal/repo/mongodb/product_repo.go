@@ -36,15 +36,11 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 		if p.Variants[i].ID == "" {
 			p.Variants[i].ID = bson.NewObjectID().Hex()
 		}
-		p.Variants[i].CreatedAt = now
-		p.Variants[i].UpdatedAt = now
 	}
 	for i := range p.Images {
 		if p.Images[i].ID == "" {
 			p.Images[i].ID = bson.NewObjectID().Hex()
 		}
-		p.Images[i].CreatedAt = now
-		p.Images[i].UpdatedAt = now
 	}
 
 	_, err := r.collection.InsertOne(ctx, p)
@@ -89,19 +85,11 @@ func (r *ProductRepo) Update(ctx context.Context, id string, p *domain.Product) 
 		if p.Variants[i].ID == "" {
 			p.Variants[i].ID = bson.NewObjectID().Hex()
 		}
-		if p.Variants[i].CreatedAt.IsZero() {
-			p.Variants[i].CreatedAt = p.UpdatedAt
-		}
-		p.Variants[i].UpdatedAt = p.UpdatedAt
 	}
 	for i := range p.Images {
 		if p.Images[i].ID == "" {
 			p.Images[i].ID = bson.NewObjectID().Hex()
 		}
-		if p.Images[i].CreatedAt.IsZero() {
-			p.Images[i].CreatedAt = p.UpdatedAt
-		}
-		p.Images[i].UpdatedAt = p.UpdatedAt
 	}
 
 	filter := bson.M{"_id": id}

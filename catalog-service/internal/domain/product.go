@@ -23,18 +23,14 @@ type Product struct {
 }
 
 type ProductVariant struct {
-	ID           string    `json:"id" bson:"id"`
-	VariantLabel string    `json:"variant_label" bson:"variant_label"`
-	PriceDelta   float64   `json:"price_delta" bson:"price_delta"`
-	Sku          string    `json:"sku" bson:"sku"`
-	CreatedAt    time.Time `json:"created_at" bson:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" bson:"updated_at"`
+	ID           string  `json:"id" bson:"id"`
+	VariantLabel string  `json:"variant_label" bson:"variant_label"`
+	PriceDelta   float64 `json:"price_delta" bson:"price_delta"`
+	Sku          string  `json:"sku" bson:"sku"`
 }
 
 type ProductImage struct {
-	ID        string    `json:"id" bson:"id"`
-	Url       string    `json:"url" bson:"url"`
-	SortOrder int32     `json:"sort_order" bson:"sort_order"`
-	CreatedAt time.Time `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
+	ID        string `json:"id" bson:"id"`
+	Url       string `json:"url" bson:"url"`
+	SortOrder int32  `json:"sort_order" bson:"sort_order"`
 }

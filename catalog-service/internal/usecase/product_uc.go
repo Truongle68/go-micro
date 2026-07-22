@@ -30,8 +30,6 @@ func toProductDTO(p *domain.Product) *ProductDTO {
 			VariantLabel: v.VariantLabel,
 			PriceDelta:   v.PriceDelta,
 			Sku:          v.Sku,
-			CreatedAt:    v.CreatedAt,
-			UpdatedAt:    v.UpdatedAt,
 		}
 	}
 
@@ -41,8 +39,6 @@ func toProductDTO(p *domain.Product) *ProductDTO {
 			ID:        img.ID,
 			Url:       img.Url,
 			SortOrder: img.SortOrder,
-			CreatedAt: img.CreatedAt,
-			UpdatedAt: img.UpdatedAt,
 		}
 	}
 
