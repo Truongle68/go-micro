@@ -39,13 +39,18 @@ type UpdateCategoryInput struct {
 	SortOrder *int64
 }
 
+type CategoryListResultDTO struct {
+	Categories []*CategoryDTO `json:"categories"`
+	TotalCount int64          `json:"total_count"`
+}
+
 type CategoryUsecase interface {
 	Create(ctx context.Context, in CreateCategoryInput) (*CategoryDTO, error)
 	GetByID(ctx context.Context, id string) (*CategoryDTO, error)
-	GetChildren(ctx context.Context, parentID string) ([]*CategoryDTO, error)
+	GetChildren(ctx context.Context, parentID string, params pagination.Params) (*CategoryListResultDTO, error)
 	Update(ctx context.Context, in UpdateCategoryInput) (*CategoryDTO, error)
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context, params pagination.Params) ([]*CategoryDTO, error)
+	List(ctx context.Context, params pagination.Params) (*CategoryListResultDTO, error)
 }
 
 type ProductVariantDTO struct {
@@ -127,7 +132,7 @@ type UpdateProductInput struct {
 	Images        []ProductImageInput
 }
 
-type ProductSearchResultDTO struct {
+type ProductListResultDTO struct {
 	Products   []*ProductDTO `json:"products"`
 	TotalCount int64         `json:"total_count"`
 }
@@ -145,9 +150,9 @@ type SearchProductInput struct {
 type ProductUsecase interface {
 	Create(ctx context.Context, in CreateProductInput) (*ProductDTO, error)
 	GetByID(ctx context.Context, id string) (*ProductDTO, error)
-	GetByCategory(ctx context.Context, categoryID string) ([]*ProductDTO, error)
+	GetByCategory(ctx context.Context, categoryID string, params pagination.Params) (*ProductListResultDTO, error)
 	Update(ctx context.Context, in UpdateProductInput) (*ProductDTO, error)
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context, params pagination.Params) ([]*ProductDTO, error)
-	Search(ctx context.Context, searchParams domain.SearchProductParams, paginatedParams pagination.Params) (*ProductSearchResultDTO, error)
+	List(ctx context.Context, params pagination.Params) (*ProductListResultDTO, error)
+	Search(ctx context.Context, searchParams domain.SearchProductParams, paginatedParams pagination.Params) (*ProductListResultDTO, error)
 }

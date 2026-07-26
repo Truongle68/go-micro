@@ -98,21 +98,3 @@ func ToProductListResponse(dtos []*usecase.ProductDTO) []ProductResponse {
 	}
 	return res
 }
-
-type ProductSearchResultResponse struct {
-	Products   []ProductResponse `json:"products"`
-	TotalCount int64             `json:"total_count"`
-}
-
-func ToProductSearchResultResponse(dto *usecase.ProductSearchResultDTO) ProductSearchResultResponse {
-	if dto == nil {
-		return ProductSearchResultResponse{
-			Products:   []ProductResponse{},
-			TotalCount: 0,
-		}
-	}
-	return ProductSearchResultResponse{
-		Products:   ToProductListResponse(dto.Products),
-		TotalCount: dto.TotalCount,
-	}
-}

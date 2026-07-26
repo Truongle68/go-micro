@@ -5,11 +5,13 @@ import (
 	"catalog-service/internal/repo"
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type CategoryRepo struct {
@@ -130,13 +132,31 @@ func (r *CategoryRepo) FindByID(ctx context.Context, id string) (*domain.Categor
 	return &c, nil
 }
 
-func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string) ([]domain.Category, error) {
+func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagination.Params) (*domain.ListCategoryResult, error) {
 	poid, err := bson.ObjectIDFromHex(parentID)
 	if err != nil {
 		return nil, domain.ErrInvalidCategoryID
 	}
 
-	cursor, err := r.collection.Find(ctx, bson.M{"parent_id": poid})
+	filter := bson.M{"parent_id": poid}
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count child categories: %w", err)
+	}
+
+	if total == 0 {
+		return &domain.ListCategoryResult{
+			Categories: []*domain.Category{},
+			TotalCount: 0,
+		}, nil
+	}
+
+	findOpts := options.Find().
+		SetSort(bson.D{{Key: "sort_order", Value: 1}, {Key: "_id", Value: 1}}).
+		SetSkip(p.Skip()).
+		SetLimit(p.Limit)
+
+	cursor, err := r.collection.Find(ctx, filter, findOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +167,15 @@ func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string) ([]dom
 		return nil, err
 	}
 
-	categories := make([]domain.Category, len(models))
+	categories := make([]*domain.Category, len(models))
 	for i, m := range models {
-		categories[i] = m.toDomain()
+		cat := m.toDomain()
+		categories[i] = &cat
 	}
-	return categories, nil
+	return &domain.ListCategoryResult{
+		Categories: categories,
+		TotalCount: total,
+	}, nil
 }
 
 func (r *CategoryRepo) Update(ctx context.Context, id string, c *domain.Category) (*domain.Category, error) {
@@ -192,8 +216,26 @@ func (r *CategoryRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *CategoryRepo) List(ctx context.Context, p pagination.Params) ([]domain.Category, error) {
-	cursor, err := r.collection.Find(ctx, bson.M{})
+func (r *CategoryRepo) List(ctx context.Context, p pagination.Params) (*domain.ListCategoryResult, error) {
+	filter := bson.M{}
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count categories: %w", err)
+	}
+
+	if total == 0 {
+		return &domain.ListCategoryResult{
+			Categories: []*domain.Category{},
+			TotalCount: 0,
+		}, nil
+	}
+
+	findOpts := options.Find().
+		SetSort(bson.D{{Key: "sort_order", Value: 1}, {Key: "_id", Value: 1}}).
+		SetSkip(p.Skip()).
+		SetLimit(p.Limit)
+
+	cursor, err := r.collection.Find(ctx, filter, findOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -204,9 +246,13 @@ func (r *CategoryRepo) List(ctx context.Context, p pagination.Params) ([]domain.
 		return nil, err
 	}
 
-	categories := make([]domain.Category, len(models))
+	categories := make([]*domain.Category, len(models))
 	for i, m := range models {
-		categories[i] = m.toDomain()
+		cat := m.toDomain()
+		categories[i] = &cat
 	}
-	return categories, nil
+	return &domain.ListCategoryResult{
+		Categories: categories,
+		TotalCount: total,
+	}, nil
 }

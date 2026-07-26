@@ -45,13 +45,15 @@ func (r *V1) GetCategory(c *gin.Context) {
 
 func (r *V1) GetCategoryChildren(c *gin.Context) {
 	id := c.Param("id")
-	children, err := r.category.GetChildren(c.Request.Context(), id)
+	p := pagination.FromQuery(c)
+	listResult, err := r.category.GetChildren(c.Request.Context(), id, p)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "get category children success", res.ToCategoryListResponse(children))
+	result := pagination.NewResult(res.ToCategoryListResponse(listResult.Categories), p, listResult.TotalCount)
+	response.SuccessPaginated(c, http.StatusOK, "get category children success", result)
 }
 
 func (r *V1) UpdateCategory(c *gin.Context) {
@@ -90,11 +92,12 @@ func (r *V1) DeleteCategory(c *gin.Context) {
 
 func (r *V1) ListCategories(c *gin.Context) {
 	p := pagination.FromQuery(c)
-	categories, err := r.category.List(c.Request.Context(), p)
+	listResult, err := r.category.List(c.Request.Context(), p)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "list categories success", res.ToCategoryListResponse(categories))
+	result := pagination.NewResult(res.ToCategoryListResponse(listResult.Categories), p, listResult.TotalCount)
+	response.SuccessPaginated(c, http.StatusOK, "list categories success", result)
 }

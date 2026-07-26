@@ -43,7 +43,7 @@ func initUsecases(db *mongodrv.Database) useCases {
 	}
 }
 
-func initServers(l logger.Interface, uc useCases, cfg *config.Config, v *jwtmanager.Verifier, cache cataredis.IdentityCacher) *servers {
+func initServers(l logger.Interface, uc useCases, cfg *config.Config, v jwtmanager.JWTManager, cache cataredis.IdentityCacher) *servers {
 	http := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 	deps := v1.Dependencies{
 		Product:  uc.product,

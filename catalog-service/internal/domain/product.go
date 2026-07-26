@@ -192,7 +192,7 @@ func (p SearchProductParams) Validate() error {
 
 var ErrInvalidPriceRange = errors.New("min_price cannot be greater than max_price")
 
-type ProductSearchResult struct {
-	Products   []Product
+type ListProductResult struct {
+	Products   []*Product
 	TotalCount int64
 }

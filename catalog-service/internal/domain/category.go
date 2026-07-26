@@ -77,3 +77,9 @@ func (c *Category) ApplyUpdate(params UpdateCategoryParams) {
 
 	c.UpdatedAt = time.Now()
 }
+
+type ListCategoryResult struct {
+	Categories []*Category
+	TotalCount int64
+}
+

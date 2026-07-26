@@ -7,4 +7,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 )
 
-require github.com/GoProOrg/core-go-pkg v1.0.2 // indirect
+require (
+	github.com/GoProOrg/core-go-pkg v1.0.2 // indirect
+	go.mongodb.org/mongo-driver v1.17.9 // indirect
+)

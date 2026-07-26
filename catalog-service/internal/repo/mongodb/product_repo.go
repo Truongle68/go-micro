@@ -230,27 +230,48 @@ func (r *ProductRepo) FindByID(ctx context.Context, id string) (*domain.Product,
 	return m.toDomain(), nil
 }
 
-func (r *ProductRepo) FindByCategory(ctx context.Context, categoryID string) ([]domain.Product, error) {
+func (r *ProductRepo) FindByCategory(ctx context.Context, categoryID string, p pagination.Params) (*domain.ListProductResult, error) {
 	oid, err := bson.ObjectIDFromHex(categoryID)
 	if err != nil {
-		return []domain.Product{}, domain.ErrInvalidCategoryID
+		return nil, domain.ErrInvalidCategoryID
 	}
 
-	cursor, err := r.collection.Find(ctx, bson.M{"category_id": oid})
+	filter := bson.M{"category_id": oid}
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count products by category: %w", err)
+	}
+
+	if total == 0 {
+		return &domain.ListProductResult{
+			Products:   []*domain.Product{},
+			TotalCount: 0,
+		}, nil
+	}
+
+	findOpts := options.Find().
+		SetSort(bson.D{{Key: "_id", Value: 1}}).
+		SetSkip(p.Skip()).
+		SetLimit(p.Limit)
+
+	cursor, err := r.collection.Find(ctx, filter, findOpts)
 	if err != nil {
 		return nil, fmt.Errorf("finding products by category: %w", err)
 	}
 	defer cursor.Close(ctx)
 
-	var models []productModel
+	var models []*productModel
 	if err := cursor.All(ctx, &models); err != nil {
 		return nil, fmt.Errorf("decoding products by category: %w", err)
 	}
-	products := make([]domain.Product, len(models))
+	products := make([]*domain.Product, len(models))
 	for i, m := range models {
-		products[i] = *m.toDomain()
+		products[i] = m.toDomain()
 	}
-	return products, nil
+	return &domain.ListProductResult{
+		Products:   products,
+		TotalCount: total,
+	}, nil
 }
 
 func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) (*domain.Product, error) {
@@ -307,57 +328,59 @@ func (r *ProductRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *ProductRepo) List(ctx context.Context, p pagination.Params) ([]domain.Product, error) {
-	skip := p.Skip()
+func (r *ProductRepo) List(ctx context.Context, p pagination.Params) (*domain.ListProductResult, error) {
+	filter := bson.M{}
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count products: %w", err)
+	}
+
+	if total == 0 {
+		return &domain.ListProductResult{
+			Products:   []*domain.Product{},
+			TotalCount: 0,
+		}, nil
+	}
+
 	findOpts := options.Find().
 		SetSort(bson.D{{Key: "_id", Value: 1}}).
-		SetSkip(skip).
+		SetSkip(p.Skip()).
 		SetLimit(p.Limit)
+
 	cursor, err := r.collection.Find(ctx, bson.M{}, findOpts)
 	if err != nil {
 		return nil, fmt.Errorf("listing products: %w", err)
 	}
 	defer cursor.Close(ctx)
 
-	var models []productModel
+	var models []*productModel
 	if err := cursor.All(ctx, &models); err != nil {
 		return nil, fmt.Errorf("decoding product list: %w", err)
 	}
 
-	products := make([]domain.Product, len(models))
+	products := make([]*domain.Product, len(models))
 	for i, m := range models {
-		products[i] = *m.toDomain()
+		products[i] = m.toDomain()
 	}
 
-	return products, nil
+	return &domain.ListProductResult{
+		Products:   products,
+		TotalCount: total,
+	}, nil
 }
 
-func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*domain.ProductSearchResult, error) {
+func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*domain.ListProductResult, error) {
 
-	mustClauses := buildMustClauses(sParams)
 	filterClauses, err := buildFilterClauses(sParams)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(mustClauses) == 0 && len(filterClauses) == 0 {
-		products, err := r.List(ctx, pParams)
-		if err != nil {
-			return nil, err
-		}
-
-		counts, err := r.collection.CountDocuments(ctx, bson.M{})
-		if err != nil {
-			return nil, fmt.Errorf("counting products: %w", err)
-		}
-
-		return &domain.ProductSearchResult{
-			Products:   products,
-			TotalCount: counts,
-		}, nil
+	if sParams.Query == "" && len(filterClauses) == 0 {
+		return r.List(ctx, pParams)
 	}
 
-	pipeline := buildSearchPipeline(mustClauses, filterClauses, pParams.Skip(), pParams.Limit)
+	pipeline := buildSearchPipeline(sParams, filterClauses, pParams.Skip(), pParams.Limit)
 
 	opts := options.Aggregate().SetAllowDiskUse(true)
 	cursor, err := r.collection.Aggregate(ctx, pipeline, opts)
@@ -367,20 +390,6 @@ func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductPa
 	defer cursor.Close(ctx)
 
 	return decodeFacetResult(ctx, cursor)
-}
-
-func buildMustClauses(params domain.SearchProductParams) []bson.M {
-	var clauses []bson.M
-	if params.Query != "" {
-		clauses = append(clauses, bson.M{
-			"text": bson.M{
-				"query": params.Query,
-				"path":  []string{"name_vi", "name_en", "description_vi", "description_en", "sku"},
-				"fuzzy": bson.M{"maxEdits": 1},
-			},
-		})
-	}
-	return clauses
 }
 
 func buildFilterClauses(params domain.SearchProductParams) ([]bson.M, error) {
@@ -423,22 +432,51 @@ func buildFilterClauses(params domain.SearchProductParams) ([]bson.M, error) {
 	return clauses, nil
 }
 
-func buildSearchPipeline(must, filter []bson.M, skip, limit int64) mongo.Pipeline {
+func buildSearchPipeline(sParams domain.SearchProductParams, filterClauses []bson.M, skip, limit int64) mongo.Pipeline {
 	compoundStage := bson.M{}
-	if len(must) > 0 {
-		compoundStage["must"] = must
+
+	if len(filterClauses) > 0 {
+		compoundStage["filter"] = filterClauses
 	}
-	if len(filter) > 0 {
-		compoundStage["filter"] = filter
+
+	if sParams.Query != "" {
+		compoundStage["should"] = []bson.M{
+			{
+				"autocomplete": bson.M{
+					"query": sParams.Query,
+					"path":  "name_en",
+				},
+			},
+			{
+				"autocomplete": bson.M{
+					"query": sParams.Query,
+					"path":  "name_vi",
+				},
+			},
+			{
+				"text": bson.M{
+					"query": sParams.Query,
+					"path":  []string{"name_vi", "name_en", "description_vi", "description_en", "sku"},
+					"fuzzy": bson.M{"maxEdits": 1},
+				},
+			},
+		}
+		compoundStage["minimumShouldMatch"] = 1
 	}
 
 	searchStage := bson.M{
-		"index":    "products_fts_idex",
+		"index":    "products_fts_idx",
 		"compound": compoundStage,
 	}
 
+	addScoreStage := bson.D{
+		{Key: "$addFields", Value: bson.M{
+			"score": bson.M{"$meta": "searchScore"},
+		}},
+	}
+
 	sortStage := bson.D{
-		{Key: "score", Value: bson.M{"$meta": "searchScore"}},
+		{Key: "score", Value: -1},
 		{Key: "_id", Value: 1},
 	}
 
@@ -455,6 +493,7 @@ func buildSearchPipeline(must, filter []bson.M, skip, limit int64) mongo.Pipelin
 
 	return mongo.Pipeline{
 		bson.D{{Key: "$search", Value: searchStage}},
+		addScoreStage,
 		bson.D{{Key: "$facet", Value: facetStage}},
 	}
 }
@@ -466,14 +505,14 @@ type facetResult struct {
 	} `bson:"totalCount"`
 }
 
-func decodeFacetResult(ctx context.Context, cursor *mongo.Cursor) (*domain.ProductSearchResult, error) {
+func decodeFacetResult(ctx context.Context, cursor *mongo.Cursor) (*domain.ListProductResult, error) {
 	var rawResults []facetResult
 	if err := cursor.All(ctx, &rawResults); err != nil {
 		return nil, fmt.Errorf("decoding search results: %w", err)
 	}
 
-	res := &domain.ProductSearchResult{
-		Products:   []domain.Product{},
+	res := &domain.ListProductResult{
+		Products:   []*domain.Product{},
 		TotalCount: 0,
 	}
 
@@ -481,9 +520,9 @@ func decodeFacetResult(ctx context.Context, cursor *mongo.Cursor) (*domain.Produ
 		return res, nil
 	}
 
-	products := make([]domain.Product, len(rawResults[0].Results))
+	products := make([]*domain.Product, len(rawResults[0].Results))
 	for i, m := range rawResults[0].Results {
-		products[i] = *m.toDomain()
+		products[i] = m.toDomain()
 	}
 	res.Products = products
 

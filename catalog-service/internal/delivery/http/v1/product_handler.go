@@ -47,13 +47,15 @@ func (r *V1) GetProduct(c *gin.Context) {
 
 func (r *V1) GetProductsByCategory(c *gin.Context) {
 	id := c.Param("id")
-	products, err := r.product.GetByCategory(c.Request.Context(), id)
+	p := pagination.FromQuery(c)
+	listResult, err := r.product.GetByCategory(c.Request.Context(), id, p)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "get products by category success", res.ToProductListResponse(products))
+	result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
+	response.SuccessPaginated(c, http.StatusOK, "get products by category success", result)
 }
 
 func (r *V1) UpdateProduct(c *gin.Context) {
@@ -95,22 +97,24 @@ func (r *V1) ListProducts(c *gin.Context) {
 	categoryID := c.Query("category_id")
 
 	if categoryID != "" {
-		products, err := r.product.GetByCategory(c.Request.Context(), categoryID)
+		listResult, err := r.product.GetByCategory(c.Request.Context(), categoryID, p)
 		if err != nil {
 			r.handleError(c, err)
 			return
 		}
-		response.Success(c, http.StatusOK, "list products by category success", res.ToProductListResponse(products))
+		result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
+		response.SuccessPaginated(c, http.StatusOK, "list products by category success", result)
 		return
 	}
 
-	products, err := r.product.List(c.Request.Context(), p)
+	listResult, err := r.product.List(c.Request.Context(), p)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "list products success", res.ToProductListResponse(products))
+	result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
+	response.SuccessPaginated(c, http.StatusOK, "list products success", result)
 }
 
 func (r *V1) SearchProducts(c *gin.Context) {
@@ -137,11 +141,12 @@ func (r *V1) SearchProducts(c *gin.Context) {
 	}
 	p := pagination.FromQuery(c)
 
-	result, err := r.product.Search(c.Request.Context(), params, p)
+	listResult, err := r.product.Search(c.Request.Context(), params, p)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "search products success", res.ToProductSearchResultResponse(result))
+	result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
+	response.SuccessPaginated(c, http.StatusOK, "search products success", result)
 }

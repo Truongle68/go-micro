@@ -127,20 +127,23 @@ func (uc *ProductUC) GetByID(ctx context.Context, id string) (*ProductDTO, error
 	return toProductDTO(p), nil
 }
 
-func (uc *ProductUC) GetByCategory(ctx context.Context, categoryID string) ([]*ProductDTO, error) {
+func (uc *ProductUC) GetByCategory(ctx context.Context, categoryID string, p pagination.Params) (*ProductListResultDTO, error) {
 	if categoryID == "" {
 		return nil, domain.ErrEmptyCategoryID
 	}
-	products, err := uc.repo.FindByCategory(ctx, categoryID)
+	result, err := uc.repo.FindByCategory(ctx, categoryID, p)
 	if err != nil {
 		return nil, fmt.Errorf("finding by category: %w", err)
 	}
 
-	dtos := make([]*ProductDTO, len(products))
-	for i := range products {
-		dtos[i] = toProductDTO(&products[i])
+	dtos := make([]*ProductDTO, len(result.Products))
+	for i := range result.Products {
+		dtos[i] = toProductDTO(result.Products[i])
 	}
-	return dtos, nil
+	return &ProductListResultDTO{
+		Products:   dtos,
+		TotalCount: result.TotalCount,
+	}, nil
 }
 
 func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*ProductDTO, error) {
@@ -198,20 +201,23 @@ func (uc *ProductUC) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (uc *ProductUC) List(ctx context.Context, p pagination.Params) ([]*ProductDTO, error) {
-	products, err := uc.repo.List(ctx, p)
+func (uc *ProductUC) List(ctx context.Context, p pagination.Params) (*ProductListResultDTO, error) {
+	result, err := uc.repo.List(ctx, p)
 	if err != nil {
 		return nil, fmt.Errorf("listing products: %w", err)
 	}
 
-	dtos := make([]*ProductDTO, len(products))
-	for i := range products {
-		dtos[i] = toProductDTO(&products[i])
+	dtos := make([]*ProductDTO, len(result.Products))
+	for i := range result.Products {
+		dtos[i] = toProductDTO(result.Products[i])
 	}
-	return dtos, nil
+	return &ProductListResultDTO{
+		Products:   dtos,
+		TotalCount: result.TotalCount,
+	}, nil
 }
 
-func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*ProductSearchResultDTO, error) {
+func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*ProductListResultDTO, error) {
 	if err := sParams.Validate(); err != nil {
 		return nil, err
 	}
@@ -223,10 +229,10 @@ func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductPar
 
 	dtos := make([]*ProductDTO, len(result.Products))
 	for i := range result.Products {
-		dtos[i] = toProductDTO(&result.Products[i])
+		dtos[i] = toProductDTO(result.Products[i])
 	}
 
-	return &ProductSearchResultDTO{
+	return &ProductListResultDTO{
 		Products:   dtos,
 		TotalCount: result.TotalCount,
 	}, nil

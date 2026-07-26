@@ -75,17 +75,20 @@ func (uc *CategoryUC) GetByID(ctx context.Context, id string) (*CategoryDTO, err
 	return toCategoryDTO(c), nil
 }
 
-func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string) ([]*CategoryDTO, error) {
-	categories, err := uc.repo.FindChildren(ctx, parentID)
+func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string, p pagination.Params) (*CategoryListResultDTO, error) {
+	result, err := uc.repo.FindChildren(ctx, parentID, p)
 	if err != nil {
 		return nil, fmt.Errorf("finding children: %w", err)
 	}
 
-	dtos := make([]*CategoryDTO, len(categories))
-	for i := range categories {
-		dtos[i] = toCategoryDTO(&categories[i])
+	dtos := make([]*CategoryDTO, len(result.Categories))
+	for i := range result.Categories {
+		dtos[i] = toCategoryDTO(result.Categories[i])
 	}
-	return dtos, nil
+	return &CategoryListResultDTO{
+		Categories: dtos,
+		TotalCount: result.TotalCount,
+	}, nil
 }
 
 func (in UpdateCategoryInput) isEmpty() bool {
@@ -135,15 +138,18 @@ func (uc *CategoryUC) Delete(ctx context.Context, id string) error {
 	return uc.repo.Delete(ctx, id)
 }
 
-func (uc *CategoryUC) List(ctx context.Context, p pagination.Params) ([]*CategoryDTO, error) {
-	categories, err := uc.repo.List(ctx, p)
+func (uc *CategoryUC) List(ctx context.Context, p pagination.Params) (*CategoryListResultDTO, error) {
+	result, err := uc.repo.List(ctx, p)
 	if err != nil {
 		return nil, fmt.Errorf("listing categories: %w", err)
 	}
 
-	dtos := make([]*CategoryDTO, len(categories))
-	for i := range categories {
-		dtos[i] = toCategoryDTO(&categories[i])
+	dtos := make([]*CategoryDTO, len(result.Categories))
+	for i := range result.Categories {
+		dtos[i] = toCategoryDTO(result.Categories[i])
 	}
-	return dtos, nil
+	return &CategoryListResultDTO{
+		Categories: dtos,
+		TotalCount: result.TotalCount,
+	}, nil
 }
