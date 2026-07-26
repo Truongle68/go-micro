@@ -365,6 +365,31 @@ func main() {
 	}
 	fmt.Printf("Logged in successfully with new password. UserID: %s\n", authRes.UserID)
 
+	// 13b. Refresh Token
+	fmt.Println("[Step 13b] POST /auth/refresh...")
+	reqBody, _ = json.Marshal(map[string]string{
+		"refresh_token": authRes.RefreshToken,
+	})
+	resp, err = client.Post(baseURL+"/auth/refresh", "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		fmt.Printf("FAIL: refresh request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	verifyStatus(resp, http.StatusOK)
+
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		fmt.Printf("FAIL: Decode refresh envelope: %v\n", err)
+		os.Exit(1)
+	}
+	var newAuthRes AuthResponse
+	if err := json.Unmarshal(envelope.Data, &newAuthRes); err != nil {
+		fmt.Printf("FAIL: Unmarshal refresh data: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Refreshed token successfully. New AccessToken & RefreshToken generated.\n")
+	authRes = newAuthRes
+
 	// 14. Logout
 	fmt.Println("[Step 14] POST /auth/logout...")
 	reqBody, _ = json.Marshal(map[string]string{
