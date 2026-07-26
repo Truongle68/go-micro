@@ -33,6 +33,10 @@ func (req *Logout) ToInput(accessToken string) usecase.LogoutInput {
 	}
 }
 
+type RefreshToken struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
 type RequestOTP struct {
 	Identifier string `json:"identifier"`
 	Phone      string `json:"phone"`

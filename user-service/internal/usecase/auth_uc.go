@@ -346,6 +346,59 @@ func (uc *AuthUC) Logout(ctx context.Context, in LogoutInput) error {
 	return nil
 }
 
+func (uc *AuthUC) RefreshToken(ctx context.Context, refreshTokenStr string) (AuthOutput, error) {
+	claims, err := uc.tokens.VerifyRefreshToken(refreshTokenStr)
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("%w: %v", domain.ErrInvalidToken, err)
+	}
+
+	isBlacklisted, err := uc.cache.IsBlacklisted(ctx, refreshTokenStr)
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("checking token blacklist: %w", err)
+	}
+	if isBlacklisted {
+		return AuthOutput{}, domain.ErrInvalidToken
+	}
+
+	u, err := uc.userRepo.FindByID(ctx, claims.UserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return AuthOutput{}, domain.ErrUserNotFound
+		}
+		return AuthOutput{}, fmt.Errorf("fetching user: %w", err)
+	}
+
+	switch u.Status {
+	case domain.UserStatusBanned:
+		return AuthOutput{}, domain.ErrUserBanned
+	case domain.UserStatusUnverified, domain.UserStatusVerified:
+		// OK
+	default:
+		return AuthOutput{}, fmt.Errorf("unknown user status: %s", u.Status)
+	}
+
+	newAccessToken, err := uc.tokens.GenerateAccessToken(u.ID, u.Role)
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("generating access token: %w", err)
+	}
+
+	newRefreshToken, err := uc.tokens.GenerateRefreshToken(u.ID)
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("generating refresh token: %w", err)
+	}
+
+	refTtl := time.Until(claims.ExpiresAt.Time)
+	if refTtl > 0 {
+		_ = uc.cache.Blacklist(ctx, refreshTokenStr, refTtl)
+	}
+
+	return AuthOutput{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+		UserID:       u.ID,
+	}, nil
+}
+
 func (uc *AuthUC) GetRoleByIdentifier(ctx context.Context, identifier string) (domain.UserRole, error) {
 	u, err := uc.getUserByIdentifier(ctx, identifier)
 	if err != nil {

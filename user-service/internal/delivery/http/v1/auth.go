@@ -220,3 +220,26 @@ func (r *V1) resetPassword(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, "reset password success", nil)
 }
+
+func (r *V1) refreshToken(c *gin.Context) {
+	var request req.RefreshToken
+	if err := c.ShouldBindJSON(&request); err != nil {
+		r.l.Warn("restapi - v1 - refreshToken - ShouldBindJSON: %v", err)
+		response.Error(c, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := r.v.Struct(request); err != nil {
+		r.l.Warn("restapi - v1 - refreshToken - validate: %v", err)
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	authOut, err := r.a.RefreshToken(c.Request.Context(), request.RefreshToken)
+	if err != nil {
+		r.l.Error(err, "restapi - v1 - refreshToken - usecase failed")
+		r.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "token refreshed successfully", res.ToAuthResponse(authOut))
+}

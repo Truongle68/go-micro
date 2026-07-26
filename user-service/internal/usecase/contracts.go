@@ -202,4 +202,5 @@ type Auth interface {
 	ForgotPassword(ctx context.Context, email string) (string, error)
 	ResetPassword(ctx context.Context, in ResetPasswordInput) error
 	Logout(ctx context.Context, in LogoutInput) error
+	RefreshToken(ctx context.Context, refreshToken string) (AuthOutput, error)
 }
