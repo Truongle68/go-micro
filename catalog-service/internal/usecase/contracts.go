@@ -1,8 +1,11 @@
 package usecase
 
 import (
+	"catalog-service/internal/domain"
 	"context"
 	"time"
+
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 )
 
 type CategoryDTO struct {
@@ -12,7 +15,7 @@ type CategoryDTO struct {
 	NameEn    string    `json:"name_en"`
 	Slug      string    `json:"slug"`
 	Icon      string    `json:"icon"`
-	SortOrder int       `json:"sort_order"`
+	SortOrder int64     `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -23,7 +26,7 @@ type CreateCategoryInput struct {
 	NameEn    string
 	Slug      string
 	Icon      string
-	SortOrder int
+	SortOrder int64
 }
 
 type UpdateCategoryInput struct {
@@ -33,7 +36,7 @@ type UpdateCategoryInput struct {
 	NameEn    *string
 	Slug      *string
 	Icon      *string
-	SortOrder *int
+	SortOrder *int64
 }
 
 type CategoryUsecase interface {
@@ -42,7 +45,7 @@ type CategoryUsecase interface {
 	GetChildren(ctx context.Context, parentID string) ([]*CategoryDTO, error)
 	Update(ctx context.Context, in UpdateCategoryInput) (*CategoryDTO, error)
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context) ([]*CategoryDTO, error)
+	List(ctx context.Context, params pagination.Params) ([]*CategoryDTO, error)
 }
 
 type ProductVariantDTO struct {
@@ -57,7 +60,7 @@ type ProductVariantDTO struct {
 type ProductImageDTO struct {
 	ID        string    `json:"id"`
 	Url       string    `json:"url"`
-	SortOrder int32     `json:"sort_order"`
+	SortOrder int64     `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -74,7 +77,7 @@ type ProductDTO struct {
 	BasePrice     float64              `json:"base_price"`
 	SalePrice     float64              `json:"sale_price"`
 	RatingAvg     float64              `json:"rating_avg"`
-	RatingCount   int32                `json:"rating_count"`
+	RatingCount   int64                `json:"rating_count"`
 	IsActive      bool                 `json:"is_active"`
 	Variants      []*ProductVariantDTO `json:"variants"`
 	Images        []*ProductImageDTO   `json:"images"`
@@ -90,7 +93,7 @@ type ProductVariantInput struct {
 
 type ProductImageInput struct {
 	Url       string
-	SortOrder int32
+	SortOrder int64
 }
 
 type CreateProductInput struct {
@@ -124,11 +127,27 @@ type UpdateProductInput struct {
 	Images        []ProductImageInput
 }
 
+type ProductSearchResultDTO struct {
+	Products   []*ProductDTO `json:"products"`
+	TotalCount int64         `json:"total_count"`
+}
+
+type SearchProductInput struct {
+	Query      string   `json:"query"`
+	CategoryID string   `json:"category_id"`
+	MinPrice   *float64 `json:"min_price"`
+	MaxPrice   *float64 `json:"max_price"`
+	IsActive   *bool    `json:"is_active"`
+	Page       int64    `json:"page"`
+	Limit      int64    `json:"limit"`
+}
+
 type ProductUsecase interface {
 	Create(ctx context.Context, in CreateProductInput) (*ProductDTO, error)
 	GetByID(ctx context.Context, id string) (*ProductDTO, error)
 	GetByCategory(ctx context.Context, categoryID string) ([]*ProductDTO, error)
 	Update(ctx context.Context, in UpdateProductInput) (*ProductDTO, error)
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context) ([]*ProductDTO, error)
+	List(ctx context.Context, params pagination.Params) ([]*ProductDTO, error)
+	Search(ctx context.Context, searchParams domain.SearchProductParams, paginatedParams pagination.Params) (*ProductSearchResultDTO, error)
 }

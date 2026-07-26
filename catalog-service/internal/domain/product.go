@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-var (
-	ErrInvalidProductID = errors.New("invalid product id")
-	ErrNoFieldsToUpdate = errors.New("no fields provided to update")
-)
-
 type ProductVariant struct {
 	ID           string
 	VariantLabel string
@@ -186,8 +181,6 @@ type SearchProductParams struct {
 	MinPrice   *float64
 	MaxPrice   *float64
 	IsActive   *bool
-	Page       int64
-	Limit      int64
 }
 
 func (p SearchProductParams) Validate() error {

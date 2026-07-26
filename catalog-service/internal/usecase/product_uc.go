@@ -5,6 +5,8 @@ import (
 	"catalog-service/internal/repo"
 	"context"
 	"fmt"
+
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 )
 
 type ProductUC struct {
@@ -196,8 +198,8 @@ func (uc *ProductUC) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (uc *ProductUC) List(ctx context.Context, in PaginatedInput) ([]*ProductDTO, error) {
-	products, err := uc.repo.List(ctx, in.Page, in.Limit)
+func (uc *ProductUC) List(ctx context.Context, p pagination.Params) ([]*ProductDTO, error) {
+	products, err := uc.repo.List(ctx, p)
 	if err != nil {
 		return nil, fmt.Errorf("listing products: %w", err)
 	}
@@ -209,12 +211,12 @@ func (uc *ProductUC) List(ctx context.Context, in PaginatedInput) ([]*ProductDTO
 	return dtos, nil
 }
 
-func (uc *ProductUC) Search(ctx context.Context, params domain.SearchProductParams) (*ProductSearchResultDTO, error) {
-	if err := params.Validate(); err != nil {
+func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*ProductSearchResultDTO, error) {
+	if err := sParams.Validate(); err != nil {
 		return nil, err
 	}
-	
-	result, err := uc.repo.Search(ctx, params)
+
+	result, err := uc.repo.Search(ctx, sParams, pParams)
 	if err != nil {
 		return nil, fmt.Errorf("searching product: %w", err)
 	}

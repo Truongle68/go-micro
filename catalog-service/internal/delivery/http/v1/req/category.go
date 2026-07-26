@@ -8,7 +8,7 @@ type CreateCategory struct {
 	NameEn    string  `json:"name_en" validate:"required"`
 	Slug      string  `json:"slug" validate:"required"`
 	Icon      string  `json:"icon"`
-	SortOrder int     `json:"sort_order"`
+	SortOrder int64   `json:"sort_order"`
 }
 
 func (req *CreateCategory) ToCreateCategoryInput() usecase.CreateCategoryInput {
@@ -28,7 +28,7 @@ type UpdateCategory struct {
 	NameEn    *string `json:"name_en"`
 	Slug      *string `json:"slug"`
 	Icon      *string `json:"icon"`
-	SortOrder *int    `json:"sort_order"`
+	SortOrder *int64  `json:"sort_order"`
 }
 
 func (req *UpdateCategory) ToUpdateCategoryInput(id string) usecase.UpdateCategoryInput {

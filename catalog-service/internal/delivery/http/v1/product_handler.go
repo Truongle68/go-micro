@@ -4,10 +4,10 @@ import (
 	"catalog-service/internal/delivery/http/v1/req"
 	"catalog-service/internal/delivery/http/v1/res"
 	"catalog-service/internal/domain"
-	"catalog-service/internal/usecase"
 	"net/http"
 	"strconv"
 
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -91,19 +91,8 @@ func (r *V1) DeleteProduct(c *gin.Context) {
 }
 
 func (r *V1) ListProducts(c *gin.Context) {
+	p := pagination.FromQuery(c)
 	categoryID := c.Query("category_id")
-	pageStr := c.DefaultQuery("page", "1")
-	limitStr := c.DefaultQuery("limit", "10")
-
-	page, err := strconv.ParseInt(pageStr, 10, 64)
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	limit, err := strconv.ParseInt(limitStr, 10, 64)
-	if err != nil || limit < 1 {
-		limit = 10
-	}
 
 	if categoryID != "" {
 		products, err := r.product.GetByCategory(c.Request.Context(), categoryID)
@@ -115,10 +104,7 @@ func (r *V1) ListProducts(c *gin.Context) {
 		return
 	}
 
-	products, err := r.product.List(c.Request.Context(), usecase.PaginatedInput{
-		Page:  page,
-		Limit: limit,
-	})
+	products, err := r.product.List(c.Request.Context(), p)
 	if err != nil {
 		r.handleError(c, err)
 		return
@@ -149,18 +135,9 @@ func (r *V1) SearchProducts(c *gin.Context) {
 			params.IsActive = &val
 		}
 	}
-	if pageStr := c.Query("page"); pageStr != "" {
-		if val, err := strconv.ParseInt(pageStr, 10, 64); err == nil {
-			params.Page = val
-		}
-	}
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if val, err := strconv.ParseInt(limitStr, 10, 64); err == nil {
-			params.Limit = val
-		}
-	}
+	p := pagination.FromQuery(c)
 
-	result, err := r.product.Search(c.Request.Context(), params)
+	result, err := r.product.Search(c.Request.Context(), params, p)
 	if err != nil {
 		r.handleError(c, err)
 		return

@@ -11,4 +11,6 @@ var (
 	ErrEmptySku          = errors.New("sku cannot be empty")
 	ErrInvalidPrice      = errors.New("price cannot be negative")
 	ErrInvalidCategoryID = errors.New("invalid category id")
+	ErrInvalidProductID  = errors.New("invalid product id")
+	ErrNoFieldsToUpdate  = errors.New("no fields provided to update")
 )

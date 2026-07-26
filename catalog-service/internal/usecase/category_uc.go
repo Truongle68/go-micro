@@ -4,6 +4,9 @@ import (
 	"catalog-service/internal/domain"
 	"catalog-service/internal/repo"
 	"context"
+	"fmt"
+
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 )
 
 type CategoryUC struct {
@@ -36,22 +39,26 @@ func toCategoryDTO(c *domain.Category) *CategoryDTO {
 }
 
 func (uc *CategoryUC) Create(ctx context.Context, in CreateCategoryInput) (*CategoryDTO, error) {
-	if in.NameVi == "" && in.NameEn == "" {
-		return nil, domain.ErrEmptyName
+	if in.ParentID != nil && *in.ParentID != "" {
+		if _, err := uc.repo.FindByID(ctx, *in.ParentID); err != nil {
+			return nil, err
+		}
 	}
-
-	c := &domain.Category{
+	c, err := domain.NewCategory(domain.NewCategoryParams{
 		ParentID:  in.ParentID,
 		NameVi:    in.NameVi,
-		NameEn:    in.NameEn,
+		NameEn:    in.NameVi,
 		Slug:      in.Slug,
 		Icon:      in.Icon,
 		SortOrder: in.SortOrder,
-	}
+	})
 
-	err := uc.repo.Create(ctx, c)
 	if err != nil {
 		return nil, err
+	}
+
+	if err = uc.repo.Create(ctx, c); err != nil {
+		return nil, fmt.Errorf("creating category: %w", err)
 	}
 
 	return toCategoryDTO(c), nil
@@ -63,7 +70,7 @@ func (uc *CategoryUC) GetByID(ctx context.Context, id string) (*CategoryDTO, err
 	}
 	c, err := uc.repo.FindByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding by id: %w", err)
 	}
 	return toCategoryDTO(c), nil
 }
@@ -71,7 +78,7 @@ func (uc *CategoryUC) GetByID(ctx context.Context, id string) (*CategoryDTO, err
 func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string) ([]*CategoryDTO, error) {
 	categories, err := uc.repo.FindChildren(ctx, parentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding children: %w", err)
 	}
 
 	dtos := make([]*CategoryDTO, len(categories))
@@ -81,38 +88,41 @@ func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string) ([]*Cate
 	return dtos, nil
 }
 
+func (in UpdateCategoryInput) isEmpty() bool {
+	return in.ParentID == nil &&
+		in.NameVi == nil &&
+		in.NameEn == nil &&
+		in.Slug == nil &&
+		in.Icon == nil &&
+		in.SortOrder == nil
+}
+
 func (uc *CategoryUC) Update(ctx context.Context, in UpdateCategoryInput) (*CategoryDTO, error) {
 	if in.ID == "" {
 		return nil, domain.ErrEmptyCategoryID
 	}
 
-	c, err := uc.repo.FindByID(ctx, in.ID)
-	if err != nil {
-		return nil, err
+	if in.isEmpty() {
+		return nil, domain.ErrNoFieldsToUpdate
 	}
 
-	if in.ParentID != nil {
-		c.ParentID = in.ParentID
+	c, err := uc.repo.FindByID(ctx, in.ID)
+	if err != nil {
+		return nil, fmt.Errorf("finding by id: %w", err)
 	}
-	if in.NameVi != nil {
-		c.NameVi = *in.NameVi
-	}
-	if in.NameEn != nil {
-		c.NameEn = *in.NameEn
-	}
-	if in.Slug != nil {
-		c.Slug = *in.Slug
-	}
-	if in.Icon != nil {
-		c.Icon = *in.Icon
-	}
-	if in.SortOrder != nil {
-		c.SortOrder = *in.SortOrder
-	}
+
+	c.ApplyUpdate(domain.UpdateCategoryParams{
+		ParentID:  in.ParentID,
+		NameVi:    in.NameVi,
+		NameEn:    in.NameEn,
+		Slug:      in.Slug,
+		Icon:      in.Icon,
+		SortOrder: in.SortOrder,
+	})
 
 	updated, err := uc.repo.Update(ctx, in.ID, c)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("updating category: %w", err)
 	}
 
 	return toCategoryDTO(updated), nil
@@ -125,10 +135,10 @@ func (uc *CategoryUC) Delete(ctx context.Context, id string) error {
 	return uc.repo.Delete(ctx, id)
 }
 
-func (uc *CategoryUC) List(ctx context.Context) ([]*CategoryDTO, error) {
-	categories, err := uc.repo.List(ctx)
+func (uc *CategoryUC) List(ctx context.Context, p pagination.Params) ([]*CategoryDTO, error) {
+	categories, err := uc.repo.List(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing categories: %w", err)
 	}
 
 	dtos := make([]*CategoryDTO, len(categories))

@@ -12,7 +12,7 @@ type CategoryResponse struct {
 	NameEn    string    `json:"name_en"`
 	Slug      string    `json:"slug"`
 	Icon      string    `json:"icon"`
-	SortOrder int       `json:"sort_order"`
+	SortOrder int64     `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

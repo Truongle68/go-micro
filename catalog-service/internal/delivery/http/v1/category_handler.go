@@ -5,6 +5,7 @@ import (
 	"catalog-service/internal/delivery/http/v1/res"
 	"net/http"
 
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -88,7 +89,8 @@ func (r *V1) DeleteCategory(c *gin.Context) {
 }
 
 func (r *V1) ListCategories(c *gin.Context) {
-	categories, err := r.category.List(c.Request.Context())
+	p := pagination.FromQuery(c)
+	categories, err := r.category.List(c.Request.Context(), p)
 	if err != nil {
 		r.handleError(c, err)
 		return

@@ -3,13 +3,77 @@ package domain
 import "time"
 
 type Category struct {
-	ID        string    `json:"id" bson:"_id,omitempty"`
-	ParentID  *string   `json:"parent_id" bson:"parent_id,omitempty"`
-	NameVi    string    `json:"name_vi" bson:"name_vi"`
-	NameEn    string    `json:"name_en" bson:"name_en"`
-	Slug      string    `json:"slug" bson:"slug"`
-	Icon      string    `json:"icon" bson:"icon"`
-	SortOrder int       `json:"sort_order" bson:"sort_order"`
-	CreatedAt time.Time `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
+	ID        string
+	ParentID  *string
+	NameVi    string
+	NameEn    string
+	Slug      string
+	Icon      string
+	SortOrder int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type NewCategoryParams struct {
+	ParentID  *string
+	NameVi    string
+	NameEn    string
+	Slug      string
+	Icon      string
+	SortOrder int64
+}
+
+func NewCategory(params NewCategoryParams) (*Category, error) {
+	if params.NameVi == "" && params.NameEn == "" {
+		return nil, ErrEmptyName
+	}
+
+	if params.Slug == "" {
+		return nil, ErrEmptySku
+	}
+
+	now := time.Now()
+	return &Category{
+		ParentID:  params.ParentID,
+		NameVi:    params.NameVi,
+		NameEn:    params.NameEn,
+		Slug:      params.Slug,
+		Icon:      params.Icon,
+		SortOrder: params.SortOrder,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
+type UpdateCategoryParams struct {
+	ID        string
+	ParentID  *string
+	NameVi    *string
+	NameEn    *string
+	Slug      *string
+	Icon      *string
+	SortOrder *int64
+}
+
+func (c *Category) ApplyUpdate(params UpdateCategoryParams) {
+	if params.ParentID != nil {
+		c.ParentID = params.ParentID
+	}
+	if params.NameVi != nil {
+		c.NameVi = *params.NameVi
+	}
+	if params.NameEn != nil {
+		c.NameEn = *params.NameEn
+	}
+	if params.Slug != nil {
+		c.Slug = *params.Slug
+	}
+	if params.Icon != nil {
+		c.Icon = *params.Icon
+	}
+	if params.SortOrder != nil {
+		c.SortOrder = *params.SortOrder
+	}
+
+	c.UpdatedAt = time.Now()
 }

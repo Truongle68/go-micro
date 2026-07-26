@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -306,13 +307,12 @@ func (r *ProductRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *ProductRepo) List(ctx context.Context, page, limit int64) ([]domain.Product, error) {
-	page, limit, skip := normalizePagination(page, limit)
-
+func (r *ProductRepo) List(ctx context.Context, p pagination.Params) ([]domain.Product, error) {
+	skip := p.Skip()
 	findOpts := options.Find().
 		SetSort(bson.D{{Key: "_id", Value: 1}}).
 		SetSkip(skip).
-		SetLimit(limit)
+		SetLimit(p.Limit)
 	cursor, err := r.collection.Find(ctx, bson.M{}, findOpts)
 	if err != nil {
 		return nil, fmt.Errorf("listing products: %w", err)
@@ -329,21 +329,19 @@ func (r *ProductRepo) List(ctx context.Context, page, limit int64) ([]domain.Pro
 		products[i] = *m.toDomain()
 	}
 
-	_ = page
 	return products, nil
 }
 
-func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductParams) (*domain.ProductSearchResult, error) {
-	page, limit, skip := normalizePagination(params.Page, params.Limit)
+func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*domain.ProductSearchResult, error) {
 
-	mustClauses := buildMustClauses(params)
-	filterClauses, err := buildFilterClauses(params)
+	mustClauses := buildMustClauses(sParams)
+	filterClauses, err := buildFilterClauses(sParams)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(mustClauses) == 0 && len(filterClauses) == 0 {
-		products, err := r.List(ctx, page, limit)
+		products, err := r.List(ctx, pParams)
 		if err != nil {
 			return nil, err
 		}
@@ -359,7 +357,7 @@ func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductPar
 		}, nil
 	}
 
-	pipeline := buildSearchPipeline(mustClauses, filterClauses, skip, limit)
+	pipeline := buildSearchPipeline(mustClauses, filterClauses, pParams.Skip(), pParams.Limit)
 
 	opts := options.Aggregate().SetAllowDiskUse(true)
 	cursor, err := r.collection.Aggregate(ctx, pipeline, opts)
@@ -369,23 +367,6 @@ func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductPar
 	defer cursor.Close(ctx)
 
 	return decodeFacetResult(ctx, cursor)
-}
-
-func normalizePagination(page, limit int64) (normPage, normLimit, skip int64) {
-	normPage = page
-	if normPage <= 0 {
-		normPage = 1
-	}
-
-	normLimit = limit
-	if normLimit <= 0 {
-		normLimit = defaultSearchLimit
-	} else if normLimit > maxSearchLimit {
-		normLimit = maxSearchLimit
-	}
-
-	skip = (normPage - 1) * normLimit
-	return
 }
 
 func buildMustClauses(params domain.SearchProductParams) []bson.M {
