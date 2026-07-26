@@ -18,7 +18,7 @@ type Interface interface {
 
 // adapter
 type Logger struct {
-	logger *zerolog.Logger // adaptee
+	logger zerolog.Logger // adaptee
 }
 
 var _ Interface = (*Logger)(nil)
@@ -42,14 +42,14 @@ func New(level string) *Logger {
 	zerolog.SetGlobalLevel(l)
 
 	skipFrameCount := 3
-	logger := zerolog.New(os.Stdout).
+	zLogger := zerolog.New(os.Stdout).
 		With().
 		Timestamp().
 		CallerWithSkipFrameCount(zerolog.CallerSkipFrameCount + skipFrameCount).
 		Logger()
 
 	return &Logger{
-		logger: new(logger),
+		logger: zLogger,
 	}
 }
 
@@ -71,21 +71,33 @@ func (l *Logger) Fatal(msg any, args ...any) {
 	os.Exit(1)
 }
 
-func (l *Logger) log(level zerolog.Level, msg string, args ...any) {
-	if len(args) == 0 {
-		l.logger.WithLevel(level).Msg(msg)
-	} else {
-		l.logger.WithLevel(level).Msgf(msg, args...)
-	}
-}
-
 func (l *Logger) msg(level zerolog.Level, msg any, args ...any) {
+	event := l.logger.WithLevel(level)
+
 	switch m := msg.(type) {
 	case error:
-		l.log(level, m.Error(), args...)
+		event = event.Err(m)
+
+		if len(args) > 0 {
+			if format, ok := args[0].(string); ok {
+				if len(args) > 1 {
+					event.Msgf(format, args[1:]...)
+				} else {
+					event.Msg(format)
+				}
+				return
+			}
+		}
+		event.Msg(m.Error())
+
 	case string:
-		l.log(level, m, args...)
+		if len(args) == 0 {
+			event.Msg(m)
+		} else {
+			event.Msgf(m, args...)
+		}
+
 	default:
-		l.log(level, fmt.Sprintf("%s message %v has unknown type %v", level, msg, m), args...)
+		event.Msg(fmt.Sprintf("%v", m))
 	}
 }

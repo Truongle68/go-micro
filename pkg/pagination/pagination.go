@@ -29,12 +29,16 @@ func (p Params) Skip() int64 {
 	return (p.Page - 1) * p.Limit
 }
 
-type Result[T any] struct {
-	Items      []T   `json:"items"`
+type Meta struct {
 	Page       int64 `json:"page"`
 	Limit      int64 `json:"limit"`
 	TotalCount int64 `json:"total_count"`
 	TotalPages int64 `json:"total_pages"`
+}
+
+type Result[T any] struct {
+	Items []T
+	Meta  Meta
 }
 
 func NewResult[T any](items []T, p Params, totalCount int64) Result[T] {
@@ -43,10 +47,12 @@ func NewResult[T any](items []T, p Params, totalCount int64) Result[T] {
 		totalPages++
 	}
 	return Result[T]{
-		Items:      items,
-		Page:       p.Page,
-		Limit:      p.Limit,
-		TotalCount: totalCount,
-		TotalPages: totalPages,
+		Items: items,
+		Meta: Meta{
+			Page:       p.Page,
+			Limit:      p.Limit,
+			TotalCount: totalCount,
+			TotalPages: totalPages,
+		},
 	}
 }
