@@ -1,22 +1,22 @@
-db = db.getSiblingDB('catalog_db');
+db = db.getSiblingDB("catalog-db");
 
 db.createUser({
-    user: 'catalog_user',
-    pwd: 'catalog_password',
-    roles: [
-        {
-            role: 'readWrite',
-            db: 'catalog_db'
-        }
-    ]
-})
+  user: "catalog_user",
+  pwd: "catalog_password",
+  roles: [
+    {
+      role: "readWrite",
+      db: "catalog-db",
+    },
+  ],
+});
 
-db.createCollection('categories');
-db.createCollection('products');
+db.createCollection("categories");
+db.createCollection("products");
 
-db.categories.createIndex({slug: 1}, {unique: true});
+db.categories.createIndex({ slug: 1 }, { unique: true });
 
-db.products.createIndex({category_id: 1});
-db.products.createIndex({sku: 1}, {unique: true});
+db.products.createIndex({ category_id: 1 });
+db.products.createIndex({ sku: 1 }, { unique: true });
 
-print('=== Catalog Database initialized & indexes created ===');
+print("=== Catalog Database initialized & indexes created ===");
