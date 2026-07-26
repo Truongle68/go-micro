@@ -17,7 +17,7 @@ type ProductVariantResponse struct {
 type ProductImageResponse struct {
 	ID        string    `json:"id"`
 	Url       string    `json:"url"`
-	SortOrder int32     `json:"sort_order"`
+	SortOrder int64     `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -34,7 +34,7 @@ type ProductResponse struct {
 	BasePrice     float64                   `json:"base_price"`
 	SalePrice     float64                   `json:"sale_price"`
 	RatingAvg     float64                   `json:"rating_avg"`
-	RatingCount   int32                     `json:"rating_count"`
+	RatingCount   int64                     `json:"rating_count"`
 	IsActive      bool                      `json:"is_active"`
 	Variants      []*ProductVariantResponse `json:"variants"`
 	Images        []*ProductImageResponse   `json:"images"`
@@ -97,4 +97,22 @@ func ToProductListResponse(dtos []*usecase.ProductDTO) []ProductResponse {
 		res[i] = ToProductResponse(dto)
 	}
 	return res
+}
+
+type ProductSearchResultResponse struct {
+	Products   []ProductResponse `json:"products"`
+	TotalCount int64             `json:"total_count"`
+}
+
+func ToProductSearchResultResponse(dto *usecase.ProductSearchResultDTO) ProductSearchResultResponse {
+	if dto == nil {
+		return ProductSearchResultResponse{
+			Products:   []ProductResponse{},
+			TotalCount: 0,
+		}
+	}
+	return ProductSearchResultResponse{
+		Products:   ToProductListResponse(dto.Products),
+		TotalCount: dto.TotalCount,
+	}
 }

@@ -9,9 +9,10 @@ type ProductRepository interface {
 	Create(ctx context.Context, p *domain.Product) error
 	FindByID(ctx context.Context, id string) (*domain.Product, error)
 	FindByCategory(ctx context.Context, categoryID string) ([]domain.Product, error)
-	Update(ctx context.Context, id string, p *domain.Product) (*domain.Product, error)
+	Update(ctx context.Context, p *domain.Product) (*domain.Product, error)
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context) ([]domain.Product, error)
+	List(ctx context.Context, page, limit int64) ([]domain.Product, error)
+	Search(ctx context.Context, params domain.SearchProductParams) (*domain.ProductSearchResult, error)
 }
 
 type CategoryRepository interface {

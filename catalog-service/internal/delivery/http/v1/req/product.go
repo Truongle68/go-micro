@@ -10,7 +10,7 @@ type ProductVariant struct {
 
 type ProductImage struct {
 	Url       string `json:"url" validate:"required"`
-	SortOrder int32  `json:"sort_order"`
+	SortOrder int64  `json:"sort_order"`
 }
 
 type CreateProduct struct {
@@ -114,4 +114,14 @@ func (req *UpdateProduct) ToUpdateProductInput(id string) usecase.UpdateProductI
 		Variants:      variants,
 		Images:        images,
 	}
+}
+
+type SearchProduct struct {
+	Query      string   `json:"query"`
+	CategoryID string   `json:"category_id"`
+	MinPrice   *float64 `json:"min_price"`
+	MaxPrice   *float64 `json:"max_price"`
+	IsActive   *bool    `json:"is_active"`
+	Page       int64    `json:"page"`
+	Limit      int64    `json:"limit"`
 }
