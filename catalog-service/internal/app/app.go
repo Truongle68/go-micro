@@ -34,7 +34,7 @@ type useCases struct {
 func initUsecases(db *mongodrv.Database) useCases {
 	productRepo := repo.NewProductRepo(db)
 	categoryRepo := repo.NewCategoryRepo(db)
-	productUC := usecase.NewProductUC(productRepo)
+	productUC := usecase.NewProductUC(productRepo, categoryRepo)
 	categoryUC := usecase.NewCategoryUC(categoryRepo)
 
 	return useCases{

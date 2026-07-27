@@ -40,22 +40,22 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
 
 	products := apiV1Group.Group("/products")
 	{
-		products.POST("", authMid, adminMid, r.CreateProduct)
-		products.GET("/search", r.SearchProducts)
-		products.GET("/:id", r.GetProduct)
-		products.PUT("/:id", authMid, adminMid, r.UpdateProduct)
-		products.DELETE("/:id", authMid, adminMid, r.DeleteProduct)
-		products.GET("", authMid, r.ListProducts)
+		products.POST("", authMid, adminMid, r.createProduct)
+		products.GET("/search", r.searchProducts)
+		products.GET("/:id", r.getProduct)
+		products.PUT("/:id", authMid, adminMid, r.updateProduct)
+		products.DELETE("/:id", authMid, adminMid, r.deleteProduct)
+		products.GET("", authMid, r.listProducts)
 	}
 
 	categories := apiV1Group.Group("/categories")
 	{
-		categories.POST("", authMid, adminMid, r.CreateCategory)
-		categories.GET("/:id", r.GetCategory)
-		categories.GET("/:id/children", r.GetCategoryChildren)
-		categories.PUT("/:id", authMid, adminMid, r.UpdateCategory)
-		categories.DELETE("/:id", authMid, adminMid, r.DeleteCategory)
-		categories.GET("", r.ListCategories)
-		categories.GET("/:id/products", r.GetProductsByCategory)
+		categories.POST("", authMid, adminMid, r.createCategory)
+		categories.GET("/:id", r.getCategory)
+		categories.GET("/:id/children", r.getCategoryChildren)
+		categories.PUT("/:id", authMid, adminMid, r.updateCategory)
+		categories.DELETE("/:id", authMid, adminMid, r.deleteCategory)
+		categories.GET("", r.listCategories)
+		categories.GET("/:id/products", r.getProductsByCategory)
 	}
 }
