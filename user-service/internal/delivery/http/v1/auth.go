@@ -7,21 +7,14 @@ import (
 	"user-service/internal/delivery/http/v1/res"
 	"user-service/internal/domain"
 
+	"github.com/TruongLe68/go-micro/pkg/httpbind"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 func (r *V1) requestOTP(c *gin.Context, purpose domain.VerifyPurpose) {
-	var request req.RequestOTP
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - requestOTP - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - requestOTP - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.RequestOTP](c, r.v, r.l, "requestOTP")
+	if !ok {
 		return
 	}
 
@@ -40,16 +33,8 @@ func (r *V1) requestRegisterOTP(c *gin.Context) {
 }
 
 func (r *V1) verifyOTP(c *gin.Context, purpose domain.VerifyPurpose) {
-	var request req.VerifyOTP
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - verifyOTP - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - verifyOTP - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.VerifyOTP](c, r.v, r.l, "verifyOTP")
+	if !ok {
 		return
 	}
 
@@ -68,16 +53,8 @@ func (r *V1) verifyRegisterOTP(c *gin.Context) {
 }
 
 func (r *V1) completeRegister(c *gin.Context) {
-	var request req.CompleteRegister
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - completeRegister - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - completeRegister - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.CompleteRegister](c, r.v, r.l, "completeRegister")
+	if !ok {
 		return
 	}
 
@@ -123,15 +100,8 @@ func (r *V1) portalLogin(c *gin.Context) {
 }
 
 func (r *V1) executeLoginFlow(c *gin.Context, contextTag string, requiredRoles []domain.UserRole) {
-	var request req.Login
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - %s - ShouldBindJSON: %v", contextTag, err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - %s - validate: %v", contextTag, err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.Login](c, r.v, r.l, contextTag)
+	if !ok {
 		return
 	}
 
@@ -145,15 +115,8 @@ func (r *V1) executeLoginFlow(c *gin.Context, contextTag string, requiredRoles [
 }
 
 func (r *V1) logout(c *gin.Context) {
-	var request req.Logout
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - logout - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - logout - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.Logout](c, r.v, r.l, "logout")
+	if !ok {
 		return
 	}
 
@@ -173,15 +136,8 @@ func (r *V1) logout(c *gin.Context) {
 }
 
 func (r *V1) forgotPassword(c *gin.Context) {
-	var request req.ForgotPassword
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - forgotPassword - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - forgotPassword - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.ForgotPassword](c, r.v, r.l, "forgotPassword")
+	if !ok {
 		return
 	}
 
@@ -195,15 +151,8 @@ func (r *V1) forgotPassword(c *gin.Context) {
 }
 
 func (r *V1) resetPassword(c *gin.Context) {
-	var request req.ResetPassword
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - resetPassword - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - resetPassword - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.ResetPassword](c, r.v, r.l, "resetPassword")
+	if !ok {
 		return
 	}
 
@@ -222,15 +171,8 @@ func (r *V1) resetPassword(c *gin.Context) {
 }
 
 func (r *V1) refreshToken(c *gin.Context) {
-	var request req.RefreshToken
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - refreshToken - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - refreshToken - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.RefreshToken](c, r.v, r.l, "refreshToken")
+	if !ok {
 		return
 	}
 

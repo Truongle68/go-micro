@@ -6,6 +6,7 @@ import (
 	"user-service/internal/delivery/http/v1/res"
 	"user-service/internal/domain"
 
+	"github.com/TruongLe68/go-micro/pkg/httpbind"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -33,15 +34,8 @@ func (r *V1) updateProfile(c *gin.Context) {
 		return
 	}
 
-	var request req.UpdateProfile
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - updateProfile - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - updateProfile - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.UpdateProfile](c, r.v, r.l, "updateProfile")
+	if !ok {
 		return
 	}
 
@@ -61,13 +55,8 @@ func (r *V1) requestEmailLink(c *gin.Context) {
 		return
 	}
 
-	var request req.RequestEmailLink
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.RequestEmailLink](c, r.v, r.l, "requestEmailLink")
+	if !ok {
 		return
 	}
 
@@ -110,13 +99,8 @@ func (r *V1) changeEmail(c *gin.Context) {
 		return
 	}
 
-	var request req.ChangeEmail
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.ChangeEmail](c, r.v, r.l, "changeEmail")
+	if !ok {
 		return
 	}
 
@@ -136,16 +120,10 @@ func (r *V1) changeEmailVerify(c *gin.Context) {
 		return
 	}
 
-	var request req.ChangeEmailConfirm
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid request body")
+	request, ok := httpbind.BindAndValidate[req.ChangeEmailConfirm](c, r.v, r.l, "changeEmailVerify")
+	if !ok {
 		return
 	}
-	if err := r.v.Struct(request); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
 	err := r.u.VerifyChangeEmailOTP(c.Request.Context(), request.ToInput(userID))
 	if err != nil {
 		r.handleError(c, err)
@@ -178,13 +156,8 @@ func (r *V1) verifyPhone(c *gin.Context) {
 		return
 	}
 
-	var request req.VerifyPhone
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.VerifyPhone](c, r.v, r.l, "verifyPhone")
+	if !ok {
 		return
 	}
 
@@ -206,13 +179,8 @@ func (r *V1) changePhone(c *gin.Context) {
 		return
 	}
 
-	var request req.ChangePhone
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.ChangePhone](c, r.v, r.l, "changePhone")
+	if !ok {
 		return
 	}
 
@@ -232,13 +200,8 @@ func (r *V1) changePhoneVerify(c *gin.Context) {
 		return
 	}
 
-	var request req.ChangePhoneVerify
-	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.ChangePhoneVerify](c, r.v, r.l, "changePhoneVerify")
+	if !ok {
 		return
 	}
 
@@ -274,15 +237,8 @@ func (r *V1) addAddress(c *gin.Context) {
 		return
 	}
 
-	var request req.CreateAddress
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - addAddress - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - addAddress - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.CreateAddress](c, r.v, r.l, "addAddress")
+	if !ok {
 		return
 	}
 
@@ -320,15 +276,8 @@ func (r *V1) updateAddress(c *gin.Context) {
 		return
 	}
 
-	var request req.UpdateAddress
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - updateAddress - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - updateAddress - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.UpdateAddress](c, r.v, r.l, "updateAddress")
+	if !ok {
 		return
 	}
 

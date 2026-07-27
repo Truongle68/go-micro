@@ -7,21 +7,15 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/TruongLe68/go-micro/pkg/httpbind"
 	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
-func (r *V1) CreateProduct(c *gin.Context) {
-	var request req.CreateProduct
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - CreateProduct - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - CreateProduct - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+func (r *V1) createProduct(c *gin.Context) {
+	request, ok := httpbind.BindAndValidate[req.CreateProduct](c, r.v, r.l, "createProduct")
+	if !ok {
 		return
 	}
 
@@ -34,7 +28,7 @@ func (r *V1) CreateProduct(c *gin.Context) {
 	response.Success(c, http.StatusCreated, "create product success", res.ToProductResponse(product))
 }
 
-func (r *V1) GetProduct(c *gin.Context) {
+func (r *V1) getProduct(c *gin.Context) {
 	id := c.Param("id")
 	product, err := r.product.GetByID(c.Request.Context(), id)
 	if err != nil {
@@ -45,30 +39,25 @@ func (r *V1) GetProduct(c *gin.Context) {
 	response.Success(c, http.StatusOK, "get product success", res.ToProductResponse(product))
 }
 
-func (r *V1) GetProductsByCategory(c *gin.Context) {
-	id := c.Param("id")
-	p := pagination.FromQuery(c)
-	listResult, err := r.product.GetByCategory(c.Request.Context(), id, p)
+func (r *V1) responseProductsByCategory(c *gin.Context, categoryID string, p pagination.Params, msg string) {
+	listResult, err := r.product.GetByCategory(c.Request.Context(), categoryID, p)
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
 	result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
-	response.SuccessPaginated(c, http.StatusOK, "get products by category success", result)
+	response.SuccessPaginated(c, http.StatusOK, msg, result)
 }
 
-func (r *V1) UpdateProduct(c *gin.Context) {
+func (r *V1) getProductsByCategory(c *gin.Context) {
+	r.responseProductsByCategory(c, c.Param("id"), pagination.FromQuery(c), "get products by category success")
+}
+
+func (r *V1) updateProduct(c *gin.Context) {
 	id := c.Param("id")
-	var request req.UpdateProduct
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - UpdateProduct - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - UpdateProduct - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.UpdateProduct](c, r.v, r.l, "updateProduct")
+	if !ok {
 		return
 	}
 
@@ -81,7 +70,7 @@ func (r *V1) UpdateProduct(c *gin.Context) {
 	response.Success(c, http.StatusOK, "update product success", res.ToProductResponse(product))
 }
 
-func (r *V1) DeleteProduct(c *gin.Context) {
+func (r *V1) deleteProduct(c *gin.Context) {
 	id := c.Param("id")
 	err := r.product.Delete(c.Request.Context(), id)
 	if err != nil {
@@ -92,18 +81,12 @@ func (r *V1) DeleteProduct(c *gin.Context) {
 	response.Success(c, http.StatusOK, "delete product success", nil)
 }
 
-func (r *V1) ListProducts(c *gin.Context) {
+func (r *V1) listProducts(c *gin.Context) {
 	p := pagination.FromQuery(c)
 	categoryID := c.Query("category_id")
 
 	if categoryID != "" {
-		listResult, err := r.product.GetByCategory(c.Request.Context(), categoryID, p)
-		if err != nil {
-			r.handleError(c, err)
-			return
-		}
-		result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
-		response.SuccessPaginated(c, http.StatusOK, "list products by category success", result)
+		r.responseProductsByCategory(c, categoryID, p, "list products by category success")
 		return
 	}
 
@@ -117,7 +100,7 @@ func (r *V1) ListProducts(c *gin.Context) {
 	response.SuccessPaginated(c, http.StatusOK, "list products success", result)
 }
 
-func (r *V1) SearchProducts(c *gin.Context) {
+func (r *V1) searchProducts(c *gin.Context) {
 	var params domain.SearchProductParams
 	params.Query = c.Query("q")
 	if categoryID := c.Query("category_id"); categoryID != "" {
@@ -125,19 +108,28 @@ func (r *V1) SearchProducts(c *gin.Context) {
 	}
 
 	if minPriceStr := c.Query("min_price"); minPriceStr != "" {
-		if val, err := strconv.ParseFloat(minPriceStr, 64); err == nil {
-			params.MinPrice = &val
+		val, err := strconv.ParseFloat(minPriceStr, 64)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid min_price parameter")
+			return
 		}
+		params.MinPrice = &val
 	}
 	if maxPriceStr := c.Query("max_price"); maxPriceStr != "" {
-		if val, err := strconv.ParseFloat(maxPriceStr, 64); err == nil {
-			params.MaxPrice = &val
+		val, err := strconv.ParseFloat(maxPriceStr, 64)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid max_price parameter")
+			return
 		}
+		params.MaxPrice = &val
 	}
 	if activeStr := c.Query("is_active"); activeStr != "" {
-		if val, err := strconv.ParseBool(activeStr); err == nil {
-			params.IsActive = &val
+		val, err := strconv.ParseBool(activeStr)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid is_active parameter")
+			return
 		}
+		params.IsActive = &val
 	}
 	p := pagination.FromQuery(c)
 

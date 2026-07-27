@@ -5,21 +5,15 @@ import (
 	"catalog-service/internal/delivery/http/v1/res"
 	"net/http"
 
+	"github.com/TruongLe68/go-micro/pkg/httpbind"
 	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
-func (r *V1) CreateCategory(c *gin.Context) {
-	var request req.CreateCategory
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - CreateCategory - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - CreateCategory - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+func (r *V1) createCategory(c *gin.Context) {
+	request, ok := httpbind.BindAndValidate[req.CreateCategory](c, r.v, r.l, "CreateCategory")
+	if !ok {
 		return
 	}
 
@@ -32,7 +26,7 @@ func (r *V1) CreateCategory(c *gin.Context) {
 	response.Success(c, http.StatusCreated, "create category success", res.ToCategoryResponse(category))
 }
 
-func (r *V1) GetCategory(c *gin.Context) {
+func (r *V1) getCategory(c *gin.Context) {
 	id := c.Param("id")
 	category, err := r.category.GetByID(c.Request.Context(), id)
 	if err != nil {
@@ -43,7 +37,7 @@ func (r *V1) GetCategory(c *gin.Context) {
 	response.Success(c, http.StatusOK, "get category success", res.ToCategoryResponse(category))
 }
 
-func (r *V1) GetCategoryChildren(c *gin.Context) {
+func (r *V1) getCategoryChildren(c *gin.Context) {
 	id := c.Param("id")
 	p := pagination.FromQuery(c)
 	listResult, err := r.category.GetChildren(c.Request.Context(), id, p)
@@ -56,17 +50,10 @@ func (r *V1) GetCategoryChildren(c *gin.Context) {
 	response.SuccessPaginated(c, http.StatusOK, "get category children success", result)
 }
 
-func (r *V1) UpdateCategory(c *gin.Context) {
+func (r *V1) updateCategory(c *gin.Context) {
 	id := c.Param("id")
-	var request req.UpdateCategory
-	if err := c.ShouldBindJSON(&request); err != nil {
-		r.l.Warn("restapi - v1 - UpdateCategory - ShouldBindJSON: %v", err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := r.v.Struct(request); err != nil {
-		r.l.Warn("restapi - v1 - UpdateCategory - validate: %v", err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+	request, ok := httpbind.BindAndValidate[req.UpdateCategory](c, r.v, r.l, "UpdateCategory")
+	if !ok {
 		return
 	}
 
@@ -79,7 +66,7 @@ func (r *V1) UpdateCategory(c *gin.Context) {
 	response.Success(c, http.StatusOK, "update category success", res.ToCategoryResponse(category))
 }
 
-func (r *V1) DeleteCategory(c *gin.Context) {
+func (r *V1) deleteCategory(c *gin.Context) {
 	id := c.Param("id")
 	err := r.category.Delete(c.Request.Context(), id)
 	if err != nil {
@@ -90,7 +77,7 @@ func (r *V1) DeleteCategory(c *gin.Context) {
 	response.Success(c, http.StatusOK, "delete category success", nil)
 }
 
-func (r *V1) ListCategories(c *gin.Context) {
+func (r *V1) listCategories(c *gin.Context) {
 	p := pagination.FromQuery(c)
 	listResult, err := r.category.List(c.Request.Context(), p)
 	if err != nil {
