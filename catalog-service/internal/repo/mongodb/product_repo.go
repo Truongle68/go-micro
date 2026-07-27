@@ -281,7 +281,8 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) (*domain.Pr
 	if err != nil {
 		return nil, err
 	}
-	p.UpdatedAt = time.Now()
+	now := time.Now()
+	m.UpdatedAt = now
 
 	filter := bson.M{"_id": m.ID}
 	update := bson.M{
@@ -310,8 +311,8 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) (*domain.Pr
 	if res.MatchedCount == 0 {
 		return nil, domain.ErrProductNotFound
 	}
+	p.UpdatedAt = now
 
-	p.UpdatedAt = m.UpdatedAt
 	return p, nil
 }
 

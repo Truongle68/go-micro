@@ -10,14 +10,16 @@ import (
 )
 
 type ProductUC struct {
-	repo repo.ProductRepository
+	repo     repo.ProductRepository
+	cateRepo repo.CategoryRepository
 }
 
 var _ ProductUsecase = (*ProductUC)(nil)
 
-func NewProductUC(repo repo.ProductRepository) *ProductUC {
+func NewProductUC(repo repo.ProductRepository, cateRepo repo.CategoryRepository) *ProductUC {
 	return &ProductUC{
-		repo: repo,
+		repo:     repo,
+		cateRepo: cateRepo,
 	}
 }
 
@@ -149,9 +151,34 @@ func (uc *ProductUC) GetByCategory(ctx context.Context, categoryID string, p pag
 	}, nil
 }
 
+func (in UpdateProductInput) isEmpty() bool {
+	return in.CategoryID == nil &&
+		in.Sku == nil &&
+		in.NameVi == nil &&
+		in.NameEn == nil &&
+		in.DescriptionVi == nil &&
+		in.DescriptionEn == nil &&
+		in.Unit == nil &&
+		in.BasePrice == nil &&
+		in.SalePrice == nil &&
+		in.IsActive == nil &&
+		in.Variants == nil &&
+		in.Images == nil
+}
+
 func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*ProductDTO, error) {
 	if in.ID == "" {
 		return nil, domain.ErrEmptyProductID
+	}
+
+	if in.isEmpty() {
+		return nil, domain.ErrNoFieldsToUpdate
+	}
+
+	if in.CategoryID != nil && *in.CategoryID != "" {
+		if _, err := uc.cateRepo.FindByID(ctx, *in.CategoryID); err != nil {
+			return nil, fmt.Errorf("finding category by id: %w", err)
+		}
 	}
 
 	p, err := uc.repo.FindByID(ctx, in.ID)

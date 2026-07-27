@@ -102,74 +102,56 @@ type UpdateProductParams struct {
 }
 
 func (p *Product) ApplyUpdate(params UpdateProductParams) error {
-	changed := false
-
 	if params.CategoryID != nil {
 		if *params.CategoryID == "" {
 			return ErrEmptyCategoryID
 		}
 		p.CategoryID = *params.CategoryID
-		changed = true
 	}
 	if params.Sku != nil {
 		if *params.Sku == "" {
 			return ErrEmptySku
 		}
 		p.Sku = *params.Sku
-		changed = true
 	}
 	if params.NameVi != nil {
 		p.NameVi = *params.NameVi
-		changed = true
 	}
 	if params.NameEn != nil {
 		p.NameEn = *params.NameEn
-		changed = true
 	}
 	if p.NameVi == "" && p.NameEn == "" {
 		return ErrEmptyName
 	}
 	if params.DescriptionVi != nil {
 		p.DescriptionVi = *params.DescriptionVi
-		changed = true
 	}
 	if params.DescriptionEn != nil {
 		p.DescriptionEn = *params.DescriptionEn
-		changed = true
 	}
 	if params.Unit != nil {
 		p.Unit = *params.Unit
-		changed = true
 	}
 	if params.BasePrice != nil {
 		if *params.BasePrice < 0 {
 			return ErrInvalidPrice
 		}
 		p.BasePrice = *params.BasePrice
-		changed = true
 	}
 	if params.SalePrice != nil {
 		if *params.SalePrice < 0 {
 			return ErrInvalidPrice
 		}
 		p.SalePrice = *params.SalePrice
-		changed = true
 	}
 	if params.IsActive != nil {
 		p.IsActive = *params.IsActive
-		changed = true
 	}
 	if params.Variants != nil {
 		p.Variants = params.Variants
-		changed = true
 	}
 	if params.Images != nil {
 		p.Images = params.Images
-		changed = true
-	}
-
-	if !changed {
-		return ErrNoFieldsToUpdate
 	}
 	p.UpdatedAt = time.Now()
 	return nil

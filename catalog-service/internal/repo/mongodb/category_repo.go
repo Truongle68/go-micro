@@ -182,25 +182,35 @@ func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagi
 	}, nil
 }
 
-func (r *CategoryRepo) Update(ctx context.Context, id string, c *domain.Category) (*domain.Category, error) {
-	oid, err := bson.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, domain.ErrInvalidCategoryID
-	}
-
-	c.ID = id
+func (r *CategoryRepo) Update(ctx context.Context, c *domain.Category) (*domain.Category, error) {
 	m, err := categoryModelFromDomain(c)
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
+	m.UpdatedAt = now
 
-	res, err := r.collection.ReplaceOne(ctx, bson.M{"_id": oid}, m)
+	filter := bson.M{"_id": m.ID}
+	update := bson.M{
+		"$set": bson.M{
+			"parent_id":  m.ParentID,
+			"name_vi":    m.NameVi,
+			"name_en":    m.NameEn,
+			"slug":       m.Slug,
+			"icon":       m.Icon,
+			"sort_order": m.SortOrder,
+			"updated_at": m.UpdatedAt,
+		},
+	}
+
+	res, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("updating category: %w", err)
 	}
 	if res.MatchedCount == 0 {
 		return nil, domain.ErrCategoryNotFound
 	}
+	c.UpdatedAt = now
 	return c, nil
 }
 
