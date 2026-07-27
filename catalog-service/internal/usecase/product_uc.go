@@ -26,9 +26,9 @@ func toProductDTO(p *domain.Product) *ProductDTO {
 		return nil
 	}
 
-	variants := make([]*ProductVariantDTO, len(p.Variants))
+	variants := make([]ProductVariantDTO, len(p.Variants))
 	for i, v := range p.Variants {
-		variants[i] = &ProductVariantDTO{
+		variants[i] = ProductVariantDTO{
 			ID:           v.ID,
 			VariantLabel: v.VariantLabel,
 			PriceDelta:   v.PriceDelta,
@@ -36,9 +36,9 @@ func toProductDTO(p *domain.Product) *ProductDTO {
 		}
 	}
 
-	images := make([]*ProductImageDTO, len(p.Images))
+	images := make([]ProductImageDTO, len(p.Images))
 	for i, img := range p.Images {
-		images[i] = &ProductImageDTO{
+		images[i] = ProductImageDTO{
 			ID:        img.ID,
 			Url:       img.Url,
 			SortOrder: img.SortOrder,
@@ -136,9 +136,12 @@ func (uc *ProductUC) GetByCategory(ctx context.Context, categoryID string, p pag
 		return nil, fmt.Errorf("finding by category: %w", err)
 	}
 
-	dtos := make([]*ProductDTO, len(result.Products))
-	for i := range result.Products {
-		dtos[i] = toProductDTO(result.Products[i])
+	dtos := make([]ProductDTO, len(result.Products))
+	for i, prod := range result.Products {
+		dto := toProductDTO(&prod)
+		if dto != nil {
+			dtos[i] = *dto
+		}
 	}
 	return &ProductListResultDTO{
 		Products:   dtos,
@@ -207,9 +210,12 @@ func (uc *ProductUC) List(ctx context.Context, p pagination.Params) (*ProductLis
 		return nil, fmt.Errorf("listing products: %w", err)
 	}
 
-	dtos := make([]*ProductDTO, len(result.Products))
-	for i := range result.Products {
-		dtos[i] = toProductDTO(result.Products[i])
+	dtos := make([]ProductDTO, len(result.Products))
+	for i, prod := range result.Products {
+		dto := toProductDTO(&prod)
+		if dto != nil {
+			dtos[i] = *dto
+		}
 	}
 	return &ProductListResultDTO{
 		Products:   dtos,
@@ -227,9 +233,12 @@ func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductPar
 		return nil, fmt.Errorf("searching product: %w", err)
 	}
 
-	dtos := make([]*ProductDTO, len(result.Products))
-	for i := range result.Products {
-		dtos[i] = toProductDTO(result.Products[i])
+	dtos := make([]ProductDTO, len(result.Products))
+	for i, prod := range result.Products {
+		dto := toProductDTO(&prod)
+		if dto != nil {
+			dtos[i] = *dto
+		}
 	}
 
 	return &ProductListResultDTO{

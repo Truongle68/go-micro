@@ -10,16 +10,12 @@ type ProductVariantResponse struct {
 	VariantLabel string    `json:"variant_label"`
 	PriceDelta   float64   `json:"price_delta"`
 	Sku          string    `json:"sku"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type ProductImageResponse struct {
 	ID        string    `json:"id"`
 	Url       string    `json:"url"`
 	SortOrder int64     `json:"sort_order"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type ProductResponse struct {
@@ -36,8 +32,8 @@ type ProductResponse struct {
 	RatingAvg     float64                   `json:"rating_avg"`
 	RatingCount   int64                     `json:"rating_count"`
 	IsActive      bool                      `json:"is_active"`
-	Variants      []*ProductVariantResponse `json:"variants"`
-	Images        []*ProductImageResponse   `json:"images"`
+	Variants      []ProductVariantResponse `json:"variants"`
+	Images        []ProductImageResponse   `json:"images"`
 	CreatedAt     time.Time                 `json:"created_at"`
 	UpdatedAt     time.Time                 `json:"updated_at"`
 }
@@ -47,26 +43,22 @@ func ToProductResponse(dto *usecase.ProductDTO) ProductResponse {
 		return ProductResponse{}
 	}
 
-	variants := make([]*ProductVariantResponse, len(dto.Variants))
+	variants := make([]ProductVariantResponse, len(dto.Variants))
 	for i, v := range dto.Variants {
-		variants[i] = &ProductVariantResponse{
+		variants[i] = ProductVariantResponse{
 			ID:           v.ID,
 			VariantLabel: v.VariantLabel,
 			PriceDelta:   v.PriceDelta,
 			Sku:          v.Sku,
-			CreatedAt:    v.CreatedAt,
-			UpdatedAt:    v.UpdatedAt,
 		}
 	}
 
-	images := make([]*ProductImageResponse, len(dto.Images))
+	images := make([]ProductImageResponse, len(dto.Images))
 	for i, img := range dto.Images {
-		images[i] = &ProductImageResponse{
+		images[i] = ProductImageResponse{
 			ID:        img.ID,
 			Url:       img.Url,
 			SortOrder: img.SortOrder,
-			CreatedAt: img.CreatedAt,
-			UpdatedAt: img.UpdatedAt,
 		}
 	}
 
@@ -91,10 +83,10 @@ func ToProductResponse(dto *usecase.ProductDTO) ProductResponse {
 	}
 }
 
-func ToProductListResponse(dtos []*usecase.ProductDTO) []ProductResponse {
+func ToProductListResponse(dtos []usecase.ProductDTO) []ProductResponse {
 	res := make([]ProductResponse, len(dtos))
 	for i, dto := range dtos {
-		res[i] = ToProductResponse(dto)
+		res[i] = ToProductResponse(&dto)
 	}
 	return res
 }

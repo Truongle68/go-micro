@@ -19,7 +19,11 @@ func (r *V1) handleError(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrEmptyCategoryID),
 		errors.Is(err, domain.ErrEmptyName),
 		errors.Is(err, domain.ErrEmptySku),
-		errors.Is(err, domain.ErrInvalidPrice):
+		errors.Is(err, domain.ErrInvalidPrice),
+		errors.Is(err, domain.ErrInvalidPriceRange),
+		errors.Is(err, domain.ErrInvalidCategoryID),
+		errors.Is(err, domain.ErrInvalidProductID),
+		errors.Is(err, domain.ErrNoFieldsToUpdate):
 		response.Error(c, http.StatusBadRequest, err.Error())
 	default:
 		r.l.Error(err, "catalog handler unexpected error")

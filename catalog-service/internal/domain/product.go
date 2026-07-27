@@ -183,7 +183,28 @@ type SearchProductParams struct {
 	IsActive   *bool
 }
 
+type SearchProductsQuery struct {
+	Query      string   `form:"q"`
+	CategoryID string   `form:"category_id"`
+	MinPrice   *float64 `form:"min_price"`
+	MaxPrice   *float64 `form:"max_price"`
+	IsActive   *bool    `form:"is_active"`
+}
+
+func (q SearchProductsQuery) ToDomainParams() SearchProductParams {
+	return SearchProductParams{
+		Query:      q.Query,
+		CategoryID: q.CategoryID,
+		MinPrice:   q.MinPrice,
+		MaxPrice:   q.MaxPrice,
+		IsActive:   q.IsActive,
+	}
+}
+
 func (p SearchProductParams) Validate() error {
+	if (p.MinPrice != nil && *p.MinPrice < 0) || (p.MaxPrice != nil && *p.MaxPrice < 0) {
+		return ErrInvalidPrice
+	}
 	if p.MinPrice != nil && p.MaxPrice != nil && *p.MinPrice > *p.MaxPrice {
 		return ErrInvalidPriceRange
 	}
@@ -193,6 +214,6 @@ func (p SearchProductParams) Validate() error {
 var ErrInvalidPriceRange = errors.New("min_price cannot be greater than max_price")
 
 type ListProductResult struct {
-	Products   []*Product
+	Products   []Product
 	TotalCount int64
 }

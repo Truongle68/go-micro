@@ -40,7 +40,7 @@ type UpdateCategoryInput struct {
 }
 
 type CategoryListResultDTO struct {
-	Categories []*CategoryDTO `json:"categories"`
+	Categories []CategoryDTO `json:"categories"`
 	TotalCount int64          `json:"total_count"`
 }
 
@@ -54,40 +54,36 @@ type CategoryUsecase interface {
 }
 
 type ProductVariantDTO struct {
-	ID           string    `json:"id"`
-	VariantLabel string    `json:"variant_label"`
-	PriceDelta   float64   `json:"price_delta"`
-	Sku          string    `json:"sku"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           string  `json:"id"`
+	VariantLabel string  `json:"variant_label"`
+	PriceDelta   float64 `json:"price_delta"`
+	Sku          string  `json:"sku"`
 }
 
 type ProductImageDTO struct {
-	ID        string    `json:"id"`
-	Url       string    `json:"url"`
-	SortOrder int64     `json:"sort_order"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string `json:"id"`
+	Url       string `json:"url"`
+	SortOrder int64  `json:"sort_order"`
 }
 
 type ProductDTO struct {
-	ID            string               `json:"id"`
-	CategoryID    string               `json:"category_id"`
-	Sku           string               `json:"sku"`
-	NameVi        string               `json:"name_vi"`
-	NameEn        string               `json:"name_en"`
-	DescriptionVi string               `json:"description_vi"`
-	DescriptionEn string               `json:"description_en"`
-	Unit          string               `json:"unit"`
-	BasePrice     float64              `json:"base_price"`
-	SalePrice     float64              `json:"sale_price"`
-	RatingAvg     float64              `json:"rating_avg"`
-	RatingCount   int64                `json:"rating_count"`
-	IsActive      bool                 `json:"is_active"`
-	Variants      []*ProductVariantDTO `json:"variants"`
-	Images        []*ProductImageDTO   `json:"images"`
-	CreatedAt     time.Time            `json:"created_at"`
-	UpdatedAt     time.Time            `json:"updated_at"`
+	ID            string              `json:"id"`
+	CategoryID    string              `json:"category_id"`
+	Sku           string              `json:"sku"`
+	NameVi        string              `json:"name_vi"`
+	NameEn        string              `json:"name_en"`
+	DescriptionVi string              `json:"description_vi"`
+	DescriptionEn string              `json:"description_en"`
+	Unit          string              `json:"unit"`
+	BasePrice     float64             `json:"base_price"`
+	SalePrice     float64             `json:"sale_price"`
+	RatingAvg     float64             `json:"rating_avg"`
+	RatingCount   int64               `json:"rating_count"`
+	IsActive      bool                `json:"is_active"`
+	Variants      []ProductVariantDTO `json:"variants"`
+	Images        []ProductImageDTO   `json:"images"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
 }
 
 type ProductVariantInput struct {
@@ -133,18 +129,8 @@ type UpdateProductInput struct {
 }
 
 type ProductListResultDTO struct {
-	Products   []*ProductDTO `json:"products"`
-	TotalCount int64         `json:"total_count"`
-}
-
-type SearchProductInput struct {
-	Query      string   `json:"query"`
-	CategoryID string   `json:"category_id"`
-	MinPrice   *float64 `json:"min_price"`
-	MaxPrice   *float64 `json:"max_price"`
-	IsActive   *bool    `json:"is_active"`
-	Page       int64    `json:"page"`
-	Limit      int64    `json:"limit"`
+	Products   []ProductDTO `json:"products"`
+	TotalCount int64        `json:"total_count"`
 }
 
 type ProductUsecase interface {

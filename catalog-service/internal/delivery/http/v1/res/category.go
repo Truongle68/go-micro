@@ -34,10 +34,10 @@ func ToCategoryResponse(dto *usecase.CategoryDTO) CategoryResponse {
 	}
 }
 
-func ToCategoryListResponse(dtos []*usecase.CategoryDTO) []CategoryResponse {
+func ToCategoryListResponse(dtos []usecase.CategoryDTO) []CategoryResponse {
 	res := make([]CategoryResponse, len(dtos))
 	for i, dto := range dtos {
-		res[i] = ToCategoryResponse(dto)
+		res[i] = ToCategoryResponse(&dto)
 	}
 	return res
 }

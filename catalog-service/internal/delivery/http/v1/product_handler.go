@@ -5,7 +5,6 @@ import (
 	"catalog-service/internal/delivery/http/v1/res"
 	"catalog-service/internal/domain"
 	"net/http"
-	"strconv"
 
 	"github.com/TruongLe68/go-micro/pkg/httpbind"
 	"github.com/TruongLe68/go-micro/pkg/pagination"
@@ -101,39 +100,14 @@ func (r *V1) listProducts(c *gin.Context) {
 }
 
 func (r *V1) searchProducts(c *gin.Context) {
-	var params domain.SearchProductParams
-	params.Query = c.Query("q")
-	if categoryID := c.Query("category_id"); categoryID != "" {
-		params.CategoryID = categoryID
-	}
-
-	if minPriceStr := c.Query("min_price"); minPriceStr != "" {
-		val, err := strconv.ParseFloat(minPriceStr, 64)
-		if err != nil {
-			response.Error(c, http.StatusBadRequest, "invalid min_price parameter")
-			return
-		}
-		params.MinPrice = &val
-	}
-	if maxPriceStr := c.Query("max_price"); maxPriceStr != "" {
-		val, err := strconv.ParseFloat(maxPriceStr, 64)
-		if err != nil {
-			response.Error(c, http.StatusBadRequest, "invalid max_price parameter")
-			return
-		}
-		params.MaxPrice = &val
-	}
-	if activeStr := c.Query("is_active"); activeStr != "" {
-		val, err := strconv.ParseBool(activeStr)
-		if err != nil {
-			response.Error(c, http.StatusBadRequest, "invalid is_active parameter")
-			return
-		}
-		params.IsActive = &val
+	var query domain.SearchProductsQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid query parameters")
+		return
 	}
 	p := pagination.FromQuery(c)
 
-	listResult, err := r.product.Search(c.Request.Context(), params, p)
+	listResult, err := r.product.Search(c.Request.Context(), query.ToDomainParams(), p)
 	if err != nil {
 		r.handleError(c, err)
 		return

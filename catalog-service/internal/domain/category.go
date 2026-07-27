@@ -79,7 +79,7 @@ func (c *Category) ApplyUpdate(params UpdateCategoryParams) {
 }
 
 type ListCategoryResult struct {
-	Categories []*Category
+	Categories []Category
 	TotalCount int64
 }
 

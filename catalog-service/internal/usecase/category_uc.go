@@ -81,10 +81,14 @@ func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string, p pagina
 		return nil, fmt.Errorf("finding children: %w", err)
 	}
 
-	dtos := make([]*CategoryDTO, len(result.Categories))
-	for i := range result.Categories {
-		dtos[i] = toCategoryDTO(result.Categories[i])
+	dtos := make([]CategoryDTO, len(result.Categories))
+	for i, c := range result.Categories {
+		dto := toCategoryDTO(&c)
+		if dto != nil {
+			dtos[i] = *dto
+		}
 	}
+
 	return &CategoryListResultDTO{
 		Categories: dtos,
 		TotalCount: result.TotalCount,
@@ -144,9 +148,12 @@ func (uc *CategoryUC) List(ctx context.Context, p pagination.Params) (*CategoryL
 		return nil, fmt.Errorf("listing categories: %w", err)
 	}
 
-	dtos := make([]*CategoryDTO, len(result.Categories))
-	for i := range result.Categories {
-		dtos[i] = toCategoryDTO(result.Categories[i])
+	dtos := make([]CategoryDTO, len(result.Categories))
+	for i, c := range result.Categories {
+		dto := toCategoryDTO(&c)
+		if dto != nil {
+			dtos[i] = *dto
+		}
 	}
 	return &CategoryListResultDTO{
 		Categories: dtos,

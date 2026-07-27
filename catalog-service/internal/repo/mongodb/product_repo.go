@@ -64,7 +64,7 @@ type productModel struct {
 	UpdatedAt     time.Time      `bson:"updated_at"`
 }
 
-func (m *productModel) toDomain() *domain.Product {
+func (m productModel) toDomain() *domain.Product {
 	variants := make([]domain.ProductVariant, len(m.Variants))
 	for i, v := range m.Variants {
 		variants[i] = domain.ProductVariant{
@@ -199,7 +199,7 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	now := time.Now()
 	m.CreatedAt, m.UpdatedAt = now, now
 
-	res, err := r.collection.InsertOne(ctx, p)
+	res, err := r.collection.InsertOne(ctx, m)
 	if err != nil {
 		return fmt.Errorf("inserting product: %w", err)
 	}
@@ -210,7 +210,7 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	}
 
 	p.CreatedAt, p.UpdatedAt = now, now
-	return err
+	return nil
 }
 
 func (r *ProductRepo) FindByID(ctx context.Context, id string) (*domain.Product, error) {
@@ -244,7 +244,7 @@ func (r *ProductRepo) FindByCategory(ctx context.Context, categoryID string, p p
 
 	if total == 0 {
 		return &domain.ListProductResult{
-			Products:   []*domain.Product{},
+			Products:   []domain.Product{},
 			TotalCount: 0,
 		}, nil
 	}
@@ -260,13 +260,15 @@ func (r *ProductRepo) FindByCategory(ctx context.Context, categoryID string, p p
 	}
 	defer cursor.Close(ctx)
 
-	var models []*productModel
+	var models []productModel
 	if err := cursor.All(ctx, &models); err != nil {
 		return nil, fmt.Errorf("decoding products by category: %w", err)
 	}
-	products := make([]*domain.Product, len(models))
+	products := make([]domain.Product, len(models))
 	for i, m := range models {
-		products[i] = m.toDomain()
+		if p := m.toDomain(); p != nil {
+			products[i] = *p
+		}
 	}
 	return &domain.ListProductResult{
 		Products:   products,
@@ -337,7 +339,7 @@ func (r *ProductRepo) List(ctx context.Context, p pagination.Params) (*domain.Li
 
 	if total == 0 {
 		return &domain.ListProductResult{
-			Products:   []*domain.Product{},
+			Products:   []domain.Product{},
 			TotalCount: 0,
 		}, nil
 	}
@@ -353,14 +355,16 @@ func (r *ProductRepo) List(ctx context.Context, p pagination.Params) (*domain.Li
 	}
 	defer cursor.Close(ctx)
 
-	var models []*productModel
+	var models []productModel
 	if err := cursor.All(ctx, &models); err != nil {
 		return nil, fmt.Errorf("decoding product list: %w", err)
 	}
 
-	products := make([]*domain.Product, len(models))
+	products := make([]domain.Product, len(models))
 	for i, m := range models {
-		products[i] = m.toDomain()
+		if p := m.toDomain(); p != nil {
+			products[i] = *p
+		}
 	}
 
 	return &domain.ListProductResult{
@@ -457,7 +461,7 @@ func buildSearchPipeline(sParams domain.SearchProductParams, filterClauses []bso
 				"text": bson.M{
 					"query": sParams.Query,
 					"path":  []string{"name_vi", "name_en", "description_vi", "description_en", "sku"},
-					"fuzzy": bson.M{"maxEdits": 1},
+					"fuzzy": bson.M{"maxEdits": 1, "prefixLength": 1},
 				},
 			},
 		}
@@ -512,7 +516,7 @@ func decodeFacetResult(ctx context.Context, cursor *mongo.Cursor) (*domain.ListP
 	}
 
 	res := &domain.ListProductResult{
-		Products:   []*domain.Product{},
+		Products:   []domain.Product{},
 		TotalCount: 0,
 	}
 
@@ -520,9 +524,11 @@ func decodeFacetResult(ctx context.Context, cursor *mongo.Cursor) (*domain.ListP
 		return res, nil
 	}
 
-	products := make([]*domain.Product, len(rawResults[0].Results))
+	products := make([]domain.Product, len(rawResults[0].Results))
 	for i, m := range rawResults[0].Results {
-		products[i] = m.toDomain()
+		if p := m.toDomain(); p != nil {
+			products[i] = *p
+		}
 	}
 	res.Products = products
 

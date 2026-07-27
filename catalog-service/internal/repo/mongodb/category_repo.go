@@ -38,14 +38,14 @@ type categoryModel struct {
 	UpdatedAt time.Time      `bson:"updated_at"`
 }
 
-func (m *categoryModel) toDomain() domain.Category {
+func (m categoryModel) toDomain() *domain.Category {
 	var parentID *string
 	if m.ParentID != nil && !m.ParentID.IsZero() {
 		pid := m.ParentID.Hex()
 		parentID = &pid
 	}
 
-	return domain.Category{
+	return &domain.Category{
 		ID:        m.ID.Hex(),
 		ParentID:  parentID,
 		NameVi:    m.NameVi,
@@ -59,6 +59,9 @@ func (m *categoryModel) toDomain() domain.Category {
 }
 
 func categoryModelFromDomain(c *domain.Category) (*categoryModel, error) {
+	if c == nil {
+		return nil, domain.ErrCategoryNotFound
+	}
 	now := time.Now()
 	if c.CreatedAt.IsZero() {
 		c.CreatedAt = now
@@ -129,7 +132,7 @@ func (r *CategoryRepo) FindByID(ctx context.Context, id string) (*domain.Categor
 		return nil, err
 	}
 	c := m.toDomain()
-	return &c, nil
+	return c, nil
 }
 
 func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagination.Params) (*domain.ListCategoryResult, error) {
@@ -146,7 +149,7 @@ func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagi
 
 	if total == 0 {
 		return &domain.ListCategoryResult{
-			Categories: []*domain.Category{},
+			Categories: []domain.Category{},
 			TotalCount: 0,
 		}, nil
 	}
@@ -167,10 +170,11 @@ func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagi
 		return nil, err
 	}
 
-	categories := make([]*domain.Category, len(models))
+	categories := make([]domain.Category, len(models))
 	for i, m := range models {
-		cat := m.toDomain()
-		categories[i] = &cat
+		if c := m.toDomain(); c != nil {
+			categories[i] = *c
+		}
 	}
 	return &domain.ListCategoryResult{
 		Categories: categories,
@@ -225,7 +229,7 @@ func (r *CategoryRepo) List(ctx context.Context, p pagination.Params) (*domain.L
 
 	if total == 0 {
 		return &domain.ListCategoryResult{
-			Categories: []*domain.Category{},
+			Categories: []domain.Category{},
 			TotalCount: 0,
 		}, nil
 	}
@@ -246,10 +250,11 @@ func (r *CategoryRepo) List(ctx context.Context, p pagination.Params) (*domain.L
 		return nil, err
 	}
 
-	categories := make([]*domain.Category, len(models))
+	categories := make([]domain.Category, len(models))
 	for i, m := range models {
-		cat := m.toDomain()
-		categories[i] = &cat
+		if c := m.toDomain(); c != nil {
+			categories[i] = *c
+		}
 	}
 	return &domain.ListCategoryResult{
 		Categories: categories,
