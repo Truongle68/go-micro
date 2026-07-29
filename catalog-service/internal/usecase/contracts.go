@@ -64,11 +64,6 @@ type ProductVariantInput struct {
 	Sku          string
 }
 
-type ProductImageInput struct {
-	Url       string
-	SortOrder int64
-}
-
 type CreateProductInput struct {
 	CategoryID    string
 	Sku           string
@@ -81,7 +76,7 @@ type CreateProductInput struct {
 	SalePrice     float64
 	IsActive      bool
 	Variants      []ProductVariantInput
-	Images        []ProductImageInput
+	Images        []string
 }
 
 type UpdateProductInput struct {
@@ -97,7 +92,7 @@ type UpdateProductInput struct {
 	SalePrice     *float64
 	IsActive      *bool
 	Variants      []ProductVariantInput
-	Images        []ProductImageInput
+	Images        []string
 }
 
 type ProductList struct {

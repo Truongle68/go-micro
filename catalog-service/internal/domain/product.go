@@ -6,16 +6,9 @@ import (
 )
 
 type ProductVariant struct {
-	ID           string
 	VariantLabel string
 	PriceDelta   float64
 	Sku          string
-}
-
-type ProductImage struct {
-	ID        string
-	Url       string
-	SortOrder int64
 }
 
 type PopulatedCategory struct {
@@ -42,7 +35,7 @@ type Product struct {
 	RatingCount   int64
 	IsActive      bool
 	Variants      []ProductVariant
-	Images        []ProductImage
+	Images        []string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -59,7 +52,7 @@ type NewProductParams struct {
 	SalePrice     float64
 	IsActive      bool
 	Variants      []ProductVariant
-	Images        []ProductImage
+	Images        []string
 }
 
 func NewProduct(params NewProductParams) (*Product, error) {
@@ -107,7 +100,7 @@ type UpdateProductParams struct {
 	SalePrice     *float64
 	IsActive      *bool
 	Variants      []ProductVariant
-	Images        []ProductImage
+	Images        []string
 }
 
 func (p *Product) ApplyUpdate(params UpdateProductParams) error {

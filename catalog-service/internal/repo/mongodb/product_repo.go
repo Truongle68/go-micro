@@ -32,16 +32,9 @@ func NewProductRepo(db *mongo.Database) *ProductRepo {
 }
 
 type variantModel struct {
-	ID           bson.ObjectID `bson:"_id"`
-	VariantLabel string        `bson:"variant_label"`
-	PriceDelta   float64       `bson:"price_delta"`
-	Sku          string        `bson:"sku"`
-}
-
-type imageModel struct {
-	ID        bson.ObjectID `bson:"_id"`
-	Url       string        `bson:"url"`
-	SortOrder int           `bson:"sort_order"`
+	VariantLabel string  `bson:"variant_label"`
+	PriceDelta   float64 `bson:"price_delta"`
+	Sku          string  `bson:"sku"`
 }
 
 type populatedCategoryModel struct {
@@ -68,7 +61,7 @@ type productModel struct {
 	RatingCount   int64          `bson:"rating_count"`
 	IsActive      bool           `bson:"is_active"`
 	Variants      []variantModel `bson:"variants"`
-	Images        []imageModel   `bson:"images"`
+	Images        []string       `bson:"images"`
 	CreatedAt     time.Time      `bson:"created_at"`
 	UpdatedAt     time.Time      `bson:"updated_at"`
 }
@@ -77,21 +70,14 @@ func (m productModel) toDomain() *domain.Product {
 	variants := make([]domain.ProductVariant, len(m.Variants))
 	for i, v := range m.Variants {
 		variants[i] = domain.ProductVariant{
-			ID:           v.ID.Hex(),
 			VariantLabel: v.VariantLabel,
 			PriceDelta:   v.PriceDelta,
 			Sku:          v.Sku,
 		}
 	}
 
-	images := make([]domain.ProductImage, len(m.Images))
-	for i, v := range m.Images {
-		images[i] = domain.ProductImage{
-			ID:        v.ID.Hex(),
-			Url:       v.Url,
-			SortOrder: int64(v.SortOrder),
-		}
-	}
+	images := make([]string, len(m.Images))
+	copy(images, m.Images)
 
 	return &domain.Product{
 		ID:            m.ID.Hex(),
@@ -150,42 +136,15 @@ func productModelFromDomain(p *domain.Product) (*productModel, error) {
 
 	m.Variants = make([]variantModel, len(p.Variants))
 	for i, v := range p.Variants {
-		vm := variantModel{
+		m.Variants[i] = variantModel{
 			VariantLabel: v.VariantLabel,
 			PriceDelta:   v.PriceDelta,
 			Sku:          v.Sku,
 		}
-
-		if v.ID != "" {
-			oid, err := bson.ObjectIDFromHex(v.ID)
-			if err != nil {
-				return nil, fmt.Errorf("invalid variant id: %w", err)
-			}
-			vm.ID = oid
-		} else {
-			vm.ID = bson.NewObjectID()
-		}
-		m.Variants[i] = vm
 	}
 
-	m.Images = make([]imageModel, len(p.Images))
-	for i, img := range p.Images {
-		im := imageModel{
-			Url:       img.Url,
-			SortOrder: int(img.SortOrder),
-		}
-
-		if img.ID != "" {
-			oid, err := bson.ObjectIDFromHex(img.ID)
-			if err != nil {
-				return nil, fmt.Errorf("invalid image id: %w", err)
-			}
-			im.ID = oid
-		} else {
-			im.ID = bson.NewObjectID()
-		}
-		m.Images[i] = im
-	}
+	m.Images = make([]string, len(p.Images))
+	copy(m.Images, p.Images)
 
 	return m, nil
 }
@@ -222,26 +181,6 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 
 	p.CreatedAt, p.UpdatedAt = now, now
 	return nil
-}
-
-func categoryLookupStage() mongo.Pipeline {
-	return mongo.Pipeline{
-		bson.D{{Key: "$lookup", Value: bson.M{
-			"from":         "categories",
-			"localField":   "category_id",
-			"foreignField": "_id",
-			"as":           "category",
-		}}},
-
-		bson.D{{Key: "$unwind", Value: bson.M{
-			"path":                       "$category",
-			"preserveNullAndEmptyArrays": true,
-		}}},
-	}
-}
-
-func appendCategoryLookup(pipeline mongo.Pipeline) mongo.Pipeline {
-	return append(pipeline, categoryLookupStage()...)
 }
 
 func (r *ProductRepo) FindByID(ctx context.Context, id string) (*domain.Product, error) {

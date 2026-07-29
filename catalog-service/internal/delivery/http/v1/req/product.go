@@ -8,11 +8,6 @@ type ProductVariant struct {
 	Sku          string  `json:"sku" validate:"required"`
 }
 
-type ProductImage struct {
-	Url       string `json:"url" validate:"required"`
-	SortOrder int64  `json:"sort_order"`
-}
-
 type CreateProduct struct {
 	CategoryID    string           `json:"category_id" validate:"required"`
 	Sku           string           `json:"sku" validate:"required"`
@@ -25,7 +20,7 @@ type CreateProduct struct {
 	SalePrice     float64          `json:"sale_price" validate:"required,gte=0"`
 	IsActive      bool             `json:"is_active"`
 	Variants      []ProductVariant `json:"variants"`
-	Images        []ProductImage   `json:"images"`
+	Images        []string         `json:"images"`
 }
 
 func (req *CreateProduct) ToCreateProductInput() usecase.CreateProductInput {
@@ -35,14 +30,6 @@ func (req *CreateProduct) ToCreateProductInput() usecase.CreateProductInput {
 			VariantLabel: v.VariantLabel,
 			PriceDelta:   v.PriceDelta,
 			Sku:          v.Sku,
-		})
-	}
-
-	var images []usecase.ProductImageInput
-	for _, img := range req.Images {
-		images = append(images, usecase.ProductImageInput{
-			Url:       img.Url,
-			SortOrder: img.SortOrder,
 		})
 	}
 
@@ -58,7 +45,7 @@ func (req *CreateProduct) ToCreateProductInput() usecase.CreateProductInput {
 		SalePrice:     req.SalePrice,
 		IsActive:      req.IsActive,
 		Variants:      variants,
-		Images:        images,
+		Images:        req.Images,
 	}
 }
 
@@ -74,7 +61,7 @@ type UpdateProduct struct {
 	SalePrice     *float64         `json:"sale_price" validate:"omitempty,gte=0"`
 	IsActive      *bool            `json:"is_active"`
 	Variants      []ProductVariant `json:"variants"`
-	Images        []ProductImage   `json:"images"`
+	Images        []string         `json:"images"`
 }
 
 func (req *UpdateProduct) ToUpdateProductInput(id string) usecase.UpdateProductInput {
@@ -85,16 +72,6 @@ func (req *UpdateProduct) ToUpdateProductInput(id string) usecase.UpdateProductI
 				VariantLabel: v.VariantLabel,
 				PriceDelta:   v.PriceDelta,
 				Sku:          v.Sku,
-			})
-		}
-	}
-
-	var images []usecase.ProductImageInput
-	if req.Images != nil {
-		for _, img := range req.Images {
-			images = append(images, usecase.ProductImageInput{
-				Url:       img.Url,
-				SortOrder: img.SortOrder,
 			})
 		}
 	}
@@ -112,7 +89,7 @@ func (req *UpdateProduct) ToUpdateProductInput(id string) usecase.UpdateProductI
 		SalePrice:     req.SalePrice,
 		IsActive:      req.IsActive,
 		Variants:      variants,
-		Images:        images,
+		Images:        req.Images,
 	}
 }
 

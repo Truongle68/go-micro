@@ -51,24 +51,18 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Color: Black",
         price_delta: NumberLong(0),
         sku: "HEADPHONE-001-BLK",
       },
       {
-        id: new ObjectId(),
         variant_label: "Color: Silver",
         price_delta: NumberLong(10000000),
         sku: "HEADPHONE-001-SLV",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/headphone-1.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/headphone-1.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -90,24 +84,18 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Color: Blue",
         price_delta: NumberLong(0),
         sku: "SPEAKER-002-BLU",
       },
       {
-        id: new ObjectId(),
         variant_label: "Color: Red",
         price_delta: NumberLong(0),
         sku: "SPEAKER-002-RED",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/speaker-2.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/speaker-2.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -129,18 +117,13 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Edition: Standard",
         price_delta: NumberLong(0),
         sku: "EARBUDS-003-STD",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/earbuds-3.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/earbuds-3.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -162,24 +145,18 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Size: 40mm",
         price_delta: NumberLong(0),
         sku: "WATCH-004-40",
       },
       {
-        id: new ObjectId(),
         variant_label: "Size: 44mm",
         price_delta: NumberLong(20000000),
         sku: "WATCH-004-44",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/watch-4.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/watch-4.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -201,24 +178,18 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Plug: US Standard",
         price_delta: NumberLong(0),
         sku: "CHARGER-005-US",
       },
       {
-        id: new ObjectId(),
         variant_label: "Plug: EU Standard",
         price_delta: NumberLong(0),
         sku: "CHARGER-005-EU",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/charger-5.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/charger-5.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -240,30 +211,23 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Size M / White",
         price_delta: NumberLong(0),
         sku: "TSHIRT-006-M-WHT",
       },
       {
-        id: new ObjectId(),
         variant_label: "Size L / White",
         price_delta: NumberLong(0),
         sku: "TSHIRT-006-L-WHT",
       },
       {
-        id: new ObjectId(),
         variant_label: "Size XL / Black",
         price_delta: NumberLong(0),
         sku: "TSHIRT-006-XL-BLK",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/tshirt-6.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/tshirt-6.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -285,24 +249,18 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Size M / Grey",
         price_delta: NumberLong(0),
         sku: "HOODIE-007-M-GRY",
       },
       {
-        id: new ObjectId(),
         variant_label: "Size L / Navy",
         price_delta: NumberLong(0),
         sku: "HOODIE-007-L-NVY",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/hoodie-7.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/hoodie-7.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -324,24 +282,18 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Size 30 / Dark Blue",
         price_delta: NumberLong(0),
         sku: "JEANS-008-30-DBL",
       },
       {
-        id: new ObjectId(),
         variant_label: "Size 32 / Dark Blue",
         price_delta: NumberLong(0),
         sku: "JEANS-008-32-DBL",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/jeans-8.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/jeans-8.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -363,18 +315,13 @@ db.products.insertMany([
     is_active: true,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Color: Graphite",
         price_delta: NumberLong(0),
         sku: "MOUSE-009-GPH",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/mouse-9.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/mouse-9.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),
@@ -396,18 +343,13 @@ db.products.insertMany([
     is_active: false,
     variants: [
       {
-        id: new ObjectId(),
         variant_label: "Switch: Red",
         price_delta: NumberLong(0),
         sku: "KEYBOARD-010-RED",
       },
     ],
     images: [
-      {
-        id: new ObjectId(),
-        url: "https://cdn.example.com/products/keyboard-10.jpg",
-        sort_order: 1,
-      },
+      "https://cdn.example.com/products/keyboard-10.jpg",
     ],
     created_at: new Date(),
     updated_at: new Date(),

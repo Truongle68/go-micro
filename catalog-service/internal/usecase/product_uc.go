@@ -35,17 +35,6 @@ func toDomainVariants(in []ProductVariantInput) []domain.ProductVariant {
 	return variants
 }
 
-func toDomainImages(in []ProductImageInput) []domain.ProductImage {
-	images := make([]domain.ProductImage, len(in))
-	for i, img := range in {
-		images[i] = domain.ProductImage{
-			Url:       img.Url,
-			SortOrder: img.SortOrder,
-		}
-	}
-	return images
-}
-
 func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain.Product, error) {
 	p, err := domain.NewProduct(domain.NewProductParams{
 		CategoryID:    in.CategoryID,
@@ -59,7 +48,7 @@ func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain
 		SalePrice:     in.SalePrice,
 		IsActive:      in.IsActive,
 		Variants:      toDomainVariants(in.Variants),
-		Images:        toDomainImages(in.Images),
+		Images:        in.Images,
 	})
 
 	if err != nil {
@@ -201,11 +190,6 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 		variants = toDomainVariants(in.Variants)
 	}
 
-	var images []domain.ProductImage
-	if in.Images != nil {
-		images = toDomainImages(in.Images)
-	}
-
 	if err := p.ApplyUpdate(domain.UpdateProductParams{
 		CategoryID:    in.CategoryID,
 		Sku:           in.Sku,
@@ -218,7 +202,7 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 		SalePrice:     in.SalePrice,
 		IsActive:      in.IsActive,
 		Variants:      variants,
-		Images:        images,
+		Images:        in.Images,
 	}); err != nil {
 		return nil, err
 	}

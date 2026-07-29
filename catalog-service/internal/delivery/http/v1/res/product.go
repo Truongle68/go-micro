@@ -7,7 +7,6 @@ import (
 )
 
 type ProductVariant struct {
-	ID           string  `json:"id"`
 	VariantLabel string  `json:"variant_label"`
 	PriceDelta   float64 `json:"price_delta"`
 	Sku          string  `json:"sku"`
@@ -15,24 +14,9 @@ type ProductVariant struct {
 
 func toProductVariant(v domain.ProductVariant) ProductVariant {
 	return ProductVariant{
-		ID:           v.ID,
 		VariantLabel: v.VariantLabel,
 		PriceDelta:   v.PriceDelta,
 		Sku:          v.Sku,
-	}
-}
-
-type ProductImage struct {
-	ID        string `json:"id"`
-	Url       string `json:"url"`
-	SortOrder int64  `json:"sort_order"`
-}
-
-func toProductImage(i domain.ProductImage) ProductImage {
-	return ProductImage{
-		ID:        i.ID,
-		Url:       i.Url,
-		SortOrder: i.SortOrder,
 	}
 }
 
@@ -72,7 +56,7 @@ type ProductRead struct {
 	RatingCount   int64             `json:"rating_count"`
 	IsActive      bool              `json:"is_active"`
 	Variants      []ProductVariant  `json:"variants"`
-	Images        []ProductImage    `json:"images"`
+	Images        []string          `json:"images"`
 	CreatedAt     time.Time         `json:"created_at"`
 	UpdatedAt     time.Time         `json:"updated_at"`
 }
@@ -87,10 +71,8 @@ func ToProductRead(p *domain.Product) ProductRead {
 		variants[i] = toProductVariant(v)
 	}
 
-	images := make([]ProductImage, len(p.Images))
-	for i, img := range p.Images {
-		images[i] = toProductImage(img)
-	}
+	images := make([]string, len(p.Images))
+	copy(images, p.Images)
 
 	return ProductRead{
 		ID:            p.ID,
@@ -123,10 +105,8 @@ func ToDetailedProductRead(dp *usecase.DetailedProduct) ProductRead {
 		variants[i] = toProductVariant(v)
 	}
 
-	images := make([]ProductImage, len(dp.Product.Images))
-	for i, img := range dp.Product.Images {
-		images[i] = toProductImage(img)
-	}
+	images := make([]string, len(dp.Product.Images))
+	copy(images, dp.Product.Images)
 
 	p := ProductRead{
 		ID:            dp.Product.ID,
