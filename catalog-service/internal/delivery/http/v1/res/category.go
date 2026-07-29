@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type CategoryResponse struct {
+type CategoryRead struct {
 	ID        string    `json:"id"`
 	ParentID  *string   `json:"parent_id"`
 	NameVi    string    `json:"name_vi"`
@@ -17,11 +17,11 @@ type CategoryResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func ToCategoryResponse(dto *usecase.CategoryDTO) CategoryResponse {
+func ToCategoryRead(dto *usecase.CategoryDTO) CategoryRead {
 	if dto == nil {
-		return CategoryResponse{}
+		return CategoryRead{}
 	}
-	return CategoryResponse{
+	return CategoryRead{
 		ID:        dto.ID,
 		ParentID:  dto.ParentID,
 		NameVi:    dto.NameVi,
@@ -34,10 +34,10 @@ func ToCategoryResponse(dto *usecase.CategoryDTO) CategoryResponse {
 	}
 }
 
-func ToCategoryListResponse(dtos []usecase.CategoryDTO) []CategoryResponse {
-	res := make([]CategoryResponse, len(dtos))
+func ToCategoryList(dtos []usecase.CategoryDTO) []CategoryRead {
+	res := make([]CategoryRead, len(dtos))
 	for i, dto := range dtos {
-		res[i] = ToCategoryResponse(&dto)
+		res[i] = ToCategoryRead(&dto)
 	}
 	return res
 }

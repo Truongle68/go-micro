@@ -82,4 +82,3 @@ type ListCategoryResult struct {
 	Categories []Category
 	TotalCount int64
 }
-

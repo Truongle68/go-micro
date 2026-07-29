@@ -135,13 +135,7 @@ func (r *CategoryRepo) FindByID(ctx context.Context, id string) (*domain.Categor
 	return c, nil
 }
 
-func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagination.Params) (*domain.ListCategoryResult, error) {
-	poid, err := bson.ObjectIDFromHex(parentID)
-	if err != nil {
-		return nil, domain.ErrInvalidCategoryID
-	}
-
-	filter := bson.M{"parent_id": poid}
+func (r *CategoryRepo) findWithFilter(ctx context.Context, filter bson.M, p *pagination.Params) (*domain.ListCategoryResult, error) {
 	total, err := r.collection.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count child categories: %w", err)
@@ -155,9 +149,11 @@ func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagi
 	}
 
 	findOpts := options.Find().
-		SetSort(bson.D{{Key: "sort_order", Value: 1}, {Key: "_id", Value: 1}}).
-		SetSkip(p.Skip()).
-		SetLimit(p.Limit)
+		SetSort(bson.D{{Key: "sort_order", Value: 1}, {Key: "_id", Value: 1}})
+
+	if p != nil {
+		findOpts.SetSkip(p.Skip()).SetLimit(p.Limit)
+	}
 
 	cursor, err := r.collection.Find(ctx, filter, findOpts)
 	if err != nil {
@@ -165,21 +161,40 @@ func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagi
 	}
 	defer cursor.Close(ctx)
 
-	var models []categoryModel
-	if err := cursor.All(ctx, &models); err != nil {
-		return nil, err
+	return decodeCategoryList(ctx, cursor, total)
+}
+
+func (r *CategoryRepo) FindByIDs(ctx context.Context, ids []string) (*domain.ListCategoryResult, error) {
+	if len(ids) == 0 {
+		return &domain.ListCategoryResult{
+			Categories: []domain.Category{},
+			TotalCount: 0,
+		}, nil
 	}
 
-	categories := make([]domain.Category, len(models))
-	for i, m := range models {
-		if c := m.toDomain(); c != nil {
-			categories[i] = *c
+	oids := make([]bson.ObjectID, len(ids))
+	for _, id := range ids {
+		oid, err := bson.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, domain.ErrInvalidCategoryID
 		}
+		oids = append(oids, oid)
 	}
-	return &domain.ListCategoryResult{
-		Categories: categories,
-		TotalCount: total,
-	}, nil
+
+	filter := bson.M{
+		"_id": bson.M{"$in": oids},
+	}
+	return r.findWithFilter(ctx, filter, nil)
+}
+
+func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagination.Params) (*domain.ListCategoryResult, error) {
+	poid, err := bson.ObjectIDFromHex(parentID)
+	if err != nil {
+		return nil, domain.ErrInvalidCategoryID
+	}
+
+	filter := bson.M{"parent_id": poid}
+	return r.findWithFilter(ctx, filter, &p)
 }
 
 func (r *CategoryRepo) Update(ctx context.Context, c *domain.Category) (*domain.Category, error) {
@@ -231,33 +246,16 @@ func (r *CategoryRepo) Delete(ctx context.Context, id string) error {
 }
 
 func (r *CategoryRepo) List(ctx context.Context, p pagination.Params) (*domain.ListCategoryResult, error) {
-	filter := bson.M{}
-	total, err := r.collection.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to count categories: %w", err)
-	}
+	return r.findWithFilter(ctx, bson.M{}, &p)
+}
 
-	if total == 0 {
+func decodeCategoryList(ctx context.Context, cursor *mongo.Cursor, total int64) (*domain.ListCategoryResult, error) {
+	var models []categoryModel
+	if err := cursor.All(ctx, &models); err != nil {
 		return &domain.ListCategoryResult{
 			Categories: []domain.Category{},
 			TotalCount: 0,
-		}, nil
-	}
-
-	findOpts := options.Find().
-		SetSort(bson.D{{Key: "sort_order", Value: 1}, {Key: "_id", Value: 1}}).
-		SetSkip(p.Skip()).
-		SetLimit(p.Limit)
-
-	cursor, err := r.collection.Find(ctx, filter, findOpts)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var models []categoryModel
-	if err := cursor.All(ctx, &models); err != nil {
-		return nil, err
+		}, fmt.Errorf("decoding category list: %w", err)
 	}
 
 	categories := make([]domain.Category, len(models))

@@ -23,7 +23,7 @@ func (r *V1) createCategory(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusCreated, "create category success", res.ToCategoryResponse(category))
+	response.Success(c, http.StatusCreated, "create category success", res.ToCategoryRead(category))
 }
 
 func (r *V1) getCategory(c *gin.Context) {
@@ -34,7 +34,7 @@ func (r *V1) getCategory(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, "get category success", res.ToCategoryResponse(category))
+	response.Success(c, http.StatusOK, "get category success", res.ToCategoryRead(category))
 }
 
 func (r *V1) getCategoryChildren(c *gin.Context) {
@@ -46,7 +46,7 @@ func (r *V1) getCategoryChildren(c *gin.Context) {
 		return
 	}
 
-	result := pagination.NewResult(res.ToCategoryListResponse(listResult.Categories), p, listResult.TotalCount)
+	result := pagination.NewResult(res.ToCategoryList(listResult.Categories), p, listResult.TotalCount)
 	response.SuccessPaginated(c, http.StatusOK, "get category children success", result)
 }
 
@@ -63,7 +63,7 @@ func (r *V1) updateCategory(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, "update category success", res.ToCategoryResponse(category))
+	response.Success(c, http.StatusOK, "update category success", res.ToCategoryRead(category))
 }
 
 func (r *V1) deleteCategory(c *gin.Context) {
@@ -85,6 +85,6 @@ func (r *V1) listCategories(c *gin.Context) {
 		return
 	}
 
-	result := pagination.NewResult(res.ToCategoryListResponse(listResult.Categories), p, listResult.TotalCount)
+	result := pagination.NewResult(res.ToCategoryList(listResult.Categories), p, listResult.TotalCount)
 	response.SuccessPaginated(c, http.StatusOK, "list categories success", result)
 }

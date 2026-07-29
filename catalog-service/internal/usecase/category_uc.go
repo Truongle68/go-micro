@@ -75,7 +75,7 @@ func (uc *CategoryUC) GetByID(ctx context.Context, id string) (*CategoryDTO, err
 	return toCategoryDTO(c), nil
 }
 
-func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string, p pagination.Params) (*CategoryListResultDTO, error) {
+func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string, p pagination.Params) (*CategoryList, error) {
 	result, err := uc.repo.FindChildren(ctx, parentID, p)
 	if err != nil {
 		return nil, fmt.Errorf("finding children: %w", err)
@@ -89,7 +89,7 @@ func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string, p pagina
 		}
 	}
 
-	return &CategoryListResultDTO{
+	return &CategoryList{
 		Categories: dtos,
 		TotalCount: result.TotalCount,
 	}, nil
@@ -113,6 +113,12 @@ func (uc *CategoryUC) Update(ctx context.Context, in UpdateCategoryInput) (*Cate
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
+	if in.ParentID != nil && *in.ParentID != "" {
+		if _, err := uc.repo.FindByID(ctx, *in.ParentID); err != nil {
+			return nil, fmt.Errorf("finding by id: %w", err)
+		}
+	}
+
 	c, err := uc.repo.FindByID(ctx, in.ID)
 	if err != nil {
 		return nil, fmt.Errorf("finding by id: %w", err)
@@ -127,7 +133,7 @@ func (uc *CategoryUC) Update(ctx context.Context, in UpdateCategoryInput) (*Cate
 		SortOrder: in.SortOrder,
 	})
 
-	updated, err := uc.repo.Update(ctx, in.ID, c)
+	updated, err := uc.repo.Update(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("updating category: %w", err)
 	}
@@ -142,7 +148,7 @@ func (uc *CategoryUC) Delete(ctx context.Context, id string) error {
 	return uc.repo.Delete(ctx, id)
 }
 
-func (uc *CategoryUC) List(ctx context.Context, p pagination.Params) (*CategoryListResultDTO, error) {
+func (uc *CategoryUC) List(ctx context.Context, p pagination.Params) (*CategoryList, error) {
 	result, err := uc.repo.List(ctx, p)
 	if err != nil {
 		return nil, fmt.Errorf("listing categories: %w", err)
@@ -155,7 +161,7 @@ func (uc *CategoryUC) List(ctx context.Context, p pagination.Params) (*CategoryL
 			dtos[i] = *dto
 		}
 	}
-	return &CategoryListResultDTO{
+	return &CategoryList{
 		Categories: dtos,
 		TotalCount: result.TotalCount,
 	}, nil
