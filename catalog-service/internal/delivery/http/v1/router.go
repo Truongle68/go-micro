@@ -45,7 +45,7 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
 		products.GET("/:id", r.getProduct)
 		products.PUT("/:id", authMid, adminMid, r.updateProduct)
 		products.DELETE("/:id", authMid, adminMid, r.deleteProduct)
-		products.GET("", authMid, r.listProducts)
+		products.GET("", r.listProducts)
 	}
 
 	categories := apiV1Group.Group("/categories")

@@ -24,7 +24,7 @@ func (r *V1) createProduct(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusCreated, "create product success", res.ToProductResponse(product))
+	response.Success(c, http.StatusCreated, "create product success", res.ToProductRead(product))
 }
 
 func (r *V1) getProduct(c *gin.Context) {
@@ -35,7 +35,7 @@ func (r *V1) getProduct(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, "get product success", res.ToProductResponse(product))
+	response.Success(c, http.StatusOK, "get product success", res.ToDetailedProductRead(product))
 }
 
 func (r *V1) responseProductsByCategory(c *gin.Context, categoryID string, p pagination.Params, msg string) {
@@ -45,7 +45,7 @@ func (r *V1) responseProductsByCategory(c *gin.Context, categoryID string, p pag
 		return
 	}
 
-	result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
+	result := pagination.NewResult(res.ToProductList(listResult.Products), p, listResult.TotalCount)
 	response.SuccessPaginated(c, http.StatusOK, msg, result)
 }
 
@@ -66,7 +66,7 @@ func (r *V1) updateProduct(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, "update product success", res.ToProductResponse(product))
+	response.Success(c, http.StatusOK, "update product success", res.ToProductRead(product))
 }
 
 func (r *V1) deleteProduct(c *gin.Context) {
@@ -95,7 +95,7 @@ func (r *V1) listProducts(c *gin.Context) {
 		return
 	}
 
-	result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
+	result := pagination.NewResult(res.ToProductList(listResult.Products), p, listResult.TotalCount)
 	response.SuccessPaginated(c, http.StatusOK, "list products success", result)
 }
 
@@ -113,6 +113,6 @@ func (r *V1) searchProducts(c *gin.Context) {
 		return
 	}
 
-	result := pagination.NewResult(res.ToProductListResponse(listResult.Products), p, listResult.TotalCount)
+	result := pagination.NewResult(res.ToProductList(listResult.Products), p, listResult.TotalCount)
 	response.SuccessPaginated(c, http.StatusOK, "search products success", result)
 }

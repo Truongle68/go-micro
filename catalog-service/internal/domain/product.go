@@ -18,6 +18,15 @@ type ProductImage struct {
 	SortOrder int64
 }
 
+type PopulatedCategory struct {
+	ID        string
+	NameVi    string
+	NameEn    string
+	Slug      string
+	Icon      string
+	SortOrder int64
+}
+
 type Product struct {
 	ID            string
 	CategoryID    string
@@ -195,7 +204,7 @@ func (p SearchProductParams) Validate() error {
 
 var ErrInvalidPriceRange = errors.New("min_price cannot be greater than max_price")
 
-type ListProductResult struct {
+type ProductListResult struct {
 	Products   []Product
 	TotalCount int64
 }
