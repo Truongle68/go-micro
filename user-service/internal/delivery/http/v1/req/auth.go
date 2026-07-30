@@ -5,6 +5,29 @@ import (
 	"user-service/internal/usecase"
 )
 
+type VerifyPassword struct {
+	Password string `json:"password" validate:"required"`
+}
+
+func (req *VerifyPassword) ToInput(userID string) usecase.VerifyPasswordInput {
+	return usecase.VerifyPasswordInput{
+		UserID:   userID,
+		Password: req.Password,
+	}
+}
+
+type ChangePassword struct {
+	NewPassword       string `json:"new_password" validate:"required"`
+	ConfirmedPassword string `json:"confirmed_password" validate:"required"`
+}
+
+func (req *ChangePassword) ToInput() usecase.ChangePasswordInput {
+	return usecase.ChangePasswordInput{
+		NewPassword:       req.NewPassword,
+		ConfirmedPassword: req.ConfirmedPassword,
+	}
+}
+
 type ForgotPassword struct {
 	Email string `json:"email" validate:"required,email"`
 }

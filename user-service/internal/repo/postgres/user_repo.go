@@ -146,26 +146,26 @@ func (r *UserRepo) FindCredentialByIdentifier(ctx context.Context, identifier st
 	return &c, nil
 }
 
-func (r *UserRepo) FindCredentialsByUserID(ctx context.Context, userID string) ([]*domain.UserCredential, error) {
+func (r *UserRepo) FindCredentialsByUserID(ctx context.Context, userID string) ([]domain.UserCredential, error) {
 	executor := postgres.GetExecutor(ctx, r.db)
 	query := `SELECT id, user_id, type, identifier, secret_hash, is_verified, is_primary, created_at, updated_at
 	          FROM user_credentials WHERE user_id = $1`
 	rows, err := executor.QueryContext(ctx, query, userID)
 	if err != nil {
-		return nil, err
+		return []domain.UserCredential{}, err
 	}
 	defer rows.Close()
 
-	var creds []*domain.UserCredential
+	var creds []domain.UserCredential
 	for rows.Next() {
 		var c domain.UserCredential
 		err := rows.Scan(
 			&c.ID, &c.UserID, &c.Type, &c.Identifier, &c.SecretHash, &c.IsVerified, &c.IsPrimary, &c.CreatedAt, &c.UpdatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return []domain.UserCredential{}, err
 		}
-		creds = append(creds, &c)
+		creds = append(creds, c)
 	}
 	return creds, nil
 }
@@ -293,17 +293,17 @@ func (r *UserRepo) FindAddressByID(ctx context.Context, id string) (*domain.Addr
 	return &a, nil
 }
 
-func (r *UserRepo) FindAddressesByUserID(ctx context.Context, userID string) ([]*domain.Address, error) {
+func (r *UserRepo) FindAddressesByUserID(ctx context.Context, userID string) ([]domain.Address, error) {
 	executor := postgres.GetExecutor(ctx, r.db)
 	query := `SELECT id, user_id, label, address_line, ward, district, city, lat, lng, is_default, created_at, updated_at
 	          FROM addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC`
 	rows, err := executor.QueryContext(ctx, query, userID)
 	if err != nil {
-		return nil, err
+		return []domain.Address{}, err
 	}
 	defer rows.Close()
 
-	var addresses []*domain.Address
+	var addresses []domain.Address
 	for rows.Next() {
 		var a domain.Address
 		var labelStr string
@@ -311,10 +311,10 @@ func (r *UserRepo) FindAddressesByUserID(ctx context.Context, userID string) ([]
 			&a.ID, &a.UserID, &labelStr, &a.AddressLine, &a.Ward, &a.District, &a.City, &a.Lat, &a.Lng, &a.IsDefault, &a.CreatedAt, &a.UpdatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return []domain.Address{}, err
 		}
 		a.Label = domain.AddressLabel(labelStr)
-		addresses = append(addresses, &a)
+		addresses = append(addresses, a)
 	}
 	return addresses, nil
 }

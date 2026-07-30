@@ -268,6 +268,15 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 	}, nil
 }
 
+func (uc *AuthUC) VerifyPassword(ctx context.Context, in VerifyPasswordInput) (string, error) {
+	cred, err := uc.userRepo.FindCredentialsByUserID(ctx, in.UserID)
+	if err != nil {
+		return "", domain.ErrUserNotFound
+	}
+
+	if len(cred) > 0
+}
+
 func (uc *AuthUC) ForgotPassword(ctx context.Context, email string) (string, error) {
 	cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, email)
 	if err != nil {

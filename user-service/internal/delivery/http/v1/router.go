@@ -52,8 +52,10 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	auth.GET("/check-username", r.checkAvailableUsername)
 	auth.POST("/login", r.login)
 	auth.POST("/portal/login", r.portalLogin)
-	auth.POST("/forgot-password", r.forgotPassword)
-	auth.POST("/reset-password", r.resetPassword)
+	auth.POST("/password/forgot", r.forgotPassword)
+	auth.POST("/password/verify", r.verifyPassword)
+	auth.POST("/password/change", r.changePassword)
+	auth.POST("/password/reset", r.resetPassword)
 	auth.POST("/refresh", r.refreshToken)
 
 	// public email link confirm

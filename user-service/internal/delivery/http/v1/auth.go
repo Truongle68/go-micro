@@ -150,6 +150,41 @@ func (r *V1) forgotPassword(c *gin.Context) {
 	response.Success(c, http.StatusOK, "forgot password success", res.ToForgotPasswordResponse(token))
 }
 
+func (r *V1) verifyPassword(c *gin.Context) {
+	userID, ok := r.getUserId(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	request, ok := httpbind.BindAndValidate[req.VerifyPassword](c, r.v, r.l, "verifyPassword")
+	if !ok {
+		return
+	}
+
+	err := r.a.VerifyPassword(c.Request.Context(), request.ToInput(userID))
+	if err != nil {
+		r.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "verify password success", nil)
+}
+
+func (r *V1) changePassword(c *gin.Context) {
+	request, ok := httpbind.BindAndValidate[req.ChangePassword](c, r.v, r.l, "changePassword")
+	if !ok {
+		return
+	}
+
+	err := r.a.ChangePassword(c.Request.Context(), request.ToInput())
+	if err != nil {
+		r.handleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "change password success", nil)
+}
+
 func (r *V1) resetPassword(c *gin.Context) {
 	request, ok := httpbind.BindAndValidate[req.ResetPassword](c, r.v, r.l, "resetPassword")
 	if !ok {

@@ -15,7 +15,7 @@ type UserRepository interface {
 
 	// Credentials
 	FindCredentialByIdentifier(ctx context.Context, identifier string) (*domain.UserCredential, error)
-	FindCredentialsByUserID(ctx context.Context, userID string) ([]*domain.UserCredential, error)
+	FindCredentialsByUserID(ctx context.Context, userID string) ([]domain.UserCredential, error)
 	FindCredentialByTypeAndUserID(ctx context.Context, t domain.CredentialType, userID string) (*domain.UserCredential, error)
 	UpdateCredential(ctx context.Context, cred *domain.UserCredential) error
 	SaveCredential(ctx context.Context, cred *domain.UserCredential) error
@@ -31,7 +31,7 @@ type UserRepository interface {
 	// Addresses
 	SaveAddress(ctx context.Context, address *domain.Address) error
 	FindAddressByID(ctx context.Context, id string) (*domain.Address, error)
-	FindAddressesByUserID(ctx context.Context, userID string) ([]*domain.Address, error)
+	FindAddressesByUserID(ctx context.Context, userID string) ([]domain.Address, error)
 	UpdateAddress(ctx context.Context, address *domain.Address) error
 	SetDefaultAddress(ctx context.Context, userID string, addressID string) error
 	DeleteAddress(ctx context.Context, userID string, addressID string) error

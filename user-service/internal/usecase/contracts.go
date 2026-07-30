@@ -188,6 +188,16 @@ type ResetPasswordInput struct {
 	NewPassword string
 }
 
+type VerifyPasswordInput struct {
+	UserID   string
+	Password string
+}
+
+type ChangePasswordInput struct {
+	NewPassword       string
+	ConfirmedPassword string
+}
+
 type LogoutInput struct {
 	AccessToken  string
 	RefreshToken string
@@ -201,6 +211,8 @@ type Auth interface {
 	Login(ctx context.Context, in LoginInput) (AuthOutput, error)
 	ForgotPassword(ctx context.Context, email string) (string, error)
 	ResetPassword(ctx context.Context, in ResetPasswordInput) error
+	VerifyPassword(ctx context.Context, in VerifyPasswordInput) (changePasswordToken string, err error)
+	ChangePassword(ctx context.Context, in ChangePasswordInput) (refreshToken string, err error)
 	Logout(ctx context.Context, in LogoutInput) error
 	RefreshToken(ctx context.Context, refreshToken string) (AuthOutput, error)
 }

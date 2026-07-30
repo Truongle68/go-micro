@@ -125,9 +125,9 @@ func (uc *UserUC) UpdateProfile(ctx context.Context, in UpdatedProfileInput) (*U
 		for _, c := range creds {
 			switch c.Type {
 			case domain.CredentialTypeEmail:
-				emailCred = c
+				emailCred = &c
 			case domain.CredentialTypePhone:
-				phoneCred = c
+				phoneCred = &c
 			}
 		}
 
@@ -489,9 +489,9 @@ func (uc *UserUC) attachVerifiedEmail(ctx context.Context, userID, email string)
 	for _, c := range creds {
 		switch c.Type {
 		case domain.CredentialTypeEmail:
-			emailCred = c
+			emailCred = &c
 		case domain.CredentialTypePhone:
-			phoneCred = c
+			phoneCred = &c
 		}
 	}
 
@@ -535,9 +535,9 @@ func (uc *UserUC) attachVerifiedPhone(ctx context.Context, userID, phone string)
 	for _, c := range creds {
 		switch c.Type {
 		case domain.CredentialTypePhone:
-			phoneCred = c
+			phoneCred = &c
 		case domain.CredentialTypeEmail:
-			emailCred = c
+			emailCred = &c
 		}
 	}
 
