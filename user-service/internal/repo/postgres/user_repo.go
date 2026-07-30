@@ -167,6 +167,10 @@ func (r *UserRepo) FindCredentialsByUserID(ctx context.Context, userID string) (
 		}
 		creds = append(creds, c)
 	}
+	if err := rows.Err(); err != nil {
+		return []domain.UserCredential{}, err
+	}
+
 	return creds, nil
 }
 
@@ -251,7 +255,7 @@ func (r *UserRepo) SaveCredential(ctx context.Context, c *domain.UserCredential)
 func (r *UserRepo) UpdatePassword(ctx context.Context, userID string, passwordHash string) error {
 	executor := postgres.GetExecutor(ctx, r.db)
 	query := `UPDATE user_credentials SET secret_hash = $1, updated_at = NOW()
-	          WHERE user_id = $2 AND is_primary = true`
+	          WHERE user_id = $2`
 	_, err := executor.ExecContext(ctx, query, passwordHash, userID)
 	return err
 }
@@ -316,6 +320,10 @@ func (r *UserRepo) FindAddressesByUserID(ctx context.Context, userID string) ([]
 		a.Label = domain.AddressLabel(labelStr)
 		addresses = append(addresses, a)
 	}
+	if err := rows.Err(); err != nil {
+		return []domain.Address{}, err
+	}
+
 	return addresses, nil
 }
 
