@@ -194,6 +194,8 @@ type VerifyPasswordInput struct {
 }
 
 type ChangePasswordInput struct {
+	UserID            string
+	Token             string
 	NewPassword       string
 	ConfirmedPassword string
 }
@@ -212,7 +214,7 @@ type Auth interface {
 	ForgotPassword(ctx context.Context, email string) (string, error)
 	ResetPassword(ctx context.Context, in ResetPasswordInput) error
 	VerifyPassword(ctx context.Context, in VerifyPasswordInput) (changePasswordToken string, err error)
-	ChangePassword(ctx context.Context, in ChangePasswordInput) (refreshToken string, err error)
+	ChangePassword(ctx context.Context, in ChangePasswordInput) error
 	Logout(ctx context.Context, in LogoutInput) error
 	RefreshToken(ctx context.Context, refreshToken string) (AuthOutput, error)
 }

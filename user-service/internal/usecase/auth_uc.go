@@ -217,9 +217,9 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 			// find primary credential for this user
 			creds, cErr := uc.userRepo.FindCredentialsByUserID(ctx, user.ID)
 			if cErr == nil {
-				for _, c := range creds {
-					if c.IsPrimary {
-						cred = c
+				for i := range creds {
+					if creds[i].IsPrimary {
+						cred = &creds[i]
 						break
 					}
 				}
@@ -269,12 +269,76 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 }
 
 func (uc *AuthUC) VerifyPassword(ctx context.Context, in VerifyPasswordInput) (string, error) {
-	cred, err := uc.userRepo.FindCredentialsByUserID(ctx, in.UserID)
+	if in.UserID == "" {
+		return "", domain.ErrEmptyUserID
+	}
+	if in.Password == "" {
+		return "", domain.ErrInvalidCredentials
+	}
+
+	creds, err := uc.userRepo.FindCredentialsByUserID(ctx, in.UserID)
 	if err != nil {
 		return "", domain.ErrUserNotFound
 	}
 
-	if len(cred) > 0
+	var cred *domain.UserCredential
+	for _, c := range creds {
+		if c.IsPrimary {
+			cred = &c
+			break
+		}
+	}
+	if cred == nil {
+		return "", domain.ErrUserNotFound
+	}
+
+	if !cred.CheckPassword(in.Password) {
+		return "", domain.ErrInvalidCredentials
+	}
+
+	changePasswordToken, err := uc.tokens.GenerateChangePasswordToken(in.UserID)
+	if err != nil {
+		return "", fmt.Errorf("generating change password token: %w", err)
+	}
+
+	return changePasswordToken, nil
+}
+
+func (uc *AuthUC) ChangePassword(ctx context.Context, in ChangePasswordInput) error {
+	if in.Token == "" {
+		return domain.ErrInvalidToken
+	}
+
+	claims, err := uc.tokens.VerifyChangePasswordToken(in.Token)
+	if err != nil {
+		return domain.ErrInvalidToken
+	}
+
+	if in.UserID != "" && claims.UserID != in.UserID {
+		return domain.ErrInvalidToken
+	}
+
+	if !domain.IsConfirmMatch(in.NewPassword, in.ConfirmedPassword) {
+		return domain.ErrNotMatchPassword
+	}
+
+	if err := domain.ValidatePassword(in.NewPassword); err != nil {
+		return err
+	}
+
+	hash, err := domain.HashPassword(in.NewPassword)
+	if err != nil {
+		return fmt.Errorf("hashing password: %w", err)
+	}
+
+	err = uc.userRepo.UpdatePassword(ctx, claims.UserID, hash)
+	if err != nil {
+		return fmt.Errorf("updating password: %w", err)
+	}
+
+	uc.cache.InvalidateProfile(ctx, claims.UserID)
+
+	return nil
 }
 
 func (uc *AuthUC) ForgotPassword(ctx context.Context, email string) (string, error) {
