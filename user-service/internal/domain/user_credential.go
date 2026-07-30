@@ -23,6 +23,9 @@ type UserCredential struct {
 }
 
 func (c *UserCredential) CheckPassword(pass string) bool {
+	if c == nil {
+		return false
+	}
 	return checkPassword(pass, c.SecretHash)
 }
 
