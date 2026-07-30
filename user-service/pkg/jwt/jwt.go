@@ -19,13 +19,14 @@ var (
 type TokenType string
 
 const (
-	AccessToken      TokenType = "access"
-	RefreshToken     TokenType = "refresh"
-	ResetToken       TokenType = "reset"
-	VerifyOTPToken   TokenType = "verify_otp"
-	ChangeEmailToken TokenType = "change_email"
-	ChangePhoneToken TokenType = "change_phone"
-	EmailLinkToken   TokenType = "email_link"
+	AccessToken         TokenType = "access"
+	RefreshToken        TokenType = "refresh"
+	ResetToken          TokenType = "reset"
+	VerifyOTPToken      TokenType = "verify_otp"
+	ChangeEmailToken    TokenType = "change_email"
+	ChangePhoneToken    TokenType = "change_phone"
+	ChangePasswordToken TokenType = "change_password"
+	EmailLinkToken      TokenType = "email_link"
 )
 
 type Claims struct {
@@ -90,6 +91,10 @@ func (j *JWT) GenerateChangePhoneToken(userID string) (string, error) {
 	return j.generate(userID, "", "", string(domain.VerifyPurposeChangePhone), "", ChangePhoneToken, j.actionTTL)
 }
 
+func (j *JWT) GenerateChangePasswordToken(userID string) (string, error) {
+	return j.generate(userID, "", "", "", "", ChangePasswordToken, j.actionTTL)
+}
+
 func (j *JWT) GenerateEmailLinkToken(userID, email string, purpose domain.EmailLinkPurpose, ttl time.Duration) (string, error) {
 	if ttl == 0 {
 		ttl = j.actionTTL
@@ -141,6 +146,10 @@ func (j *JWT) VerifyChangeEmailToken(tokenStr string) (*Claims, error) {
 
 func (j *JWT) VerifyChangePhoneToken(tokenStr string) (*Claims, error) {
 	return j.verify(tokenStr, ChangePhoneToken)
+}
+
+func (j *JWT) VerifyChangePasswordToken(tokenStr string) (*Claims, error) {
+	return j.verify(tokenStr, ChangePasswordToken)
 }
 
 func (j *JWT) VerifyEmailLinkToken(tokenStr string) (*Claims, error) {
