@@ -53,8 +53,6 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	auth.POST("/login", r.login)
 	auth.POST("/portal/login", r.portalLogin)
 	auth.POST("/password/forgot", r.forgotPassword)
-	auth.POST("/password/verify", r.verifyPassword)
-	auth.POST("/password/change", r.changePassword)
 	auth.POST("/password/reset", r.resetPassword)
 	auth.POST("/refresh", r.refreshToken)
 
@@ -66,6 +64,8 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	protected.Use(middleware.Auth(deps.JWT, deps.Cache))
 
 	protected.POST("/auth/logout", r.logout)
+	protected.POST("/auth/password/verify", r.verifyPassword)
+	protected.POST("/auth/password/change", r.changePassword)
 
 	users := protected.Group("/users")
 	// profile

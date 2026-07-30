@@ -40,6 +40,16 @@ func ToForgotPasswordResponse(token string) ForgotPasswordResponse {
 	}
 }
 
+type VerifyPasswordResponse struct {
+	ChangePasswordToken string `json:"change_password_token"`
+}
+
+func ToVerifyPasswordResponse(token string) VerifyPasswordResponse {
+	return VerifyPasswordResponse{
+		ChangePasswordToken: token,
+	}
+}
+
 type CheckUsernameResponse struct {
 	Available bool `json:"available"`
 }

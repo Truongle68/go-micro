@@ -161,22 +161,32 @@ func (r *V1) verifyPassword(c *gin.Context) {
 		return
 	}
 
-	err := r.a.VerifyPassword(c.Request.Context(), request.ToInput(userID))
+	token, err := r.a.VerifyPassword(c.Request.Context(), request.ToInput(userID))
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "verify password success", nil)
+	response.Success(c, http.StatusOK, "verify password success", res.ToVerifyPasswordResponse(token))
 }
 
 func (r *V1) changePassword(c *gin.Context) {
+	userID, ok := r.getUserId(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	request, ok := httpbind.BindAndValidate[req.ChangePassword](c, r.v, r.l, "changePassword")
 	if !ok {
 		return
 	}
 
-	err := r.a.ChangePassword(c.Request.Context(), request.ToInput())
+	if !domain.IsConfirmMatch(request.NewPassword, request.ConfirmedPassword) {
+		response.Error(c, http.StatusBadRequest, domain.ErrNotMatchPassword.Error())
+		return
+	}
+
+	err := r.a.ChangePassword(c.Request.Context(), request.ToInput(userID))
 	if err != nil {
 		r.handleError(c, err)
 		return
