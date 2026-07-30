@@ -47,6 +47,10 @@ type ForgotPasswordResponse struct {
 	ResetToken string `json:"reset_token"`
 }
 
+type VerifyPasswordResponse struct {
+	ChangePasswordToken string `json:"change_password_token"`
+}
+
 const (
 	baseURL   = "http://localhost:4000/api/v1"
 	dbURL     = "postgresql://postgres:postgres@localhost:5433/identity-db?sslmode=disable"
@@ -389,6 +393,93 @@ func main() {
 	}
 	fmt.Printf("Refreshed token successfully. New AccessToken & RefreshToken generated.\n")
 	authRes = newAuthRes
+
+	// 13c. Verify & Change Password Flow
+	fmt.Println("[Step 13c] Testing Verify & Change Password Flow...")
+	fmt.Println("  Sub-step A: POST /auth/password/verify with current password...")
+	reqBody, _ = json.Marshal(map[string]string{
+		"password": newPassword,
+	})
+	verifyPwReq, _ := http.NewRequest("POST", baseURL+"/auth/password/verify", bytes.NewBuffer(reqBody))
+	verifyPwReq.Header.Set("Authorization", "Bearer "+authRes.AccessToken)
+	verifyPwReq.Header.Set("Content-Type", "application/json")
+	resp, err = client.Do(verifyPwReq)
+	if err != nil {
+		fmt.Printf("FAIL: password/verify request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	verifyStatus(resp, http.StatusOK)
+
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		fmt.Printf("FAIL: Decode password/verify envelope: %v\n", err)
+		os.Exit(1)
+	}
+	var verifyPwRes VerifyPasswordResponse
+	if err := json.Unmarshal(envelope.Data, &verifyPwRes); err != nil {
+		fmt.Printf("FAIL: Unmarshal password/verify data: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("  Retrieved Change Password Token: (present)\n")
+
+	fmt.Println("  Sub-step B: POST /auth/password/change with change_password_token...")
+	finalPassword := "finalpassword123"
+	reqBody, _ = json.Marshal(map[string]string{
+		"change_password_token": verifyPwRes.ChangePasswordToken,
+		"new_password":          finalPassword,
+		"confirmed_password":    finalPassword,
+	})
+	changePwReq, _ := http.NewRequest("POST", baseURL+"/auth/password/change", bytes.NewBuffer(reqBody))
+	changePwReq.Header.Set("Authorization", "Bearer "+authRes.AccessToken)
+	changePwReq.Header.Set("Content-Type", "application/json")
+	resp, err = client.Do(changePwReq)
+	if err != nil {
+		fmt.Printf("FAIL: password/change request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	verifyStatus(resp, http.StatusOK)
+	fmt.Println("  Password changed successfully via verify & change flow.")
+
+	fmt.Println("  Sub-step C: Login with old password (should fail)...")
+	reqBody, _ = json.Marshal(map[string]string{
+		"identifier": testUsername,
+		"password":   newPassword,
+	})
+	resp, err = client.Post(baseURL+"/auth/login", "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		fmt.Printf("FAIL: login request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		fmt.Printf("FAIL: Expected 401 Unauthorized, got status: %d\n", resp.StatusCode)
+		os.Exit(1)
+	}
+	fmt.Println("  Correctly failed to log in with old password.")
+
+	fmt.Println("  Sub-step D: Login with final password (should succeed)...")
+	reqBody, _ = json.Marshal(map[string]string{
+		"identifier": testUsername,
+		"password":   finalPassword,
+	})
+	resp, err = client.Post(baseURL+"/auth/login", "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		fmt.Printf("FAIL: login request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	verifyStatus(resp, http.StatusOK)
+
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		fmt.Printf("FAIL: Decode login envelope: %v\n", err)
+		os.Exit(1)
+	}
+	if err := json.Unmarshal(envelope.Data, &authRes); err != nil {
+		fmt.Printf("FAIL: Unmarshal login data: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("  Logged in successfully with final password. UserID: %s\n", authRes.UserID)
 
 	// 14. Logout
 	fmt.Println("[Step 14] POST /auth/logout...")
