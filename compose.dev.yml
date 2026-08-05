@@ -36,14 +36,12 @@ services:
       retries: 3
 
   catalog-db:
-    image: mongodb/mongodb-atlas-local:8.0
+    image: mongodb/mongodb-community-server:8.0-ubi8-slim
     container_name: catalog-db
     hostname: catalog-db
     volumes:
       - ./catalog-service/scripts/mongo-init:/docker-entrypoint-initdb.d
       - catalog-data:/data/db
-      - catalog-configdb:/data/configdb
-      - catalog-mongot:/data/mongot
     environment:
       - MONGODB_INITDB_ROOT_USERNAME=${CATALOG_MONGO_USER}
       - MONGODB_INITDB_ROOT_PASSWORD=${CATALOG_MONGO_PW}
@@ -62,8 +60,6 @@ services:
 volumes:
   identity-data:
   catalog-data:
-  catalog-configdb:
-  catalog-mongot:
   redis-data:
 
 networks:

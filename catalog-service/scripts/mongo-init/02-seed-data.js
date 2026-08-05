@@ -1,359 +1,1623 @@
 db = db.getSiblingDB("catalog-db");
 
-const electronicsId = new ObjectId();
-const audioSubCatId = new ObjectId();
-const clothingId = new ObjectId();
+// Clear existing collections to prevent duplicate key errors
+db.categories.drop();
+db.products.drop();
 
+// Define Category ObjectIDs
+const freshProduceId = new ObjectId();
+const organicVegetablesId = new ObjectId();
+const localFruitsId = new ObjectId();
+const meatSeafoodId = new ObjectId();
+
+// Warehouse IDs
+const whSgn01 = "WH-SGN-01";
+const whSgn02 = "WH-SGN-02";
+
+// -----------------------------------------------------------------------------
+// 1. SEED CATEGORIES
+// -----------------------------------------------------------------------------
 db.categories.insertMany([
   {
-    _id: electronicsId,
+    _id: freshProduceId,
     parent_id: null,
-    name_vi: "Thiết bị điện tử",
-    name_en: "Electronics",
-    slug: "electronics",
-    sort_order: 1,
+    name: "Rau Củ Tươi",
+    name_translation: {
+      vi: "Rau Củ Tươi",
+      en: "Fresh Produce",
+    },
+    slug: "rau-cu-tuoi",
+    icon: "leaf",
+    sort_order: 10,
+    is_active: true,
+    ancestors: [],
     created_at: new Date(),
+    updated_at: new Date(),
   },
   {
-    _id: audioSubCatId,
-    parent_id: electronicsId,
-    name_vi: "Âm thanh",
-    name_en: "Audio",
-    slug: "audio",
-    sort_order: 2,
+    _id: organicVegetablesId,
+    parent_id: freshProduceId,
+    name: "Rau Hữu Cơ",
+    name_translation: {
+      vi: "Rau Hữu Cơ",
+      en: "Organic Vegetables",
+    },
+    slug: "rau-huu-co",
+    icon: "carrot",
+    sort_order: 10,
+    is_active: true,
+    ancestors: [{ id: freshProduceId, name: "Rau Củ Tươi" }],
     created_at: new Date(),
+    updated_at: new Date(),
   },
   {
-    _id: clothingId,
-    parent_id: null,
-    name_vi: "Quần áo",
-    name_en: "Clothing",
-    slug: "clothing",
-    sort_order: 1,
+    _id: localFruitsId,
+    parent_id: freshProduceId,
+    name: "Trái Cây Nội Địa",
+    name_translation: {
+      vi: "Trái Cây Nội Địa",
+      en: "Local Fruits",
+    },
+    slug: "trai-cay-noi-dia",
+    icon: "apple",
+    sort_order: 20,
+    is_active: true,
+    ancestors: [{ id: freshProduceId, name: "Rau Củ Tươi" }],
     created_at: new Date(),
+    updated_at: new Date(),
+  },
+  {
+    _id: meatSeafoodId,
+    parent_id: null,
+    name: "Thịt & Hải Sản Tươi",
+    name_translation: {
+      vi: "Thịt & Hải Sản Tươi",
+      en: "Fresh Meat & Seafood",
+    },
+    slug: "thit-hai-san-tuoi",
+    icon: "fish",
+    sort_order: 20,
+    is_active: true,
+    ancestors: [],
+    created_at: new Date(),
+    updated_at: new Date(),
   },
 ]);
 
+// Breadcrumbs matching categoryRefModel
+const producePath = [{ id: freshProduceId, name: "Rau Củ Tươi" }];
+
+const organicVegPath = [
+  ...producePath,
+  { id: organicVegetablesId, name: "Rau Hữu Cơ" },
+];
+
+const localFruitsPath = [
+  ...producePath,
+  { id: localFruitsId, name: "Trái Cây Nội Địa" },
+];
+
+const meatSeafoodPath = [{ id: meatSeafoodId, name: "Thịt & Hải Sản Tươi" }];
+
+// -----------------------------------------------------------------------------
+// 2. SEED PRODUCTS
+// -----------------------------------------------------------------------------
 db.products.insertMany([
-  // 1. Audio Product
+  // Product 1: Da Lat Organic Spinach
   {
-    category_id: audioSubCatId,
-    sku: "HEADPHONE-001",
-    name_vi: "Tai nghe chống ồn không dây",
-    name_en: "Wireless Noise Canceling Headphones",
-    description_vi: "Tai nghe cao cấp tích hợp công nghệ chống ồn chủ động ANC.",
-    description_en: "Premium headphones with active noise cancellation technology.",
-    unit: "piece",
-    base_price: NumberLong(200000000),
-    sale_price: NumberLong(180000000),
-    rating_avg: 4.8,
-    rating_count: 150,
-    is_active: true,
+    _id: new ObjectId(),
+    version: 1,
+    slug: "rau-cai-bo-xoi-huu-co-da-lat",
+    name: "Rau Cải Bó Xôi Hữu Cơ Đà Lạt",
+    name_translation: {
+      vi: "Rau Cải Bó Xôi Hữu Cơ Đà Lạt",
+      en: "Da Lat Organic Spinach",
+    },
+    category_id: organicVegetablesId,
+    category_path: organicVegPath,
+    description:
+      "Cải bó xôi (rau bina) trồng thủy canh tiêu chuẩn VietGAP tại Đà Lạt. Giàu sắt, vitamin A và C.",
+    description_html:
+      '<div class="product-description space-y-6 text-[#16422F]"><p class="text-base leading-relaxed font-medium"><strong>Cải bó xôi tươi (Rau bina)</strong> được thu hoạch thủ công ngay tại vườn Đà Lạt lúc sáng sớm và giao trong ngày. Lá cải xanh mướt, thân mọng nước, giàu hàm lượng Sắt, Canxi và Vitamin A—sự lựa chọn hoàn hảo cho bữa ăn gia đình và thực đơn ăn dặm của bé.</p><div class="bg-[#FAF6EC] border border-[#EBE6DA] rounded-2xl p-4 sm:p-5"><h4 class="text-sm font-extrabold text-[#1B4D3E] uppercase tracking-wide mb-3 flex items-center gap-2">🌱 Cam kết chất lượng từ Tươi Market</h4><ul class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-semibold text-[#2C5E4A]"><li class="flex items-center gap-2"><span class="text-emerald-600">✓</span> Thu hoạch tươi mới trong ngày</li><li class="flex items-center gap-2"><span class="text-emerald-600">✓</span> Trồng theo hướng hữu cơ tại Đà Lạt</li><li class="flex items-center gap-2"><span class="text-emerald-600">✓</span> Không thuốc trừ sâu & chất bảo quản</li><li class="flex items-center gap-2"><span class="text-emerald-600">✓</span> An toàn tuyệt đối cho bé ăn dặm</li></ul></div><div class="space-y-4"><div><h3 class="text-sm font-bold text-[#16422F] mb-1">💡 Gợi ý chế biến</h3><p class="text-xs text-slate-600 leading-relaxed">Thích hợp nấu cháo, xay sinh tố detox, xào tỏi, làm salad hoặc nấu canh thịt băm. Nên nấu nhanh trên lửa lớn để giữ trọn vị ngọt tự nhiên và dưỡng chất.</p></div><div><h3 class="text-sm font-bold text-[#16422F] mb-1">❄️ Hướng dẫn bảo quản</h3><p class="text-xs text-slate-600 leading-relaxed">Không rửa trước khi cho vào tủ lạnh. Bọc rau trong khăn giấy khô rồi cho vào túi zip đựng thực phẩm, bảo quản ở ngăn mát (4–8°C) giữ tươi từ 3–5 ngày.</p></div></div></div>',
+    highlights: [
+      "Đạt chứng nhận VietGAP",
+      "Thu hoạch tươi mới mỗi sáng",
+      "Không hóa chất bảo quản",
+    ],
+    tags: ["rau-sach", "vietgap", "da-lat", "huu-co"],
+    images: [
+      {
+        url: "https://www.mahagro.com/cdn/shop/articles/spinach.jpg?v=1490962590",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Rau cải bó xôi tươi",
+      },
+      {
+        url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT__Jl2V3jLSW6beYaXZNx8xELDtr4NwfDOT9t_9jps8zE_8TuiTyEErvw&s=10",
+        is_primary: false,
+        sort_order: 2,
+        alt_text: "Đóng gói cải bó xôi 500g",
+      },
+    ],
+    option_types: [{ name: "Trọng lượng", values: ["250g", "500g"] }],
     variants: [
       {
-        variant_label: "Color: Black",
-        price_delta: NumberLong(0),
-        sku: "HEADPHONE-001-BLK",
+        _id: new ObjectId(),
+        sku: "SPINACH-ORGANIC-250G",
+        attributes: { "Trọng lượng": "250g" },
+        price: { amount: NumberLong(22000), currency: "VND" },
+        inventory: {
+          total_available: 50,
+          reserved: 2,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 30 },
+            { warehouse_id: whSgn02, quantity: 20 },
+          ],
+        },
+        weight_grams: 250,
+        images: [
+          {
+            url: "https://media-cdn-v2.laodong.vn/storage/newsportal/2026/4/4/1680092/Rau.jpg",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Gói cải bó xôi 250g",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
       {
-        variant_label: "Color: Silver",
-        price_delta: NumberLong(10000000),
-        sku: "HEADPHONE-001-SLV",
+        _id: new ObjectId(),
+        sku: "SPINACH-ORGANIC-500G",
+        attributes: { "Trọng lượng": "500g" },
+        price: { amount: NumberLong(40000), currency: "VND" },
+        inventory: {
+          total_available: 30,
+          reserved: 0,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 15 },
+            { warehouse_id: whSgn02, quantity: 15 },
+          ],
+        },
+        weight_grams: 500,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRvQtIxAWIiKnsyXXd-3moYbqXZVOJvxSFb_KDHLiEc67K6myOf-POfTJ9A&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Gói cải bó xôi 500g",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
     ],
-    images: [
-      "https://cdn.example.com/products/headphone-1.jpg",
+    specifications: [
+      {
+        group: "Thông tin xuất xứ",
+        items: [
+          { label: "Nơi sản xuất", value: "Đà Lạt, Lâm Đồng" },
+          { label: "Tiêu chuẩn", value: "VietGAP / Organic" },
+        ],
+      },
+      {
+        group: "Bảo quản",
+        items: [
+          { label: "Nhiệt độ", value: "4°C - 8°C trong ngăn mát tủ lạnh" },
+          { label: "Hạn sử dụng", value: "3 - 5 ngày" },
+        ],
+      },
     ],
+    rating_summary: {
+      average: 4.9,
+      count: 48,
+      breakdown: { 1: 0, 2: 0, 3: 0, 4: 4, 5: 44 },
+    },
+    sales_count: NumberLong(320),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn01, region: "Ho Chi Minh City" },
+      fragile: true,
+      shipping_class: "cold_express",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
 
-  // 2. Audio Product
+  // Product 2: Binh Thuan Red Flesh Dragon Fruit
   {
-    category_id: audioSubCatId,
-    sku: "SPEAKER-002",
-    name_vi: "Loa Bluetooth di động kháng nước",
-    name_en: "Waterproof Portable Bluetooth Speaker",
-    description_vi: "Loa di động âm thanh nổi bass sâu, chuẩn kháng nước IPX7.",
-    description_en: "Portable stereo speaker with deep bass and IPX7 waterproof rating.",
-    unit: "piece",
-    base_price: NumberLong(120000000),
-    sale_price: NumberLong(99000000),
-    rating_avg: 4.6,
-    rating_count: 85,
-    is_active: true,
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
+      {
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
+      },
+    ],
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
+    ],
     variants: [
       {
-        variant_label: "Color: Blue",
-        price_delta: NumberLong(0),
-        sku: "SPEAKER-002-BLU",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
       {
-        variant_label: "Color: Red",
-        price_delta: NumberLong(0),
-        sku: "SPEAKER-002-RED",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
     ],
-    images: [
-      "https://cdn.example.com/products/speaker-2.jpg",
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
     ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
 
-  // 3. Audio Product
+  // Product 3: Fresh Norwegian Salmon Fillet
   {
-    category_id: audioSubCatId,
-    sku: "EARBUDS-003",
-    name_vi: "Tai nghe In-Ear True Wireless",
-    name_en: "True Wireless In-Ear Earbuds",
-    description_vi: "Tai nghe nhét tai nhỏ gọn, thời lượng pin lên đến 24 giờ cùng hộp sạc.",
-    description_en: "Compact earbuds with up to 24 hours total battery life with charging case.",
-    unit: "piece",
-    base_price: NumberLong(150000000),
-    sale_price: NumberLong(135000000),
-    rating_avg: 4.5,
-    rating_count: 210,
-    is_active: true,
-    variants: [
+    _id: new ObjectId(),
+    version: 1,
+    slug: "than-ca-hoi-tuoi-phile-na-uy",
+    name: "Thăn Cá Hồi Tươi Phile Na Uy",
+    name_translation: {
+      vi: "Thăn Cá Hồi Tươi Phile Na Uy",
+      en: "Fresh Norwegian Salmon Fillet",
+    },
+    category_id: meatSeafoodId,
+    category_path: meatSeafoodPath,
+    description:
+      "Cá hồi Na Uy nhập khẩu hàng không về trong ngày. Thăn phile lọc sạch xương, phù hợp làm Sashimi hoặc áp chảo.",
+    description_html:
+      "<p>Cá hồi tươi đạt chuẩn ăn sống (Sashimi grade). Dày thịt, ngậy thơm béo ngậy giàu Omega-3.</p>",
+    highlights: [
+      "Nhập khẩu hàng không tươi mới mỗi ngày",
+      "Đạt tiêu chuẩn ăn Sashimi trực tiếp",
+      "Miễn phí cắt thái theo yêu cầu",
+    ],
+    tags: ["hai-san", "ca-hoi", "sashimi", "nhap-khau"],
+    images: [
       {
-        variant_label: "Edition: Standard",
-        price_delta: NumberLong(0),
-        sku: "EARBUDS-003-STD",
+        url: "https://cdn.tuoimarket.vn/products/salmon-1.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thăn cá hồi phile tươi",
+      },
+      {
+        url: "https://cdn.tuoimarket.vn/products/salmon-2.jpg",
+        is_primary: false,
+        sort_order: 2,
+        alt_text: "Cá hồi áp chảo",
       },
     ],
-    images: [
-      "https://cdn.example.com/products/earbuds-3.jpg",
+    option_types: [{ name: "Quy cách", values: ["Khay 300g", "Khay 500g"] }],
+    variants: [
+      {
+        _id: new ObjectId(),
+        sku: "SALMON-NOR-300G",
+        attributes: { "Quy cách": "Khay 300g" },
+        price: { amount: NumberLong(195000), currency: "VND" },
+        inventory: {
+          total_available: 20,
+          reserved: 4,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 20 }],
+        },
+        weight_grams: 300,
+        images: [
+          {
+            url: "https://cdn.tuoimarket.vn/products/salmon-1.jpg",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Khay cá hồi 300g",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "SALMON-NOR-500G",
+        attributes: { "Quy cách": "Khay 500g" },
+        price: { amount: NumberLong(320000), currency: "VND" },
+        inventory: {
+          total_available: 15,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 15 }],
+        },
+        weight_grams: 500,
+        images: [
+          {
+            url: "https://cdn.tuoimarket.vn/products/salmon-1.jpg",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Khay cá hồi 500g",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
     ],
+    specifications: [
+      {
+        group: "Thông tin hải sản",
+        items: [
+          { label: "Nguồn gốc", value: "Na Uy (Norwegian Atlantic Salmon)" },
+          { label: "Bảo quản", value: "Giao kèm đá gel, giữ mát 0°C - 2°C" },
+        ],
+      },
+    ],
+    rating_summary: {
+      average: 5.0,
+      count: 112,
+      breakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 112 },
+    },
+    sales_count: NumberLong(540),
+    shipping: {
+      is_free_shipping: true,
+      ships_from: { warehouse_id: whSgn01, region: "Ho Chi Minh City" },
+      fragile: true,
+      shipping_class: "cold_express",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
 
-  // 4. Electronics Product
+  // Product 4: Seasonal / Out of Stock (Sầu Riêng Ri6)
   {
-    category_id: electronicsId,
-    sku: "WATCH-004",
-    name_vi: "Đồng hồ thông minh theo dõi sức khỏe",
-    name_en: "Smart Fitness Tracker Watch",
-    description_vi: "Màn hình AMOLED, đo nhịp tim liên tục và theo dõi giấc ngủ.",
-    description_en: "AMOLED screen, continuous heart rate monitoring, and sleep tracking.",
-    unit: "piece",
-    base_price: NumberLong(250000000),
-    sale_price: NumberLong(220000000),
-    rating_avg: 4.7,
-    rating_count: 310,
-    is_active: true,
+    _id: new ObjectId(),
+    version: 1,
+    slug: "sau-rieng-ri6-viet-gap-nguyen-trai",
+    name: "Sầu Riêng Ri6 VietGAP Nguyên Trái (Hết Mùa)",
+    name_translation: {
+      vi: "Sầu Riêng Ri6 VietGAP Nguyên Trái",
+      en: "Whole Ri6 Durian (Out of Season)",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description: "Sầu riêng Ri6 cơm vàng hạt lép, béo ngậy dẻo ngọt.",
+    description_html:
+      "<p>Sầu riêng chín cây tự nhiên không rụng cuống. Hiện đang hết mùa thu hoạch.</p>",
+    highlights: ["Cơm vàng dẻo hạt lép", "Bao đổi trả nếu bị sượng"],
+    tags: ["trai-cay", "sau-rieng", "ri6", "dac-san"],
+    images: [
+      {
+        url: "https://cdn.tuoimarket.vn/products/durian-1.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Sầu riêng Ri6",
+      },
+    ],
+    option_types: [],
     variants: [
       {
-        variant_label: "Size: 40mm",
-        price_delta: NumberLong(0),
-        sku: "WATCH-004-40",
+        _id: new ObjectId(),
+        sku: "DURIAN-RI6-WHOLE",
+        attributes: {},
+        price: { amount: NumberLong(180000), currency: "VND" },
+        inventory: {
+          total_available: 0,
+          reserved: 0,
+          warehouses: [{ warehouse_id: whSgn02, quantity: 0 }],
+        },
+        weight_grams: 2500,
+        images: [
+          {
+            url: "https://cdn.tuoimarket.vn/products/durian-1.jpg",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Sầu riêng nguyên trái",
+          },
+        ],
+        is_active: false,
+        created_at: new Date(),
       },
+    ],
+    specifications: [
       {
-        variant_label: "Size: 44mm",
-        price_delta: NumberLong(20000000),
-        sku: "WATCH-004-44",
+        group: "Thông tin",
+        items: [{ label: "Xuất xứ", value: "Vĩnh Long, Việt Nam" }],
       },
     ],
-    images: [
-      "https://cdn.example.com/products/watch-4.jpg",
-    ],
+    rating_summary: {
+      average: 4.6,
+      count: 15,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 3, 5: 11 },
+    },
+    sales_count: NumberLong(90),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: true,
+      shipping_class: "standard",
+    },
+    status: "inactive",
     created_at: new Date(),
     updated_at: new Date(),
   },
-
-  // 5. Electronics Product
   {
-    category_id: electronicsId,
-    sku: "CHARGER-005",
-    name_vi: "Sạc nhanh GaN 65W 3 cổng",
-    name_en: "65W 3-Port GaN Fast Charger",
-    description_vi: "Công nghệ GaN III nhỏ gọn, hỗ trợ sạc nhanh cho Laptop và Điện thoại.",
-    description_en: "Compact GaN III technology supporting fast charge for Laptops and Phones.",
-    unit: "piece",
-    base_price: NumberLong(60000000),
-    sale_price: NumberLong(49000000),
-    rating_avg: 4.9,
-    rating_count: 520,
-    is_active: true,
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
+      {
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
+      },
+    ],
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
+    ],
     variants: [
       {
-        variant_label: "Plug: US Standard",
-        price_delta: NumberLong(0),
-        sku: "CHARGER-005-US",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
       {
-        variant_label: "Plug: EU Standard",
-        price_delta: NumberLong(0),
-        sku: "CHARGER-005-EU",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
     ],
-    images: [
-      "https://cdn.example.com/products/charger-5.jpg",
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
     ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
-
-  // 6. Clothing Product
   {
-    category_id: clothingId,
-    sku: "TSHIRT-006",
-    name_vi: "Áo phông nam Cotton Oversized",
-    name_en: "Men's Oversized Cotton T-Shirt",
-    description_vi: "Chất liệu 100% cotton thoáng mát, phom dáng rộng thời trang.",
-    description_en: "100% breathable cotton fabric with a stylish relaxed fit.",
-    unit: "piece",
-    base_price: NumberLong(30000000),
-    sale_price: NumberLong(25000000),
-    rating_avg: 4.4,
-    rating_count: 95,
-    is_active: true,
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
+      {
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
+      },
+    ],
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
+    ],
     variants: [
       {
-        variant_label: "Size M / White",
-        price_delta: NumberLong(0),
-        sku: "TSHIRT-006-M-WHT",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
       {
-        variant_label: "Size L / White",
-        price_delta: NumberLong(0),
-        sku: "TSHIRT-006-L-WHT",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
       {
-        variant_label: "Size XL / Black",
-        price_delta: NumberLong(0),
-        sku: "TSHIRT-006-XL-BLK",
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
     ],
-    images: [
-      "https://cdn.example.com/products/tshirt-6.jpg",
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
     ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
-
-  // 7. Clothing Product
   {
-    category_id: clothingId,
-    sku: "HOODIE-007",
-    name_vi: "Áo Hoodie nỉ dầy Unisex",
-    name_en: "Unisex Heavyweight Fleece Hoodie",
-    description_vi: "Áo hoodie chất vải nỉ bông giữ ấm tốt, túi kangaroo tiện lợi.",
-    description_en: "Warm fleece material hoodie with a comfortable front kangaroo pocket.",
-    unit: "piece",
-    base_price: NumberLong(55000000),
-    sale_price: NumberLong(45000000),
-    rating_avg: 4.7,
-    rating_count: 140,
-    is_active: true,
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
+      {
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
+      },
+    ],
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
+    ],
     variants: [
       {
-        variant_label: "Size M / Grey",
-        price_delta: NumberLong(0),
-        sku: "HOODIE-007-M-GRY",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
       {
-        variant_label: "Size L / Navy",
-        price_delta: NumberLong(0),
-        sku: "HOODIE-007-L-NVY",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
     ],
-    images: [
-      "https://cdn.example.com/products/hoodie-7.jpg",
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
     ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
-
-  // 8. Clothing Product
   {
-    category_id: clothingId,
-    sku: "JEANS-008",
-    name_vi: "Quần Jeans nam dáng đứng",
-    name_en: "Men's Straight Fit Denim Jeans",
-    description_vi: "Quần denim co giãn nhẹ, phong cách cổ điển dễ phối đồ.",
-    description_en: "Slightly stretchy denim jeans in a classic, easy-to-match style.",
-    unit: "piece",
-    base_price: NumberLong(65000000),
-    sale_price: NumberLong(58000000),
-    rating_avg: 4.3,
-    rating_count: 62,
-    is_active: true,
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
+      {
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
+      },
+    ],
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
+    ],
     variants: [
       {
-        variant_label: "Size 30 / Dark Blue",
-        price_delta: NumberLong(0),
-        sku: "JEANS-008-30-DBL",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
       {
-        variant_label: "Size 32 / Dark Blue",
-        price_delta: NumberLong(0),
-        sku: "JEANS-008-32-DBL",
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
       },
     ],
-    images: [
-      "https://cdn.example.com/products/jeans-8.jpg",
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
     ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
-
-  // 9. Electronics Product
   {
-    category_id: electronicsId,
-    sku: "MOUSE-009",
-    name_vi: "Chuột máy tính không dây Ergonomic",
-    name_en: "Ergonomic Wireless Computer Mouse",
-    description_vi: "Thiết kế công phỏng học giảm mỏi cổ tay, kết nối Bluetooth & 2.4G.",
-    description_en: "Ergonomic design reducing wrist strain, dual Bluetooth & 2.4G connection.",
-    unit: "piece",
-    base_price: NumberLong(45000000),
-    sale_price: NumberLong(39000000),
-    rating_avg: 4.8,
-    rating_count: 405,
-    is_active: true,
-    variants: [
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
       {
-        variant_label: "Color: Graphite",
-        price_delta: NumberLong(0),
-        sku: "MOUSE-009-GPH",
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
       },
     ],
-    images: [
-      "https://cdn.example.com/products/mouse-9.jpg",
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
     ],
+    variants: [
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+    ],
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
+    ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
-
-  // 10. Inactive Product (Useful for testing is_active filters)
   {
-    category_id: electronicsId,
-    sku: "KEYBOARD-010",
-    name_vi: "Bàn phím cơ không dây TKL (Tạm ngưng bán)",
-    name_en: "Wireless TKL Mechanical Keyboard (Inactive)",
-    description_vi: "Bàn phím cơ switch Custom, đèn nền RGB nhiều chế độ.",
-    description_en: "Custom switch mechanical keyboard with multi-mode RGB backlighting.",
-    unit: "piece",
-    base_price: NumberLong(180000000),
-    sale_price: NumberLong(180000000),
-    rating_avg: 0.0,
-    rating_count: 0,
-    is_active: false,
-    variants: [
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
       {
-        variant_label: "Switch: Red",
-        price_delta: NumberLong(0),
-        sku: "KEYBOARD-010-RED",
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
       },
     ],
-    images: [
-      "https://cdn.example.com/products/keyboard-10.jpg",
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
     ],
+    variants: [
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+    ],
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
+    ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
+    created_at: new Date(),
+    updated_at: new Date(),
+  },
+  {
+    _id: new ObjectId(),
+    version: 1,
+    slug: "thanh-long-binh-thuan",
+    name: "Thanh Long Bình Thuận",
+    name_translation: {
+      vi: "Thanh Long Bình Thuận",
+      en: "Binh Thuan Dragon Fruit",
+    },
+    category_id: localFruitsId,
+    category_path: localFruitsPath,
+    description:
+      "Thanh long ngọt đậm, trái to mọng nước, giàu chất chống oxy hóa.",
+    description_html:
+      "<p>Thanh long tươi hái tận vườn Bình Thuận, vỏ mỏng mọng, vị ngọt tự nhiên thanh mát.</p>",
+    highlights: [
+      "Trái to từ 500g - 700g/trái",
+      "Vị ngọt tự nhiên đậm đà",
+      "Tốt cho hệ tiêu hóa & tim mạch",
+    ],
+    tags: ["trai-cay", "binh-thuan", "thanh-long", "giai-nhiet"],
+    images: [
+      {
+        url: "https://product.hstatic.net/200000886243/product/dragon-fruit-pitaya-white-exoticfruitscouk-988200_7db64a23831249e3b101d64bf76d271e.jpg",
+        is_primary: true,
+        sort_order: 1,
+        alt_text: "Thanh long",
+      },
+    ],
+    option_types: [
+      { name: "Loại", values: ["Ruột trắng", "Ruột đỏ"] },
+      { name: "Đóng gói", values: ["Túi 1kg", "Hộp quà 3kg"] },
+    ],
+    variants: [
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-1KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(38000), currency: "VND" },
+        inventory: {
+          total_available: 100,
+          reserved: 5,
+          warehouses: [
+            { warehouse_id: whSgn01, quantity: 60 },
+            { warehouse_id: whSgn02, quantity: 40 },
+          ],
+        },
+        weight_grams: 1000,
+        images: [
+          {
+            url: "https://nyrafoods.com/wp-content/uploads/2024/11/product-8.webp",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-WHITE-3KG",
+        attributes: { "Loại": "Ruột trắng", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(110000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://cdn.jwplayer.com/v2/media/aYRMP4Wy/poster.jpg?width=720",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-1KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Túi 1kg" },
+        price: { amount: NumberLong(100000), currency: "VND" },
+        inventory: {
+          total_available: 35,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTes3anQ_9ob71Mc9qXCv6pf7z3vUquB3fasd0EBVIbYNRDzPdgWxvxoZw&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Túi thanh long 1kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+      {
+        _id: new ObjectId(),
+        sku: "DRAGON-RED-3KG",
+        attributes: { "Loại": "Ruột đỏ", "Đóng gói": "Hộp quà 3kg" },
+        price: { amount: NumberLong(90000), currency: "VND" },
+        inventory: {
+          total_available: 25,
+          reserved: 1,
+          warehouses: [{ warehouse_id: whSgn01, quantity: 25 }],
+        },
+        weight_grams: 3000,
+        images: [
+          {
+            url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzVL7t6ZsxDSaoizaPlRC2PhMl1jSQr1J8GDV4mSY8Jvk7es3fjvZy53M&s=10",
+            is_primary: true,
+            sort_order: 1,
+            alt_text: "Hộp quà thanh long 3kg",
+          },
+        ],
+        is_active: true,
+        created_at: new Date(),
+      },
+    ],
+    specifications: [
+      {
+        group: "Thông tin sản phẩm",
+        items: [
+          { label: "Xuất xứ", value: "Bình Thuận, Việt Nam" },
+          { label: "Độ đường (Brix)", value: "> 14%" },
+        ],
+      },
+    ],
+    rating_summary: {
+      average: 4.7,
+      count: 29,
+      breakdown: { 1: 0, 2: 0, 3: 1, 4: 6, 5: 22 },
+    },
+    sales_count: NumberLong(185),
+    shipping: {
+      is_free_shipping: false,
+      ships_from: { warehouse_id: whSgn02, region: "Ho Chi Minh City" },
+      fragile: false,
+      shipping_class: "standard",
+    },
+    status: "active",
     created_at: new Date(),
     updated_at: new Date(),
   },
 ]);
 
-print("=== Catalog Database successfully seeded ===");
+print("==========================================================");
+print("=== Seed Data Matched to BSON Models (Tươi Market) ===");
+print("==========================================================");
