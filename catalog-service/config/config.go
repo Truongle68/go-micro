@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"time"
 
 	env "github.com/TruongLe68/go-micro/pkg/config"
 )
@@ -40,9 +39,7 @@ type (
 	}
 
 	jwt struct {
-		PublicKey  string        `env:"PUBLIC_KEY,required"`
-		AccessTTL  time.Duration `env:"JWT_ACC_TTL" envDefault:"15m"`
-		RefreshTTL time.Duration `env:"JWT_REF_TTL" envDefault:"168h"`
+		PublicKey string `env:"PUBLIC_KEY,required"`
 	}
 
 	redis struct {

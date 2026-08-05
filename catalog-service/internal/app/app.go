@@ -5,6 +5,7 @@ import (
 	repo "catalog-service/internal/repo/mongodb"
 	"catalog-service/internal/usecase"
 	cataredis "catalog-service/pkg/redis"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -33,6 +34,9 @@ type useCases struct {
 
 func initUsecases(db *mongodrv.Database) useCases {
 	productRepo := repo.NewProductRepo(db)
+	if err := productRepo.EnsureIndexes(context.Background()); err != nil {
+		log.Printf("failed to ensure product indexes: %v", err)
+	}
 	categoryRepo := repo.NewCategoryRepo(db)
 	productUC := usecase.NewProductUC(productRepo, categoryRepo)
 	categoryUC := usecase.NewCategoryUC(categoryRepo)

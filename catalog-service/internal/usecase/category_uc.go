@@ -5,9 +5,50 @@ import (
 	"catalog-service/internal/repo"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/TruongLe68/go-micro/pkg/pagination"
 )
+
+type CategoryDTO struct {
+	ID              string               `json:"id"`
+	ParentID        *string              `json:"parent_id"`
+	Name            string               `json:"name"`
+	NameTranslation map[string]string    `json:"name_translation"`
+	Slug            string               `json:"slug"`
+	Icon            string               `json:"icon"`
+	SortOrder       int64                `json:"sort_order"`
+	IsActive        bool                 `json:"is_active"`
+	Ancestors       []domain.CategoryRef `json:"ancestors"`
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
+}
+
+type CreateCategoryInput struct {
+	ParentID        *string
+	Name            string
+	NameTranslation map[string]string
+	Slug            string
+	Icon            string
+	SortOrder       int64
+	IsActive        *bool
+}
+
+type UpdateCategoryInput struct {
+	ID              string
+	ParentID        *string
+	Name            *string
+	NameTranslation map[string]string
+	Slug            *string
+	Icon            *string
+	SortOrder       *int64
+	IsActive        *bool
+}
+
+type CategoryList struct {
+	Categories []CategoryDTO `json:"categories"`
+	TotalCount int64         `json:"total_count"`
+}
 
 type CategoryUC struct {
 	repo repo.CategoryRepository
@@ -26,31 +67,52 @@ func toCategoryDTO(c *domain.Category) *CategoryDTO {
 		return nil
 	}
 	return &CategoryDTO{
-		ID:        c.ID,
-		ParentID:  c.ParentID,
-		NameVi:    c.NameVi,
-		NameEn:    c.NameEn,
-		Slug:      c.Slug,
-		Icon:      c.Icon,
-		SortOrder: c.SortOrder,
-		CreatedAt: c.CreatedAt,
-		UpdatedAt: c.UpdatedAt,
+		ID:              c.ID,
+		ParentID:        c.ParentID,
+		Name:            c.Name,
+		NameTranslation: c.NameTranslation,
+		Slug:            c.Slug,
+		Icon:            c.Icon,
+		SortOrder:       c.SortOrder,
+		IsActive:        c.IsActive,
+		Ancestors:       c.Ancestors,
+		CreatedAt:       c.CreatedAt,
+		UpdatedAt:       c.UpdatedAt,
 	}
 }
 
-func (uc *CategoryUC) Create(ctx context.Context, in CreateCategoryInput) (*CategoryDTO, error) {
-	if in.ParentID != nil && *in.ParentID != "" {
-		if _, err := uc.repo.FindByID(ctx, *in.ParentID); err != nil {
-			return nil, err
-		}
+func (uc *CategoryUC) buildAncestors(ctx context.Context, parentID *string) ([]domain.CategoryRef, error) {
+	if parentID == nil || *parentID == "" {
+		return nil, nil
 	}
+	parent, err := uc.repo.FindByID(ctx, *parentID)
+	if err != nil {
+		return nil, err
+	}
+	ancestors := make([]domain.CategoryRef, 0, len(parent.Ancestors)+1)
+	ancestors = append(ancestors, parent.Ancestors...)
+	ancestors = append(ancestors, domain.CategoryRef{
+		ID:   parent.ID,
+		Name: parent.Name,
+	})
+	return ancestors, nil
+}
+
+func (uc *CategoryUC) Create(ctx context.Context, in CreateCategoryInput) (*CategoryDTO, error) {
+	ancestors, err := uc.buildAncestors(ctx, in.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("building ancestors: %w", err)
+	}
+
 	c, err := domain.NewCategory(domain.NewCategoryParams{
-		ParentID:  in.ParentID,
-		NameVi:    in.NameVi,
-		NameEn:    in.NameVi,
-		Slug:      in.Slug,
-		Icon:      in.Icon,
-		SortOrder: in.SortOrder,
+		ParentID:        in.ParentID,
+		Name:            in.Name,
+		NameTranslation: in.NameTranslation,
+		Slug:            in.Slug,
+		Icon:            in.Icon,
+		SortOrder:       in.SortOrder,
+		IsActive:        in.IsActive,
+		Ancestors:       ancestors,
 	})
 
 	if err != nil {
@@ -97,11 +159,12 @@ func (uc *CategoryUC) GetChildren(ctx context.Context, parentID string, p pagina
 
 func (in UpdateCategoryInput) isEmpty() bool {
 	return in.ParentID == nil &&
-		in.NameVi == nil &&
-		in.NameEn == nil &&
+		in.Name == nil &&
+		in.NameTranslation == nil &&
 		in.Slug == nil &&
 		in.Icon == nil &&
-		in.SortOrder == nil
+		in.SortOrder == nil &&
+		in.IsActive == nil
 }
 
 func (uc *CategoryUC) Update(ctx context.Context, in UpdateCategoryInput) (*CategoryDTO, error) {
@@ -113,24 +176,43 @@ func (uc *CategoryUC) Update(ctx context.Context, in UpdateCategoryInput) (*Cate
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
-	if in.ParentID != nil && *in.ParentID != "" {
-		if _, err := uc.repo.FindByID(ctx, *in.ParentID); err != nil {
-			return nil, fmt.Errorf("finding by id: %w", err)
-		}
-	}
-
 	c, err := uc.repo.FindByID(ctx, in.ID)
 	if err != nil {
 		return nil, fmt.Errorf("finding by id: %w", err)
 	}
 
+	var newAncestors []domain.CategoryRef
+	if in.ParentID != nil {
+		if *in.ParentID != "" {
+			if *in.ParentID == in.ID {
+				return nil, domain.ErrCircularCategoryParent
+			}
+			parent, err := uc.repo.FindByID(ctx, *in.ParentID)
+			if err != nil {
+				return nil, fmt.Errorf("finding parent category: %w", err)
+			}
+			for _, a := range parent.Ancestors {
+				if a.ID == in.ID {
+					return nil, domain.ErrCircularCategoryParent
+				}
+			}
+			ancestors, err := uc.buildAncestors(ctx, in.ParentID)
+			if err != nil {
+				return nil, fmt.Errorf("building ancestors: %w", err)
+			}
+			newAncestors = ancestors
+		}
+	}
+
 	c.ApplyUpdate(domain.UpdateCategoryParams{
-		ParentID:  in.ParentID,
-		NameVi:    in.NameVi,
-		NameEn:    in.NameEn,
-		Slug:      in.Slug,
-		Icon:      in.Icon,
-		SortOrder: in.SortOrder,
+		ParentID:        in.ParentID,
+		Name:            in.Name,
+		NameTranslation: in.NameTranslation,
+		Slug:            in.Slug,
+		Icon:            in.Icon,
+		SortOrder:       in.SortOrder,
+		IsActive:        in.IsActive,
+		Ancestors:       newAncestors,
 	})
 
 	updated, err := uc.repo.Update(ctx, c)

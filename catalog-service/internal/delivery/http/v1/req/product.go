@@ -1,104 +1,85 @@
 package req
 
-import "catalog-service/internal/usecase"
-
-type ProductVariant struct {
-	VariantLabel string  `json:"variant_label" validate:"required"`
-	PriceDelta   float64 `json:"price_delta"`
-	Sku          string  `json:"sku" validate:"required"`
-}
-
 type CreateProduct struct {
-	CategoryID    string           `json:"category_id" validate:"required"`
-	Sku           string           `json:"sku" validate:"required"`
-	NameVi        string           `json:"name_vi" validate:"required"`
-	NameEn        string           `json:"name_en" validate:"required"`
-	DescriptionVi string           `json:"description_vi"`
-	DescriptionEn string           `json:"description_en"`
-	Unit          string           `json:"unit" validate:"required"`
-	BasePrice     float64          `json:"base_price" validate:"required,gte=0"`
-	SalePrice     float64          `json:"sale_price" validate:"required,gte=0"`
-	IsActive      bool             `json:"is_active"`
-	Variants      []ProductVariant `json:"variants"`
-	Images        []string         `json:"images"`
+	Name            string               `json:"name" validate:"required,min=3,max=200"`
+	CategoryID      string               `json:"category_id" validate:"required"`
+	Description     string               `json:"description" validate:"required"`
+	DescriptionHTML string               `json:"description_html,omitempty"`
+	Highlights      []string             `json:"highlights,omitempty"`
+	Tags            []string             `json:"tags,omitempty"`
+	Images          []ImageInput         `json:"images" validate:"required,min=1,dive"`
+	OptionTypes     []OptionTypeInput    `json:"option_types,omitempty"`
+	Variants        []CreateVariantInput `json:"variants" validate:"required,min=1,dive"`
+	Specifications  []SpecGroupInput     `json:"specifications,omitempty"`
+	Shipping        ShippingInput        `json:"shipping" validate:"required"`
 }
 
-func (req *CreateProduct) ToCreateProductInput() usecase.CreateProductInput {
-	var variants []usecase.ProductVariantInput
-	for _, v := range req.Variants {
-		variants = append(variants, usecase.ProductVariantInput{
-			VariantLabel: v.VariantLabel,
-			PriceDelta:   v.PriceDelta,
-			Sku:          v.Sku,
-		})
-	}
+type ImageInput struct {
+	URL       string `json:"url" validate:"required,url"`
+	IsPrimary bool   `json:"is_primary"`
+	SortOrder int    `json:"sort_order"`
+	AltText   string `json:"alt_text,omitempty"`
+}
 
-	return usecase.CreateProductInput{
-		CategoryID:    req.CategoryID,
-		Sku:           req.Sku,
-		NameVi:        req.NameVi,
-		NameEn:        req.NameEn,
-		DescriptionVi: req.DescriptionVi,
-		DescriptionEn: req.DescriptionEn,
-		Unit:          req.Unit,
-		BasePrice:     req.BasePrice,
-		SalePrice:     req.SalePrice,
-		IsActive:      req.IsActive,
-		Variants:      variants,
-		Images:        req.Images,
-	}
+type OptionTypeInput struct {
+	Name   string   `json:"name" validate:"required"`
+	Values []string `json:"values" validate:"required,min=1"`
+}
+
+type CreateVariantInput struct {
+	ID          string            `json:"id,omitempty"`
+	SKU         string            `json:"sku" validate:"required"`
+	Attributes  map[string]string `json:"attributes"`
+	Price       PriceInput        `json:"price" validate:"required"`
+	Stock       int               `json:"stock" validate:"gte=0"`
+	WeightGrams int               `json:"weight_grams,omitempty"`
+	Images      []ImageInput      `json:"images,omitempty"`
+}
+
+type PriceInput struct {
+	Amount   int64  `json:"amount" validate:"required,min=1"`
+	Currency string `json:"currency" validate:"required,len=3"`
+}
+
+type SpecGroupInput struct {
+	Group string          `json:"group" validate:"required"`
+	Items []SpecItemInput `json:"items" validate:"required,min=1"`
+}
+
+type SpecItemInput struct {
+	Label string `json:"label" validate:"required"`
+	Value string `json:"value" validate:"required"`
+}
+
+type ShippingInput struct {
+	IsFreeShipping bool   `json:"is_free_shipping"`
+	Fragile        bool   `json:"fragile"`
+	ShippingClass  string `json:"shipping_class,omitempty"`
 }
 
 type UpdateProduct struct {
-	CategoryID    *string          `json:"category_id"`
-	Sku           *string          `json:"sku"`
-	NameVi        *string          `json:"name_vi"`
-	NameEn        *string          `json:"name_en"`
-	DescriptionVi *string          `json:"description_vi"`
-	DescriptionEn *string          `json:"description_en"`
-	Unit          *string          `json:"unit"`
-	BasePrice     *float64         `json:"base_price" validate:"omitempty,gte=0"`
-	SalePrice     *float64         `json:"sale_price" validate:"omitempty,gte=0"`
-	IsActive      *bool            `json:"is_active"`
-	Variants      []ProductVariant `json:"variants"`
-	Images        []string         `json:"images"`
-}
-
-func (req *UpdateProduct) ToUpdateProductInput(id string) usecase.UpdateProductInput {
-	var variants []usecase.ProductVariantInput
-	if req.Variants != nil {
-		for _, v := range req.Variants {
-			variants = append(variants, usecase.ProductVariantInput{
-				VariantLabel: v.VariantLabel,
-				PriceDelta:   v.PriceDelta,
-				Sku:          v.Sku,
-			})
-		}
-	}
-
-	return usecase.UpdateProductInput{
-		ID:            id,
-		CategoryID:    req.CategoryID,
-		Sku:           req.Sku,
-		NameVi:        req.NameVi,
-		NameEn:        req.NameEn,
-		DescriptionVi: req.DescriptionVi,
-		DescriptionEn: req.DescriptionEn,
-		Unit:          req.Unit,
-		BasePrice:     req.BasePrice,
-		SalePrice:     req.SalePrice,
-		IsActive:      req.IsActive,
-		Variants:      variants,
-		Images:        req.Images,
-	}
+	Version         int                  `json:"version" validate:"required,min=1"`
+	Name            *string              `json:"name,omitempty" validate:"omitempty,min=3,max=200"`
+	NameTranslation map[string]string    `json:"name_translation,omitempty"`
+	CategoryID      *string              `json:"category_id,omitempty"`
+	Description     *string              `json:"description,omitempty"`
+	DescriptionHTML *string              `json:"description_html,omitempty"`
+	Highlights      []string             `json:"highlights,omitempty"`
+	Tags            []string             `json:"tags,omitempty"`
+	Images          []ImageInput         `json:"images,omitempty" validate:"omitempty,dive"`
+	OptionTypes     []OptionTypeInput    `json:"option_types,omitempty"`
+	Variants        []CreateVariantInput `json:"variants,omitempty" validate:"omitempty,dive"`
+	Specifications  []SpecGroupInput     `json:"specifications,omitempty"`
+	Shipping        *ShippingInput       `json:"shipping,omitempty"`
+	Status          *string              `json:"status,omitempty" validate:"omitempty,oneof=draft active inactive archived"`
 }
 
 type SearchProduct struct {
-	Query      string   `json:"query"`
-	CategoryID string   `json:"category_id"`
-	MinPrice   *float64 `json:"min_price"`
-	MaxPrice   *float64 `json:"max_price"`
-	IsActive   *bool    `json:"is_active"`
-	Page       int64    `json:"page"`
-	Limit      int64    `json:"limit"`
+	Query      string  `json:"query"`
+	CategoryID string  `json:"category_id"`
+	MinPrice   *int64  `json:"min_price"`
+	MaxPrice   *int64  `json:"max_price"`
+	Status     *string `json:"status"`
+	Page       int64   `json:"page"`
+	Limit      int64   `json:"limit"`
 }

@@ -1,143 +1,123 @@
 package res
 
 import (
-	"catalog-service/internal/domain"
-	"catalog-service/internal/usecase"
 	"time"
 )
 
-type ProductVariant struct {
-	VariantLabel string  `json:"variant_label"`
-	PriceDelta   float64 `json:"price_delta"`
-	Sku          string  `json:"sku"`
+type ProductResponse struct {
+	ID        string            `json:"id"`
+	Slug      string            `json:"slug"`
+	Name      string            `json:"name"`
+	Status    string            `json:"status"`
+	Variants  []VariantResponse `json:"variants"`
+	CreatedAt time.Time         `json:"created_at"`
 }
 
-func toProductVariant(v domain.ProductVariant) ProductVariant {
-	return ProductVariant{
-		VariantLabel: v.VariantLabel,
-		PriceDelta:   v.PriceDelta,
-		Sku:          v.Sku,
-	}
+type VariantResponse struct {
+	ID    string `json:"id"`
+	SKU   string `json:"sku"`
+	Price int64  `json:"price"`
+	Stock int    `json:"stock"`
 }
 
-type DetailedCategory struct {
-	ID        string `json:"id"`
-	NameVi    string `json:"name_vi"`
-	NameEn    string `json:"name_en"`
-	Slug      string `json:"slug"`
-	Icon      string `json:"icon"`
-	SortOrder int64  `json:"sort_order"`
+type CategoryRefRead struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
-func toDetailedCategory(c domain.Category) *DetailedCategory {
-	return &DetailedCategory{
-		ID:        c.ID,
-		NameVi:    c.NameVi,
-		NameEn:    c.NameEn,
-		Slug:      c.Slug,
-		Icon:      c.Icon,
-		SortOrder: c.SortOrder,
-	}
+type ImageRead struct {
+	URL       string `json:"url"`
+	IsPrimary bool   `json:"is_primary"`
+	SortOrder int    `json:"sort_order"`
+	AltText   string `json:"alt_text"`
+}
+
+type OptionTypeRead struct {
+	Name   string   `json:"name"`
+	Values []string `json:"values"`
+}
+
+type PriceRead struct {
+	Amount   int64  `json:"amount"`
+	Currency string `json:"currency"`
+}
+
+type InventoryRead struct {
+	TotalAvailable int `json:"total_available"`
+	Reserved       int `json:"reserved"`
+}
+
+type VariantRead struct {
+	ID          string            `json:"id,omitempty"`
+	SKU         string            `json:"sku"`
+	Attributes  map[string]string `json:"attributes,omitempty"`
+	Price       PriceRead         `json:"price"`
+	Inventory   InventoryRead     `json:"inventory"`
+	WeightGrams int               `json:"weight_grams,omitempty"`
+	Images      []ImageRead       `json:"images,omitempty"`
+	IsActive    bool              `json:"is_active"`
+	CreatedAt   time.Time         `json:"created_at"`
+}
+
+type SpecItemRead struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+type SpecGroupRead struct {
+	Group string         `json:"group"`
+	Items []SpecItemRead `json:"items"`
+}
+
+type RatingSummaryRead struct {
+	Average   float64          `json:"average"`
+	Count     int              `json:"count"`
+	Breakdown map[string]int64 `json:"breakdown,omitempty"`
+}
+
+type ShipsFromRead struct {
+	WarehouseID string `json:"warehouse_id,omitempty"`
+	Region      string `json:"region,omitempty"`
+}
+
+type ShippingInfoRead struct {
+	IsFreeShipping bool          `json:"is_free_shipping"`
+	ShipsFrom      ShipsFromRead `json:"ships_from,omitempty"`
+	Fragile        bool          `json:"fragile"`
+	ShippingClass  string        `json:"shipping_class,omitempty"`
+}
+
+type ProductCategoryRead struct {
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	NameTranslation map[string]string `json:"name_translation,omitempty"`
+	Slug            string            `json:"slug"`
+	Icon            string            `json:"icon,omitempty"`
+	SortOrder       int64             `json:"sort_order"`
+	IsActive        bool              `json:"is_active"`
 }
 
 type ProductRead struct {
-	ID            string            `json:"id"`
-	CategoryID    *string           `json:"category_id"`
-	Category      *DetailedCategory `json:"category"`
-	Sku           string            `json:"sku"`
-	NameVi        string            `json:"name_vi"`
-	NameEn        string            `json:"name_en"`
-	DescriptionVi string            `json:"description_vi"`
-	DescriptionEn string            `json:"description_en"`
-	Unit          string            `json:"unit"`
-	BasePrice     float64           `json:"base_price"`
-	SalePrice     float64           `json:"sale_price"`
-	RatingAvg     float64           `json:"rating_avg"`
-	RatingCount   int64             `json:"rating_count"`
-	IsActive      bool              `json:"is_active"`
-	Variants      []ProductVariant  `json:"variants"`
-	Images        []string          `json:"images"`
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
-}
-
-func ToProductRead(p *domain.Product) ProductRead {
-	if p == nil {
-		return ProductRead{}
-	}
-
-	variants := make([]ProductVariant, len(p.Variants))
-	for i, v := range p.Variants {
-		variants[i] = toProductVariant(v)
-	}
-
-	images := make([]string, len(p.Images))
-	copy(images, p.Images)
-
-	return ProductRead{
-		ID:            p.ID,
-		CategoryID:    &p.CategoryID,
-		Sku:           p.Sku,
-		NameVi:        p.NameVi,
-		NameEn:        p.NameEn,
-		DescriptionVi: p.DescriptionVi,
-		DescriptionEn: p.DescriptionEn,
-		Unit:          p.Unit,
-		BasePrice:     p.BasePrice,
-		SalePrice:     p.SalePrice,
-		RatingAvg:     p.RatingAvg,
-		RatingCount:   p.RatingCount,
-		IsActive:      p.IsActive,
-		Variants:      variants,
-		Images:        images,
-		CreatedAt:     p.CreatedAt,
-		UpdatedAt:     p.UpdatedAt,
-	}
-}
-
-func ToDetailedProductRead(dp *usecase.DetailedProduct) ProductRead {
-	if dp == nil {
-		return ProductRead{}
-	}
-
-	variants := make([]ProductVariant, len(dp.Product.Variants))
-	for i, v := range dp.Product.Variants {
-		variants[i] = toProductVariant(v)
-	}
-
-	images := make([]string, len(dp.Product.Images))
-	copy(images, dp.Product.Images)
-
-	p := ProductRead{
-		ID:            dp.Product.ID,
-		Sku:           dp.Product.Sku,
-		NameVi:        dp.Product.NameVi,
-		NameEn:        dp.Product.NameEn,
-		DescriptionVi: dp.Product.DescriptionVi,
-		DescriptionEn: dp.Product.DescriptionEn,
-		Unit:          dp.Product.Unit,
-		BasePrice:     dp.Product.BasePrice,
-		SalePrice:     dp.Product.SalePrice,
-		RatingAvg:     dp.Product.RatingAvg,
-		RatingCount:   dp.Product.RatingCount,
-		IsActive:      dp.Product.IsActive,
-		Variants:      variants,
-		Images:        images,
-		CreatedAt:     dp.Product.CreatedAt,
-		UpdatedAt:     dp.Product.UpdatedAt,
-	}
-
-	if dp.Category != nil {
-		p.Category = toDetailedCategory(*dp.Category)
-	}
-
-	return p
-}
-
-func ToProductList(dps []usecase.DetailedProduct) []ProductRead {
-	products := make([]ProductRead, len(dps))
-	for i, dp := range dps {
-		products[i] = ToDetailedProductRead(&dp)
-	}
-	return products
+	ID              string               `json:"id"`
+	Version         int                  `json:"version"`
+	Slug            string               `json:"slug"`
+	Name            string               `json:"name"`
+	NameTranslation map[string]string    `json:"name_translation,omitempty"`
+	CategoryID      string               `json:"category_id"`
+	CategoryPath    []CategoryRefRead    `json:"category_path,omitempty"`
+	Category        *ProductCategoryRead `json:"category,omitempty"`
+	Description     string               `json:"description"`
+	DescriptionHTML string               `json:"description_html,omitempty"`
+	Highlights      []string             `json:"highlights,omitempty"`
+	Tags            []string             `json:"tags,omitempty"`
+	Images          []ImageRead          `json:"images,omitempty"`
+	OptionTypes     []OptionTypeRead     `json:"option_types,omitempty"`
+	Variants        []VariantRead        `json:"variants,omitempty"`
+	Specifications  []SpecGroupRead      `json:"specifications,omitempty"`
+	RatingSummary   RatingSummaryRead    `json:"rating_summary"`
+	SalesCount      int64                `json:"sales_count"`
+	Shipping        ShippingInfoRead     `json:"shipping"`
+	Status          string               `json:"status"`
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
 }

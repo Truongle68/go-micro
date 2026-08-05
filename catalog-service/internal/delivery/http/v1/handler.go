@@ -15,14 +15,27 @@ func (r *V1) handleError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrProductNotFound),
 		errors.Is(err, domain.ErrCategoryNotFound):
 		response.Error(c, http.StatusNotFound, err.Error())
+	case errors.Is(err, domain.ErrDuplicateSKU),
+		errors.Is(err, domain.ErrDuplicateSlug),
+		errors.Is(err, domain.ErrDuplicateField),
+		errors.Is(err, domain.ErrConcurrentUpdate):
+		response.Error(c, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrEmptyProductID),
 		errors.Is(err, domain.ErrEmptyCategoryID),
 		errors.Is(err, domain.ErrEmptyName),
 		errors.Is(err, domain.ErrEmptySku),
+		errors.Is(err, domain.ErrEmptySlug),
+		errors.Is(err, domain.ErrCircularCategoryParent),
 		errors.Is(err, domain.ErrInvalidPrice),
 		errors.Is(err, domain.ErrInvalidPriceRange),
 		errors.Is(err, domain.ErrInvalidCategoryID),
 		errors.Is(err, domain.ErrInvalidProductID),
+		errors.Is(err, domain.ErrInvalidVariantAttribute),
+		errors.Is(err, domain.ErrProductRequiresVariant),
+		errors.Is(err, domain.ErrInvalidOptionType),
+		errors.Is(err, domain.ErrInvalidSimpleVariant),
+		errors.Is(err, domain.ErrExceedExpectedVariantCount),
+		errors.Is(err, domain.ErrInvalidVersion),
 		errors.Is(err, domain.ErrNoFieldsToUpdate):
 		response.Error(c, http.StatusBadRequest, err.Error())
 	default:

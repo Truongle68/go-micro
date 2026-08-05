@@ -4,62 +4,359 @@ import (
 	"catalog-service/internal/domain"
 	"catalog-service/internal/repo"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/TruongLe68/go-micro/pkg/pagination"
+	"github.com/gosimple/slug"
+	"github.com/microcosm-cc/bluemonday"
 )
 
+type DetailedProduct struct {
+	Product  domain.Product
+	Category *domain.Category
+}
+
+type ImageInput struct {
+	URL       string
+	IsPrimary bool
+	SortOrder int
+	AltText   string
+}
+
+type OptionTypeInput struct {
+	Name   string
+	Values []string
+}
+
+type CreateVariantInput struct {
+	ID          string
+	SKU         string
+	Attributes  map[string]string
+	Price       PriceInput
+	Stock       int
+	WeightGrams int
+	Images      []ImageInput
+}
+
+type PriceInput struct {
+	Amount   int64
+	Currency string
+}
+
+type SpecGroupInput struct {
+	Group string
+	Items []SpecItemInput
+}
+
+type SpecItemInput struct {
+	Label string
+	Value string
+}
+
+type ShippingInput struct {
+	IsFreeShipping bool
+	Fragile        bool
+	ShippingClass  string
+}
+
+type CreateProductInput struct {
+	Name            string
+	NameTranslation map[string]string
+	CategoryID      string
+	Description     string
+	DescriptionHTML string
+	Highlights      []string
+	Tags            []string
+	Images          []ImageInput
+	OptionTypes     []OptionTypeInput
+	Variants        []CreateVariantInput
+	Specifications  []SpecGroupInput
+	Shipping        ShippingInput
+}
+
+type UpdateProductInput struct {
+	ID              string
+	Version         int
+	Name            *string
+	NameTranslation map[string]string
+	CategoryID      *string
+	Description     *string
+	DescriptionHTML *string
+	Highlights      []string
+	Tags            []string
+	Images          []ImageInput
+	OptionTypes     []OptionTypeInput
+	Variants        []CreateVariantInput
+	Specifications  []SpecGroupInput
+	Shipping        *ShippingInput
+	Status          *domain.ProductStatus
+}
+
+type ProductList struct {
+	Products   []DetailedProduct `json:"products"`
+	TotalCount int64             `json:"total_count"`
+}
+
 type ProductUC struct {
-	repo     repo.ProductRepository
-	cateRepo repo.CategoryRepository
+	repo      repo.ProductRepository
+	cateRepo  repo.CategoryRepository
+	sanitizer *bluemonday.Policy
 }
 
 var _ ProductUsecase = (*ProductUC)(nil)
 
 func NewProductUC(repo repo.ProductRepository, cateRepo repo.CategoryRepository) *ProductUC {
 	return &ProductUC{
-		repo:     repo,
-		cateRepo: cateRepo,
+		repo:      repo,
+		cateRepo:  cateRepo,
+		sanitizer: bluemonday.UGCPolicy(),
 	}
-}
-
-func toDomainVariants(in []ProductVariantInput) []domain.ProductVariant {
-	variants := make([]domain.ProductVariant, len(in))
-	for i, v := range in {
-		variants[i] = domain.ProductVariant{
-			VariantLabel: v.VariantLabel,
-			PriceDelta:   v.PriceDelta,
-			Sku:          v.Sku,
-		}
-	}
-	return variants
 }
 
 func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain.Product, error) {
-	p, err := domain.NewProduct(domain.NewProductParams{
-		CategoryID:    in.CategoryID,
-		Sku:           in.Sku,
-		NameVi:        in.NameVi,
-		NameEn:        in.NameEn,
-		DescriptionVi: in.DescriptionVi,
-		DescriptionEn: in.DescriptionEn,
-		Unit:          in.Unit,
-		BasePrice:     in.BasePrice,
-		SalePrice:     in.SalePrice,
-		IsActive:      in.IsActive,
-		Variants:      toDomainVariants(in.Variants),
-		Images:        in.Images,
-	})
-
-	if err != nil {
+	if err := validateVariantOptions(in.Variants, in.OptionTypes); err != nil {
 		return nil, err
 	}
 
-	if err := uc.repo.Create(ctx, p); err != nil {
+	category, err := uc.cateRepo.FindByID(ctx, in.CategoryID)
+	if err != nil {
+		return nil, fmt.Errorf("find category: %w", err)
+	}
+	if category == nil {
+		return nil, domain.ErrCategoryNotFound
+	}
+	categoryPath, err := uc.cateRepo.BuildBreadcrumb(ctx, category.ID)
+	if err != nil {
+		return nil, fmt.Errorf("build category path: %w", err)
+	}
+
+	safeHTML := uc.sanitizer.Sanitize(in.DescriptionHTML)
+
+	now := time.Now()
+	product := &domain.Product{
+		Slug:            generateUniqueSlug(in.Name),
+		Version:         1,
+		Name:            in.Name,
+		NameTranslation: in.NameTranslation,
+		CategoryID:      category.ID,
+		CategoryPath:    categoryPath,
+		Tags:            in.Tags,
+		Description:     in.Description,
+		DescriptionHTML: safeHTML,
+		Highlights:      in.Highlights,
+		Images:          toDomainImages(in.Images),
+		OptionTypes:     toDomainOptionTypes(in.OptionTypes),
+		Variants:        toDomainVariants(in.Variants, now),
+		Specifications:  toDomainSpecifications(in.Specifications),
+		RatingSummary:   domain.RatingSummary{Breakdown: map[string]int64{}},
+		Shipping: domain.ShippingInfo{
+			IsFreeShipping: in.Shipping.IsFreeShipping,
+			Fragile:        in.Shipping.Fragile,
+			ShippingClass:  in.Shipping.ShippingClass,
+		},
+		Status:    domain.ProductStatusDraft,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	maxRetries := 3
+	for retry := 0; retry <= maxRetries; retry++ {
+		err = uc.repo.Create(ctx, product)
+		if err == nil {
+			return product, nil
+		}
+		if errors.Is(err, domain.ErrDuplicateSlug) && retry < maxRetries {
+			product.Slug = fmt.Sprintf("%s-%d", slug.Make(in.Name), retry+1)
+			continue
+		}
+		if errors.Is(err, domain.ErrDuplicateSKU) {
+			return nil, domain.ErrDuplicateSKU
+		}
+		if errors.Is(err, domain.ErrDuplicateSlug) {
+			return nil, domain.ErrDuplicateSlug
+		}
+		if domain.IsDuplicateKeyError(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("creating product: %w", err)
 	}
 
-	return p, nil
+	return product, nil
+}
+
+func validateVariantOptions(variants []CreateVariantInput, optionTypes []OptionTypeInput) error {
+	if len(variants) == 0 {
+		return fmt.Errorf("%w: product must have at least 1 variant", domain.ErrInvalidSimpleVariant)
+	}
+	if len(optionTypes) == 0 {
+		if len(variants) != 1 {
+			return fmt.Errorf("%w: product with no option types must have exactly 1 variant (got %d)", domain.ErrInvalidSimpleVariant, len(variants))
+		}
+		if len(variants[0].Attributes) > 0 {
+			return fmt.Errorf("%w: product has no option types, but variant %s contains attributes", domain.ErrInvalidVariantAttribute, variants[0].SKU)
+		}
+		return nil
+	} 
+
+	expectedVariantCount := 1
+	for _, ot := range optionTypes {
+		expectedVariantCount *= len(ot.Values)
+	}
+
+	if len(variants) > expectedVariantCount {
+		return fmt.Errorf("%w: got %d, max possible is %d", domain.ErrExceedExpectedVariantCount, len(variants), expectedVariantCount)
+	}
+
+	return validateVariantAttributesMatchOptions(variants, optionTypes)
+}
+
+func validateVariantAttributesMatchOptions(variants []CreateVariantInput, optionTypes []OptionTypeInput) error {
+	totalPairs := 0
+	for _, ot := range optionTypes {
+		totalPairs += len(ot.Values)
+	}
+	validPairs := make(map[string]struct{}, totalPairs)
+	validKeys := make(map[string]struct{}, len(optionTypes))
+
+	for _, ot := range optionTypes {
+		key := strings.ToLower(strings.TrimSpace(ot.Name))
+		if _, duplicate := validKeys[key]; duplicate {
+			return fmt.Errorf("%w: duplicate option type name %q", domain.ErrInvalidOptionType, ot.Name)
+		}
+		validKeys[key] = struct{}{}
+		for _, v := range ot.Values {
+			pairKey := key + ":" + strings.ToLower(strings.TrimSpace(v))
+			validPairs[pairKey] = struct{}{}
+		}
+	}
+	seenSKUs := make(map[string]struct{}, len(variants))
+	seenCombination := make(map[string]string, len(variants))
+	for _, v := range variants {
+		// check SKU uniqueness
+		normalizedSKU := strings.ToUpper(strings.TrimSpace(v.SKU))
+		if _, exists := seenSKUs[normalizedSKU]; exists {
+			return fmt.Errorf("%w: %s", domain.ErrDuplicateSKU, v.SKU)
+		}
+		seenSKUs[normalizedSKU] = struct{}{}
+
+		// check attribute count match
+		if len(v.Attributes) != len(optionTypes) {
+			return fmt.Errorf("%w: variants %s attributes count (%d) does not match option types count (%d)", domain.ErrInvalidVariantAttribute, v.SKU, len(v.Attributes), len(optionTypes))
+		}
+
+		// validate key/value pairs
+		attrPairs := make([]string, 0, len(v.Attributes))
+		for key, val := range v.Attributes {
+			lowerKey := strings.ToLower(strings.TrimSpace(key))
+			lowerVal := strings.ToLower(strings.TrimSpace(val))
+			if _, exists := validKeys[lowerKey]; !exists {
+				return fmt.Errorf("%w: variant %s has unknown attribute %q", domain.ErrInvalidVariantAttribute, v.SKU, key)
+			}
+
+			pairKey := lowerKey + ":" + lowerVal
+			if _, valid := validPairs[pairKey]; !valid {
+				return fmt.Errorf("%w: variant %s has invalid value %q for attribute %q", domain.ErrInvalidVariantAttribute, v.SKU, val, key)
+			}
+
+			attrPairs = append(attrPairs, pairKey)
+		}
+
+		sort.Strings(attrPairs)
+		comboKey := strings.Join(attrPairs, "|")
+
+		// check duplicate option combinations
+		if existingSKU, duplicate := seenCombination[comboKey]; duplicate {
+			return fmt.Errorf("%w: duplicate variant attribute combination between SKU %s and SKU %s",
+				domain.ErrInvalidVariantAttribute, existingSKU, v.SKU)
+		}
+		seenCombination[comboKey] = v.SKU
+	}
+	return nil
+}
+
+func generateUniqueSlug(name string) string {
+	base := slug.Make(name)
+	b := make([]byte, 3)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%s-%s", base, hex.EncodeToString(b))
+}
+
+func toDomainVariants(in []CreateVariantInput, now time.Time) []domain.Variant {
+	out := make([]domain.Variant, len(in))
+	for i, v := range in {
+		out[i] = domain.Variant{
+			ID:         v.ID,
+			SKU:        v.SKU,
+			Attributes: v.Attributes,
+			Price: domain.Price{
+				Amount:   v.Price.Amount,
+				Currency: v.Price.Currency,
+			},
+			Inventory: domain.Inventory{
+				TotalAvailable: v.Stock,
+			},
+			WeightGrams: v.WeightGrams,
+			Images:      toDomainImages(v.Images),
+			IsActive:    true,
+			CreatedAt:   now,
+		}
+	}
+	return out
+}
+
+func toDomainImages(in []ImageInput) []domain.Image {
+	out := make([]domain.Image, len(in))
+	hasPrimary := false
+	for i, img := range in {
+		if img.IsPrimary {
+			hasPrimary = true
+		}
+		out[i] = domain.Image{
+			URL:       img.URL,
+			IsPrimary: img.IsPrimary,
+			SortOrder: img.SortOrder,
+			AltText:   img.AltText,
+		}
+	}
+	if len(out) > 0 && !hasPrimary {
+		out[0].IsPrimary = true
+	}
+	return out
+}
+
+func toDomainOptionTypes(in []OptionTypeInput) []domain.OptionType {
+	out := make([]domain.OptionType, len(in))
+	for i, ot := range in {
+		out[i] = domain.OptionType{
+			Name:   ot.Name,
+			Values: ot.Values,
+		}
+	}
+	return out
+}
+
+func toDomainSpecifications(in []SpecGroupInput) []domain.SpecGroup {
+	out := make([]domain.SpecGroup, len(in))
+	for i, sg := range in {
+		items := make([]domain.SpecItem, len(sg.Items))
+		for j, item := range sg.Items {
+			items[j] = domain.SpecItem{
+				Label: item.Label,
+				Value: item.Value,
+			}
+		}
+		out[i] = domain.SpecGroup{
+			Group: sg.Group,
+			Items: items,
+		}
+	}
+	return out
 }
 
 func (uc *ProductUC) GetByID(ctx context.Context, id string) (*DetailedProduct, error) {
@@ -151,18 +448,19 @@ func (uc *ProductUC) GetByCategory(ctx context.Context, categoryID string, p pag
 }
 
 func (in UpdateProductInput) isEmpty() bool {
-	return in.CategoryID == nil &&
-		in.Sku == nil &&
-		in.NameVi == nil &&
-		in.NameEn == nil &&
-		in.DescriptionVi == nil &&
-		in.DescriptionEn == nil &&
-		in.Unit == nil &&
-		in.BasePrice == nil &&
-		in.SalePrice == nil &&
-		in.IsActive == nil &&
+	return in.Name == nil &&
+		in.NameTranslation == nil &&
+		in.CategoryID == nil &&
+		in.Description == nil &&
+		in.DescriptionHTML == nil &&
+		in.Highlights == nil &&
+		in.Tags == nil &&
+		in.Images == nil &&
+		in.OptionTypes == nil &&
 		in.Variants == nil &&
-		in.Images == nil
+		in.Specifications == nil &&
+		in.Shipping == nil &&
+		in.Status == nil
 }
 
 func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain.Product, error) {
@@ -174,10 +472,8 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
-	if in.CategoryID != nil && *in.CategoryID != "" {
-		if _, err := uc.cateRepo.FindByID(ctx, *in.CategoryID); err != nil {
-			return nil, fmt.Errorf("finding category by id: %w", err)
-		}
+	if in.Version <= 0 {
+		return nil, domain.ErrInvalidVersion
 	}
 
 	p, err := uc.repo.FindByID(ctx, in.ID)
@@ -185,34 +481,113 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 		return nil, fmt.Errorf("finding by id: %w", err)
 	}
 
-	var variants []domain.ProductVariant
+	var categoryPath []domain.CategoryRef
+	if in.CategoryID != nil && *in.CategoryID != "" {
+		category, err := uc.cateRepo.FindByID(ctx, *in.CategoryID)
+		if err != nil {
+			return nil, fmt.Errorf("finding category by id: %w", err)
+		}
+		if category == nil {
+			return nil, domain.ErrCategoryNotFound
+		}
+		path, err := uc.cateRepo.BuildBreadcrumb(ctx, category.ID)
+		if err != nil {
+			return nil, fmt.Errorf("building category path: %w", err)
+		}
+		categoryPath = path
+	}
+
+	if err := uc.validateVariantState(p, in); err != nil {
+		return nil, err
+	}
+
+	var descHTML *string
+	if in.DescriptionHTML != nil {
+		safeHTML := uc.sanitizer.Sanitize(*in.DescriptionHTML)
+		descHTML = &safeHTML
+	}
+
+	now := time.Now()
+	var images []domain.Image
+	if in.Images != nil {
+		images = toDomainImages(in.Images)
+	}
+	var optionTypes []domain.OptionType
+	if in.OptionTypes != nil {
+		optionTypes = toDomainOptionTypes(in.OptionTypes)
+	}
+	var variants []domain.Variant
 	if in.Variants != nil {
-		variants = toDomainVariants(in.Variants)
+		variants = toDomainVariants(in.Variants, now)
+	}
+	var specs []domain.SpecGroup
+	if in.Specifications != nil {
+		specs = toDomainSpecifications(in.Specifications)
+	}
+	var shipping *domain.ShippingInfo
+	if in.Shipping != nil {
+		shipping = &domain.ShippingInfo{
+			IsFreeShipping: in.Shipping.IsFreeShipping,
+			Fragile:        in.Shipping.Fragile,
+			ShippingClass:  in.Shipping.ShippingClass,
+		}
 	}
 
 	if err := p.ApplyUpdate(domain.UpdateProductParams{
-		CategoryID:    in.CategoryID,
-		Sku:           in.Sku,
-		NameVi:        in.NameVi,
-		NameEn:        in.NameEn,
-		DescriptionVi: in.DescriptionVi,
-		DescriptionEn: in.DescriptionEn,
-		Unit:          in.Unit,
-		BasePrice:     in.BasePrice,
-		SalePrice:     in.SalePrice,
-		IsActive:      in.IsActive,
-		Variants:      variants,
-		Images:        in.Images,
+		Name:            in.Name,
+		NameTranslation: in.NameTranslation,
+		CategoryID:      in.CategoryID,
+		CategoryPath:    categoryPath,
+		Description:     in.Description,
+		DescriptionHTML: descHTML,
+		Highlights:      in.Highlights,
+		Tags:            in.Tags,
+		Images:          images,
+		OptionTypes:     optionTypes,
+		Variants:        variants,
+		Specifications:  specs,
+		Shipping:        shipping,
+		Status:          in.Status,
 	}); err != nil {
 		return nil, err
 	}
 
-	updated, err := uc.repo.Update(ctx, p)
+	updated, err := uc.repo.Update(ctx, p, in.Version)
 	if err != nil {
+		if domain.IsDuplicateKeyError(err) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("updating product: %w", err)
 	}
 
 	return updated, nil
+}
+
+// Helper to isolate variant & option type validation logic
+func (uc *ProductUC) validateVariantState(p *domain.Product, in UpdateProductInput) error {
+	if in.Variants != nil {
+		opts := in.OptionTypes
+		if opts == nil {
+			opts = make([]OptionTypeInput, 0, len(p.OptionTypes))
+			for _, ot := range p.OptionTypes {
+				opts = append(opts, OptionTypeInput{Name: ot.Name, Values: ot.Values})
+			}
+		}
+		return validateVariantOptions(in.Variants, opts)
+	}
+
+	if in.OptionTypes != nil {
+		existingVariants := make([]CreateVariantInput, len(p.Variants))
+		for i, v := range p.Variants {
+			existingVariants[i] = CreateVariantInput{
+				SKU:        v.SKU,
+				Attributes: v.Attributes,
+			}
+		}
+		return validateVariantOptions(existingVariants, in.OptionTypes)
+	}
+
+	return nil
 }
 
 func (uc *ProductUC) Delete(ctx context.Context, id string) error {
