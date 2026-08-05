@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/TruongLe68/go-micro/pkg/pagination"
@@ -31,72 +33,224 @@ func NewProductRepo(db *mongo.Database) *ProductRepo {
 	}
 }
 
-type variantModel struct {
-	VariantLabel string  `bson:"variant_label"`
-	PriceDelta   float64 `bson:"price_delta"`
-	Sku          string  `bson:"sku"`
+type categoryRefModel struct {
+	ID   bson.ObjectID `bson:"id"`
+	Name string        `bson:"name"`
 }
 
-type populatedCategoryModel struct {
-	ID        string `bson:"id"`
-	NameVi    string `bson:"name_vi"`
-	NameEn    string `bson:"name_en"`
-	Slug      string `bson:"slug"`
-	Icon      string `bson:"icon"`
-	SortOrder int64  `bson:"sort_order"`
+type imageModel struct {
+	URL       string `bson:"url"`
+	IsPrimary bool   `bson:"is_primary"`
+	SortOrder int    `bson:"sort_order"`
+	AltText   string `bson:"alt_text"`
+}
+
+type optionTypeModel struct {
+	Name   string   `bson:"name"`
+	Values []string `bson:"values"`
+}
+
+type priceModel struct {
+	Amount   int64  `bson:"amount"`
+	Currency string `bson:"currency"`
+}
+
+type warehouseStockModel struct {
+	WarehouseID string `bson:"warehouse_id"`
+	Quantity    int    `bson:"quantity"`
+}
+
+type inventoryModel struct {
+	TotalAvailable int                   `bson:"total_available"`
+	Reserved       int                   `bson:"reserved"`
+	Warehouses     []warehouseStockModel `bson:"warehouses,omitempty"`
+}
+
+type variantModel struct {
+	ID          bson.ObjectID     `bson:"_id,omitempty"`
+	SKU         string            `bson:"sku"`
+	Attributes  map[string]string `bson:"attributes,omitempty"`
+	Price       priceModel        `bson:"price"`
+	Inventory   inventoryModel    `bson:"inventory"`
+	WeightGrams int               `bson:"weight_grams,omitempty"`
+	Images      []imageModel      `bson:"images,omitempty"`
+	IsActive    bool              `bson:"is_active"`
+	CreatedAt   time.Time         `bson:"created_at"`
+}
+
+type specItemModel struct {
+	Label string `bson:"label"`
+	Value string `bson:"value"`
+}
+
+type specGroupModel struct {
+	Group string          `bson:"group"`
+	Items []specItemModel `bson:"items"`
+}
+
+type ratingSummaryModel struct {
+	Average   float64          `bson:"average"`
+	Count     int              `bson:"count"`
+	Breakdown map[string]int64 `bson:"breakdown,omitempty"`
+}
+
+type shipsFromModel struct {
+	WarehouseID string `bson:"warehouse_id,omitempty"`
+	Region      string `bson:"region,omitempty"`
+}
+
+type shippingInfoModel struct {
+	IsFreeShipping bool           `bson:"is_free_shipping"`
+	ShipsFrom      shipsFromModel `bson:"ships_from,omitempty"`
+	Fragile        bool           `bson:"fragile"`
+	ShippingClass  string         `bson:"shipping_class,omitempty"`
 }
 
 type productModel struct {
-	ID            bson.ObjectID  `bson:"_id"`
-	CategoryID    bson.ObjectID  `bson:"category_id"`
-	Sku           string         `bson:"sku"`
-	NameVi        string         `bson:"name_vi"`
-	NameEn        string         `bson:"name_en"`
-	DescriptionVi string         `bson:"description_vi"`
-	DescriptionEn string         `bson:"description_en"`
-	Unit          string         `bson:"unit"`
-	BasePrice     float64        `bson:"base_price"`
-	SalePrice     float64        `bson:"sale_price"`
-	RatingAvg     float64        `bson:"rating_avg"`
-	RatingCount   int64          `bson:"rating_count"`
-	IsActive      bool           `bson:"is_active"`
-	Variants      []variantModel `bson:"variants"`
-	Images        []string       `bson:"images"`
-	CreatedAt     time.Time      `bson:"created_at"`
-	UpdatedAt     time.Time      `bson:"updated_at"`
+	ID              bson.ObjectID      `bson:"_id"`
+	Version         int                `bson:"version"`
+	Slug            string             `bson:"slug"`
+	Name            string             `bson:"name"`
+	NameTranslation map[string]string  `bson:"name_translation,omitempty"`
+	CategoryID      bson.ObjectID      `bson:"category_id"`
+	CategoryPath    []categoryRefModel `bson:"category_path,omitempty"`
+	Description     string             `bson:"description"`
+	DescriptionHTML string             `bson:"description_html,omitempty"`
+	Highlights      []string           `bson:"highlights,omitempty"`
+	Tags            []string           `bson:"tags,omitempty"`
+	Images          []imageModel       `bson:"images,omitempty"`
+	OptionTypes     []optionTypeModel  `bson:"option_types,omitempty"`
+	Variants        []variantModel     `bson:"variants,omitempty"`
+	Specifications  []specGroupModel   `bson:"specifications,omitempty"`
+	RatingSummary   ratingSummaryModel `bson:"rating_summary,omitempty"`
+	SalesCount      int64              `bson:"sales_count"`
+	Shipping        shippingInfoModel  `bson:"shipping"`
+	Status          string             `bson:"status"`
+	CreatedAt       time.Time          `bson:"created_at"`
+	UpdatedAt       time.Time          `bson:"updated_at"`
 }
 
 func (m productModel) toDomain() *domain.Product {
-	variants := make([]domain.ProductVariant, len(m.Variants))
-	for i, v := range m.Variants {
-		variants[i] = domain.ProductVariant{
-			VariantLabel: v.VariantLabel,
-			PriceDelta:   v.PriceDelta,
-			Sku:          v.Sku,
+	categoryPath := make([]domain.CategoryRef, len(m.CategoryPath))
+	for i, cp := range m.CategoryPath {
+		categoryPath[i] = domain.CategoryRef{
+			ID:   cp.ID.Hex(),
+			Name: cp.Name,
 		}
 	}
 
-	images := make([]string, len(m.Images))
-	copy(images, m.Images)
+	images := make([]domain.Image, len(m.Images))
+	for i, img := range m.Images {
+		images[i] = domain.Image{
+			URL:       img.URL,
+			IsPrimary: img.IsPrimary,
+			SortOrder: img.SortOrder,
+			AltText:   img.AltText,
+		}
+	}
+
+	optionTypes := make([]domain.OptionType, len(m.OptionTypes))
+	for i, ot := range m.OptionTypes {
+		optionTypes[i] = domain.OptionType{
+			Name:   ot.Name,
+			Values: ot.Values,
+		}
+	}
+
+	variants := make([]domain.Variant, len(m.Variants))
+	for i, v := range m.Variants {
+		vImages := make([]domain.Image, len(v.Images))
+		for j, img := range v.Images {
+			vImages[j] = domain.Image{
+				URL:       img.URL,
+				IsPrimary: img.IsPrimary,
+				SortOrder: img.SortOrder,
+				AltText:   img.AltText,
+			}
+		}
+
+		warehouses := make([]domain.WarehouseStock, len(v.Inventory.Warehouses))
+		for j, w := range v.Inventory.Warehouses {
+			warehouses[j] = domain.WarehouseStock{
+				WarehouseID: w.WarehouseID,
+				Quantity:    w.Quantity,
+			}
+		}
+
+		var vID string
+		if !v.ID.IsZero() {
+			vID = v.ID.Hex()
+		}
+
+		variants[i] = domain.Variant{
+			ID:         vID,
+			SKU:        v.SKU,
+			Attributes: v.Attributes,
+			Price: domain.Price{
+				Amount:   v.Price.Amount,
+				Currency: v.Price.Currency,
+			},
+			Inventory: domain.Inventory{
+				TotalAvailable: v.Inventory.TotalAvailable,
+				Reserved:       v.Inventory.Reserved,
+				Warehouses:     warehouses,
+			},
+			WeightGrams: v.WeightGrams,
+			Images:      vImages,
+			IsActive:    v.IsActive,
+			CreatedAt:   v.CreatedAt,
+		}
+	}
+
+	specs := make([]domain.SpecGroup, len(m.Specifications))
+	for i, sg := range m.Specifications {
+		items := make([]domain.SpecItem, len(sg.Items))
+		for j, item := range sg.Items {
+			items[j] = domain.SpecItem{
+				Label: item.Label,
+				Value: item.Value,
+			}
+		}
+		specs[i] = domain.SpecGroup{
+			Group: sg.Group,
+			Items: items,
+		}
+	}
 
 	return &domain.Product{
-		ID:            m.ID.Hex(),
-		CategoryID:    m.CategoryID.Hex(),
-		Sku:           m.Sku,
-		NameVi:        m.NameVi,
-		NameEn:        m.NameEn,
-		DescriptionVi: m.DescriptionVi,
-		DescriptionEn: m.DescriptionEn,
-		Unit:          m.Unit,
-		BasePrice:     m.BasePrice,
-		SalePrice:     m.SalePrice,
-		RatingAvg:     m.RatingAvg,
-		RatingCount:   m.RatingCount,
-		IsActive:      m.IsActive,
-		Variants:      variants,
-		Images:        images,
-		CreatedAt:     m.CreatedAt,
-		UpdatedAt:     m.UpdatedAt,
+		ID:              m.ID.Hex(),
+		Version:         m.Version,
+		Slug:            m.Slug,
+		Name:            m.Name,
+		NameTranslation: m.NameTranslation,
+		CategoryID:      m.CategoryID.Hex(),
+		CategoryPath:    categoryPath,
+		Description:     m.Description,
+		DescriptionHTML: m.DescriptionHTML,
+		Highlights:      m.Highlights,
+		Tags:            m.Tags,
+		Images:          images,
+		OptionTypes:     optionTypes,
+		Variants:        variants,
+		Specifications:  specs,
+		RatingSummary: domain.RatingSummary{
+			Average:   m.RatingSummary.Average,
+			Count:     m.RatingSummary.Count,
+			Breakdown: m.RatingSummary.Breakdown,
+		},
+		SalesCount: m.SalesCount,
+		Shipping: domain.ShippingInfo{
+			IsFreeShipping: m.Shipping.IsFreeShipping,
+			ShipsFrom: domain.ShipsFrom{
+				WarehouseID: m.Shipping.ShipsFrom.WarehouseID,
+				Region:      m.Shipping.ShipsFrom.Region,
+			},
+			Fragile:       m.Shipping.Fragile,
+			ShippingClass: m.Shipping.ShippingClass,
+		},
+		Status:    domain.ProductStatus(m.Status),
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
 	}
 }
 
@@ -109,21 +263,134 @@ func productModelFromDomain(p *domain.Product) (*productModel, error) {
 		return nil, domain.ErrInvalidCategoryID
 	}
 
+	categoryPath := make([]categoryRefModel, len(p.CategoryPath))
+	for i, cp := range p.CategoryPath {
+		catOID, err := bson.ObjectIDFromHex(cp.ID)
+		if err != nil {
+			return nil, domain.ErrInvalidCategoryID
+		}
+		categoryPath[i] = categoryRefModel{
+			ID:   catOID,
+			Name: cp.Name,
+		}
+	}
+
+	images := make([]imageModel, len(p.Images))
+	for i, img := range p.Images {
+		images[i] = imageModel{
+			URL:       img.URL,
+			IsPrimary: img.IsPrimary,
+			SortOrder: img.SortOrder,
+			AltText:   img.AltText,
+		}
+	}
+
+	optionTypes := make([]optionTypeModel, len(p.OptionTypes))
+	for i, ot := range p.OptionTypes {
+		optionTypes[i] = optionTypeModel{
+			Name:   ot.Name,
+			Values: ot.Values,
+		}
+	}
+
+	variants := make([]variantModel, len(p.Variants))
+	for i, v := range p.Variants {
+		vImages := make([]imageModel, len(v.Images))
+		for j, img := range v.Images {
+			vImages[j] = imageModel{
+				URL:       img.URL,
+				IsPrimary: img.IsPrimary,
+				SortOrder: img.SortOrder,
+				AltText:   img.AltText,
+			}
+		}
+
+		warehouses := make([]warehouseStockModel, len(v.Inventory.Warehouses))
+		for j, w := range v.Inventory.Warehouses {
+			warehouses[j] = warehouseStockModel{
+				WarehouseID: w.WarehouseID,
+				Quantity:    w.Quantity,
+			}
+		}
+
+		var vID bson.ObjectID
+		if v.ID != "" {
+			if oid, err := bson.ObjectIDFromHex(v.ID); err == nil {
+				vID = oid
+			}
+		}
+		if vID.IsZero() {
+			vID = bson.NewObjectID()
+		}
+
+		variants[i] = variantModel{
+			ID:         vID,
+			SKU:        v.SKU,
+			Attributes: v.Attributes,
+			Price: priceModel{
+				Amount:   v.Price.Amount,
+				Currency: v.Price.Currency,
+			},
+			Inventory: inventoryModel{
+				TotalAvailable: v.Inventory.TotalAvailable,
+				Reserved:       v.Inventory.Reserved,
+				Warehouses:     warehouses,
+			},
+			WeightGrams: v.WeightGrams,
+			Images:      vImages,
+			IsActive:    v.IsActive,
+			CreatedAt:   v.CreatedAt,
+		}
+	}
+
+	specs := make([]specGroupModel, len(p.Specifications))
+	for i, sg := range p.Specifications {
+		items := make([]specItemModel, len(sg.Items))
+		for j, item := range sg.Items {
+			items[j] = specItemModel{
+				Label: item.Label,
+				Value: item.Value,
+			}
+		}
+		specs[i] = specGroupModel{
+			Group: sg.Group,
+			Items: items,
+		}
+	}
+
 	m := &productModel{
-		CategoryID:    categoryOID,
-		Sku:           p.Sku,
-		NameVi:        p.NameVi,
-		NameEn:        p.NameEn,
-		DescriptionVi: p.DescriptionVi,
-		DescriptionEn: p.DescriptionEn,
-		Unit:          p.Unit,
-		BasePrice:     p.BasePrice,
-		SalePrice:     p.SalePrice,
-		RatingAvg:     p.RatingAvg,
-		RatingCount:   p.RatingCount,
-		IsActive:      p.IsActive,
-		CreatedAt:     p.CreatedAt,
-		UpdatedAt:     p.UpdatedAt,
+		Version:         p.Version,
+		Slug:            p.Slug,
+		Name:            p.Name,
+		NameTranslation: p.NameTranslation,
+		CategoryID:      categoryOID,
+		CategoryPath:    categoryPath,
+		Description:     p.Description,
+		DescriptionHTML: p.DescriptionHTML,
+		Highlights:      p.Highlights,
+		Tags:            p.Tags,
+		Images:          images,
+		OptionTypes:     optionTypes,
+		Variants:        variants,
+		Specifications:  specs,
+		RatingSummary: ratingSummaryModel{
+			Average:   p.RatingSummary.Average,
+			Count:     p.RatingSummary.Count,
+			Breakdown: p.RatingSummary.Breakdown,
+		},
+		SalesCount: p.SalesCount,
+		Shipping: shippingInfoModel{
+			IsFreeShipping: p.Shipping.IsFreeShipping,
+			ShipsFrom: shipsFromModel{
+				WarehouseID: p.Shipping.ShipsFrom.WarehouseID,
+				Region:      p.Shipping.ShipsFrom.Region,
+			},
+			Fragile:       p.Shipping.Fragile,
+			ShippingClass: p.Shipping.ShippingClass,
+		},
+		Status:    string(p.Status),
+		CreatedAt: p.CreatedAt,
+		UpdatedAt: p.UpdatedAt,
 	}
 
 	if p.ID != "" {
@@ -134,18 +401,6 @@ func productModelFromDomain(p *domain.Product) (*productModel, error) {
 		m.ID = oid
 	}
 
-	m.Variants = make([]variantModel, len(p.Variants))
-	for i, v := range p.Variants {
-		m.Variants[i] = variantModel{
-			VariantLabel: v.VariantLabel,
-			PriceDelta:   v.PriceDelta,
-			Sku:          v.Sku,
-		}
-	}
-
-	m.Images = make([]string, len(p.Images))
-	copy(m.Images, p.Images)
-
 	return m, nil
 }
 
@@ -155,6 +410,35 @@ func idFromHex(id string) (bson.ObjectID, error) {
 		return bson.NilObjectID, domain.ErrInvalidProductID
 	}
 	return oid, nil
+}
+
+func (r *ProductRepo) ExistSlug(ctx context.Context, name string) (bool, error) {
+	count, err := r.productColl.CountDocuments(ctx, bson.M{"slug": name})
+	if err != nil {
+		return false, fmt.Errorf("checking slug existence: %w", err)
+	}
+	return count > 0, nil
+}
+
+func (r *ProductRepo) EnsureIndexes(ctx context.Context) error {
+	models := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "category_id", Value: 1}},
+		},
+		{
+			Keys:    bson.D{{Key: "variants.sku", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "slug", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+	}
+	_, err := r.productColl.Indexes().CreateMany(ctx, models)
+	if err != nil {
+		return fmt.Errorf("creating product indexes: %w", err)
+	}
+	return nil
 }
 
 func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
@@ -172,6 +456,15 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 
 	res, err := r.productColl.InsertOne(ctx, m)
 	if err != nil {
+		if field, val, ok := extractDuplicateField(err); ok {
+			if strings.Contains(field, "sku") {
+				return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSKU, field, val)
+			}
+			if field == "slug" {
+				return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSlug, field, val)
+			}
+			return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateField, field, val)
+		}
 		return fmt.Errorf("inserting product: %w", err)
 	}
 
@@ -193,7 +486,7 @@ func (r *ProductRepo) FindByID(ctx context.Context, id string) (*domain.Product,
 	err = r.productColl.FindOne(ctx, bson.M{"_id": oid}).Decode(&m)
 
 	if err != nil {
-		if errors.Is(err, mongo.ErrNilDocument) {
+		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, domain.ErrProductNotFound
 		}
 		return nil, err
@@ -257,7 +550,7 @@ func (r *ProductRepo) FindByCategory(ctx context.Context, categoryID string, p p
 	return r.findByFilter(ctx, filter, p)
 }
 
-func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) (*domain.Product, error) {
+func (r *ProductRepo) Update(ctx context.Context, p *domain.Product, expectedVersion int) (*domain.Product, error) {
 	m, err := productModelFromDomain(p)
 	if err != nil {
 		return nil, err
@@ -265,33 +558,53 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) (*domain.Pr
 	now := time.Now()
 	m.UpdatedAt = now
 
-	filter := bson.M{"_id": m.ID}
+	filter := bson.M{"_id": m.ID, "version": expectedVersion}
 	update := bson.M{
 		"$set": bson.M{
-			"category_id":    m.CategoryID,
-			"sku":            m.Sku,
-			"name_vi":        m.NameVi,
-			"name_en":        m.NameEn,
-			"description_vi": m.DescriptionVi,
-			"description_en": m.DescriptionEn,
-			"unit":           m.Unit,
-			"base_price":     m.BasePrice,
-			"sale_price":     m.SalePrice,
-			"rating_avg":     m.RatingAvg,
-			"rating_count":   m.RatingCount,
-			"is_active":      m.IsActive,
-			"variants":       m.Variants,
-			"images":         m.Images,
-			"updated_at":     m.UpdatedAt,
+			"slug":             m.Slug,
+			"name":             m.Name,
+			"name_translation": m.NameTranslation,
+			"category_id":      m.CategoryID,
+			"category_path":    m.CategoryPath,
+			"description":      m.Description,
+			"description_html": m.DescriptionHTML,
+			"highlights":       m.Highlights,
+			"tags":             m.Tags,
+			"images":           m.Images,
+			"option_types":     m.OptionTypes,
+			"variants":         m.Variants,
+			"specifications":   m.Specifications,
+			"rating_summary":   m.RatingSummary,
+			"sales_count":      m.SalesCount,
+			"shipping":         m.Shipping,
+			"status":           m.Status,
+			"updated_at":       m.UpdatedAt,
+		},
+		"$inc": bson.M{
+			"version": 1,
 		},
 	}
 	res, err := r.productColl.UpdateOne(ctx, filter, update)
 	if err != nil {
+		if field, val, ok := extractDuplicateField(err); ok {
+			if strings.Contains(field, "sku") {
+				return nil, fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSKU, field, val)
+			}
+			if field == "slug" {
+				return nil, fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSlug, field, val)
+			}
+			return nil, fmt.Errorf("%w: %s = %v", domain.ErrDuplicateField, field, val)
+		}
 		return nil, fmt.Errorf("updating product: %w", err)
 	}
 	if res.MatchedCount == 0 {
-		return nil, domain.ErrProductNotFound
+		count, _ := r.productColl.CountDocuments(ctx, bson.M{"_id": m.ID})
+		if count == 0 {
+			return nil, domain.ErrProductNotFound
+		}
+		return nil, domain.ErrConcurrentUpdate
 	}
+	p.Version++
 	p.UpdatedAt = now
 
 	return p, nil
@@ -350,18 +663,18 @@ func buildQueryFilter(params domain.SearchProductParams) (bson.M, error) {
 }
 
 func buildSearchFilter(k string) bson.M {
+	escaped := regexp.QuoteMeta(k)
 	regexQuery := bson.M{
-		"$regex":   k,
+		"$regex":   escaped,
 		"$options": "i",
 	}
 
 	return bson.M{
 		"$or": bson.A{
-			bson.M{"name_vi": regexQuery},
-			bson.M{"name_en": regexQuery},
-			bson.M{"sku": regexQuery},
-			bson.M{"description_vi": regexQuery},
-			bson.M{"description_en": regexQuery},
+			bson.M{"name": regexQuery},
+			bson.M{"tags": regexQuery},
+			bson.M{"description": regexQuery},
+			bson.M{"variants.sku": regexQuery},
 		},
 	}
 }
@@ -377,8 +690,8 @@ func buildFilter(params domain.SearchProductParams) (bson.M, error) {
 		filter["category_id"] = oid
 	}
 
-	if params.IsActive != nil {
-		filter["is_active"] = *params.IsActive
+	if params.Status != nil {
+		filter["status"] = string(*params.Status)
 	}
 
 	if params.MinPrice != nil || params.MaxPrice != nil {
@@ -389,7 +702,7 @@ func buildFilter(params domain.SearchProductParams) (bson.M, error) {
 		if params.MaxPrice != nil {
 			price["$lte"] = *params.MaxPrice
 		}
-		filter["base_price"] = price
+		filter["variants.price.amount"] = price
 	}
 	return filter, nil
 }

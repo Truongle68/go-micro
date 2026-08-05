@@ -3,67 +3,80 @@ package domain
 import "time"
 
 type Category struct {
-	ID        string
-	ParentID  *string
-	NameVi    string
-	NameEn    string
-	Slug      string
-	Icon      string
-	SortOrder int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID              string
+	ParentID        *string
+	Name            string
+	NameTranslation map[string]string
+	Slug            string
+	Icon            string
+	SortOrder       int64
+	IsActive        bool
+	Ancestors       []CategoryRef
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type NewCategoryParams struct {
-	ParentID  *string
-	NameVi    string
-	NameEn    string
-	Slug      string
-	Icon      string
-	SortOrder int64
+	ParentID        *string
+	Name            string
+	NameTranslation map[string]string
+	Slug            string
+	Icon            string
+	SortOrder       int64
+	IsActive        *bool
+	Ancestors       []CategoryRef
 }
 
 func NewCategory(params NewCategoryParams) (*Category, error) {
-	if params.NameVi == "" && params.NameEn == "" {
+	if params.Name == "" {
 		return nil, ErrEmptyName
 	}
 
 	if params.Slug == "" {
-		return nil, ErrEmptySku
+		return nil, ErrEmptySlug
+	}
+
+	isActive := true
+	if params.IsActive != nil {
+		isActive = *params.IsActive
 	}
 
 	now := time.Now()
 	return &Category{
-		ParentID:  params.ParentID,
-		NameVi:    params.NameVi,
-		NameEn:    params.NameEn,
-		Slug:      params.Slug,
-		Icon:      params.Icon,
-		SortOrder: params.SortOrder,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ParentID:        params.ParentID,
+		Name:            params.Name,
+		NameTranslation: params.NameTranslation,
+		Slug:            params.Slug,
+		Icon:            params.Icon,
+		SortOrder:       params.SortOrder,
+		IsActive:        isActive,
+		Ancestors:       params.Ancestors,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}, nil
 }
 
 type UpdateCategoryParams struct {
-	ID        string
-	ParentID  *string
-	NameVi    *string
-	NameEn    *string
-	Slug      *string
-	Icon      *string
-	SortOrder *int64
+	ID              string
+	ParentID        *string
+	Name            *string
+	NameTranslation map[string]string
+	Slug            *string
+	Icon            *string
+	SortOrder       *int64
+	IsActive        *bool
+	Ancestors       []CategoryRef
 }
 
 func (c *Category) ApplyUpdate(params UpdateCategoryParams) {
 	if params.ParentID != nil {
 		c.ParentID = params.ParentID
 	}
-	if params.NameVi != nil {
-		c.NameVi = *params.NameVi
+	if params.Name != nil {
+		c.Name = *params.Name
 	}
-	if params.NameEn != nil {
-		c.NameEn = *params.NameEn
+	if params.NameTranslation != nil {
+		c.NameTranslation = params.NameTranslation
 	}
 	if params.Slug != nil {
 		c.Slug = *params.Slug
@@ -73,6 +86,12 @@ func (c *Category) ApplyUpdate(params UpdateCategoryParams) {
 	}
 	if params.SortOrder != nil {
 		c.SortOrder = *params.SortOrder
+	}
+	if params.IsActive != nil {
+		c.IsActive = *params.IsActive
+	}
+	if params.Ancestors != nil {
+		c.Ancestors = params.Ancestors
 	}
 
 	c.UpdatedAt = time.Now()

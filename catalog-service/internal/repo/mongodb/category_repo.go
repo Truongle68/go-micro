@@ -27,15 +27,17 @@ func NewCategoryRepo(db *mongo.Database) *CategoryRepo {
 }
 
 type categoryModel struct {
-	ID        bson.ObjectID  `bson:"_id,omitempty"`
-	ParentID  *bson.ObjectID `bson:"parent_id,omitempty"`
-	NameVi    string         `bson:"name_vi"`
-	NameEn    string         `bson:"name_en"`
-	Slug      string         `bson:"slug"`
-	Icon      string         `bson:"icon"`
-	SortOrder int64          `bson:"sort_order"`
-	CreatedAt time.Time      `bson:"created_at"`
-	UpdatedAt time.Time      `bson:"updated_at"`
+	ID              bson.ObjectID      `bson:"_id,omitempty"`
+	ParentID        *bson.ObjectID     `bson:"parent_id,omitempty"`
+	Name            string             `bson:"name"`
+	NameTranslation map[string]string  `bson:"name_translation,omitempty"`
+	Slug            string             `bson:"slug"`
+	Icon            string             `bson:"icon"`
+	SortOrder       int64              `bson:"sort_order"`
+	IsActive        bool               `bson:"is_active"`
+	Ancestors       []categoryRefModel `bson:"ancestors,omitempty"`
+	CreatedAt       time.Time          `bson:"created_at"`
+	UpdatedAt       time.Time          `bson:"updated_at"`
 }
 
 func (m categoryModel) toDomain() *domain.Category {
@@ -45,16 +47,26 @@ func (m categoryModel) toDomain() *domain.Category {
 		parentID = &pid
 	}
 
+	ancestors := make([]domain.CategoryRef, len(m.Ancestors))
+	for i, a := range m.Ancestors {
+		ancestors[i] = domain.CategoryRef{
+			ID:   a.ID.Hex(),
+			Name: a.Name,
+		}
+	}
+
 	return &domain.Category{
-		ID:        m.ID.Hex(),
-		ParentID:  parentID,
-		NameVi:    m.NameVi,
-		NameEn:    m.NameEn,
-		Slug:      m.Slug,
-		Icon:      m.Icon,
-		SortOrder: m.SortOrder,
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
+		ID:              m.ID.Hex(),
+		ParentID:        parentID,
+		Name:            m.Name,
+		NameTranslation: m.NameTranslation,
+		Slug:            m.Slug,
+		Icon:            m.Icon,
+		SortOrder:       m.SortOrder,
+		IsActive:        m.IsActive,
+		Ancestors:       ancestors,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
 	}
 }
 
@@ -68,14 +80,28 @@ func categoryModelFromDomain(c *domain.Category) (*categoryModel, error) {
 	}
 	c.UpdatedAt = now
 
+	ancestors := make([]categoryRefModel, len(c.Ancestors))
+	for i, a := range c.Ancestors {
+		oid, err := bson.ObjectIDFromHex(a.ID)
+		if err != nil {
+			return nil, domain.ErrInvalidCategoryID
+		}
+		ancestors[i] = categoryRefModel{
+			ID:   oid,
+			Name: a.Name,
+		}
+	}
+
 	m := &categoryModel{
-		NameVi:    c.NameVi,
-		NameEn:    c.NameEn,
-		Slug:      c.Slug,
-		Icon:      c.Icon,
-		SortOrder: c.SortOrder,
-		CreatedAt: c.CreatedAt,
-		UpdatedAt: c.UpdatedAt,
+		Name:            c.Name,
+		NameTranslation: c.NameTranslation,
+		Slug:            c.Slug,
+		Icon:            c.Icon,
+		SortOrder:       c.SortOrder,
+		IsActive:        c.IsActive,
+		Ancestors:       ancestors,
+		CreatedAt:       c.CreatedAt,
+		UpdatedAt:       c.UpdatedAt,
 	}
 
 	if c.ID != "" {
@@ -135,6 +161,25 @@ func (r *CategoryRepo) FindByID(ctx context.Context, id string) (*domain.Categor
 	return c, nil
 }
 
+func (r *CategoryRepo) BuildBreadcrumb(ctx context.Context, id string) ([]domain.CategoryRef, error) {
+	if id == "" {
+		return nil, nil
+	}
+
+	c, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]domain.CategoryRef, 0, len(c.Ancestors)+1)
+	res = append(res, c.Ancestors...)
+	res = append(res, domain.CategoryRef{
+		ID:   c.ID,
+		Name: c.Name,
+	})
+	return res, nil
+}
+
 func (r *CategoryRepo) findWithFilter(ctx context.Context, filter bson.M, p *pagination.Params) (*domain.ListCategoryResult, error) {
 	total, err := r.collection.CountDocuments(ctx, filter)
 	if err != nil {
@@ -172,7 +217,7 @@ func (r *CategoryRepo) FindByIDs(ctx context.Context, ids []string) (*domain.Lis
 		}, nil
 	}
 
-	oids := make([]bson.ObjectID, len(ids))
+	oids := make([]bson.ObjectID, 0, len(ids))
 	for _, id := range ids {
 		oid, err := bson.ObjectIDFromHex(id)
 		if err != nil {
@@ -186,6 +231,7 @@ func (r *CategoryRepo) FindByIDs(ctx context.Context, ids []string) (*domain.Lis
 	}
 	return r.findWithFilter(ctx, filter, nil)
 }
+
 
 func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagination.Params) (*domain.ListCategoryResult, error) {
 	poid, err := bson.ObjectIDFromHex(parentID)
@@ -208,13 +254,15 @@ func (r *CategoryRepo) Update(ctx context.Context, c *domain.Category) (*domain.
 	filter := bson.M{"_id": m.ID}
 	update := bson.M{
 		"$set": bson.M{
-			"parent_id":  m.ParentID,
-			"name_vi":    m.NameVi,
-			"name_en":    m.NameEn,
-			"slug":       m.Slug,
-			"icon":       m.Icon,
-			"sort_order": m.SortOrder,
-			"updated_at": m.UpdatedAt,
+			"parent_id":        m.ParentID,
+			"name":             m.Name,
+			"name_translation": m.NameTranslation,
+			"slug":             m.Slug,
+			"icon":             m.Icon,
+			"sort_order":       m.SortOrder,
+			"is_active":        m.IsActive,
+			"ancestors":        m.Ancestors,
+			"updated_at":       m.UpdatedAt,
 		},
 	}
 

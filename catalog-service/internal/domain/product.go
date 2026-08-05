@@ -5,155 +5,174 @@ import (
 	"time"
 )
 
-type ProductVariant struct {
-	VariantLabel string
-	PriceDelta   float64
-	Sku          string
-}
-
-type PopulatedCategory struct {
-	ID        string
-	NameVi    string
-	NameEn    string
-	Slug      string
-	Icon      string
-	SortOrder int64
-}
-
 type Product struct {
-	ID            string
-	CategoryID    string
-	Sku           string
-	NameVi        string
-	NameEn        string
-	DescriptionVi string
-	DescriptionEn string
-	Unit          string
-	BasePrice     float64
-	SalePrice     float64
-	RatingAvg     float64
-	RatingCount   int64
-	IsActive      bool
-	Variants      []ProductVariant
-	Images        []string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID              string
+	Version         int
+	Slug            string
+	Name            string
+	NameTranslation map[string]string
+	CategoryID      string
+	CategoryPath    []CategoryRef
+	Description     string
+	DescriptionHTML string
+	Highlights      []string
+	Tags            []string
+	Images          []Image
+	OptionTypes     []OptionType
+	Variants        []Variant
+	Specifications  []SpecGroup
+	RatingSummary   RatingSummary
+	SalesCount      int64
+	Shipping        ShippingInfo
+	Status          ProductStatus
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
-type NewProductParams struct {
-	CategoryID    string
-	Sku           string
-	NameVi        string
-	NameEn        string
-	DescriptionVi string
-	DescriptionEn string
-	Unit          string
-	BasePrice     float64
-	SalePrice     float64
-	IsActive      bool
-	Variants      []ProductVariant
-	Images        []string
+type Variant struct {
+	ID          string
+	SKU         string
+	Attributes  map[string]string
+	Price       Price
+	Inventory   Inventory
+	WeightGrams int
+	Images      []Image
+	IsActive    bool
+	CreatedAt   time.Time
 }
 
-func NewProduct(params NewProductParams) (*Product, error) {
-	if params.CategoryID == "" {
-		return nil, ErrEmptyCategoryID
-	}
-	if params.NameVi == "" && params.NameEn == "" {
-		return nil, ErrEmptyName
-	}
-	if params.Sku == "" {
-		return nil, ErrEmptySku
-	}
-	if params.BasePrice < 0 || params.SalePrice < 0 {
-		return nil, ErrInvalidPrice
-	}
+type OptionType struct {
+	Name   string
+	Values []string
+}
 
-	now := time.Now()
-	return &Product{
-		CategoryID:    params.CategoryID,
-		Sku:           params.Sku,
-		NameVi:        params.NameVi,
-		NameEn:        params.NameEn,
-		DescriptionVi: params.DescriptionVi,
-		DescriptionEn: params.DescriptionEn,
-		Unit:          params.Unit,
-		BasePrice:     params.BasePrice,
-		SalePrice:     params.SalePrice,
-		IsActive:      params.IsActive,
-		Variants:      params.Variants,
-		Images:        params.Images,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}, nil
+type Price struct {
+	Amount   int64
+	Currency string
+}
+
+type SpecGroup struct {
+	Group string
+	Items []SpecItem
+}
+
+type SpecItem struct {
+	Label string
+	Value string
+}
+
+type Inventory struct {
+	TotalAvailable int
+	Reserved       int
+	Warehouses     []WarehouseStock
+}
+
+type WarehouseStock struct {
+	WarehouseID string
+	Quantity    int
+}
+
+type CategoryRef struct {
+	ID   string
+	Name string
+}
+
+type Image struct {
+	URL       string
+	IsPrimary bool
+	SortOrder int
+	AltText   string
+}
+
+type RatingSummary struct {
+	Average   float64
+	Count     int
+	Breakdown map[string]int64
+}
+
+type ShippingInfo struct {
+	IsFreeShipping bool
+	ShipsFrom      ShipsFrom
+	Fragile        bool
+	ShippingClass  string
+}
+
+type ShipsFrom struct {
+	WarehouseID string
+	Region      string
 }
 
 type UpdateProductParams struct {
-	CategoryID    *string
-	Sku           *string
-	NameVi        *string
-	NameEn        *string
-	DescriptionVi *string
-	DescriptionEn *string
-	Unit          *string
-	BasePrice     *float64
-	SalePrice     *float64
-	IsActive      *bool
-	Variants      []ProductVariant
-	Images        []string
+	Name            *string
+	NameTranslation map[string]string
+	CategoryID      *string
+	CategoryPath    []CategoryRef
+	Description     *string
+	DescriptionHTML *string
+	Highlights      []string
+	Tags            []string
+	Images          []Image
+	OptionTypes     []OptionType
+	Variants        []Variant
+	Specifications  []SpecGroup
+	Shipping        *ShippingInfo
+	Status          *ProductStatus
 }
 
 func (p *Product) ApplyUpdate(params UpdateProductParams) error {
+	if params.Name != nil {
+		if *params.Name == "" {
+			return ErrEmptyName
+		}
+		p.Name = *params.Name
+	}
+	if params.NameTranslation != nil {
+		p.NameTranslation = params.NameTranslation
+	}
 	if params.CategoryID != nil {
 		if *params.CategoryID == "" {
 			return ErrEmptyCategoryID
 		}
 		p.CategoryID = *params.CategoryID
 	}
-	if params.Sku != nil {
-		if *params.Sku == "" {
-			return ErrEmptySku
-		}
-		p.Sku = *params.Sku
+	if params.CategoryPath != nil {
+		p.CategoryPath = params.CategoryPath
 	}
-	if params.NameVi != nil {
-		p.NameVi = *params.NameVi
+	if params.Description != nil {
+		p.Description = *params.Description
 	}
-	if params.NameEn != nil {
-		p.NameEn = *params.NameEn
+	if params.DescriptionHTML != nil {
+		p.DescriptionHTML = *params.DescriptionHTML
 	}
-	if p.NameVi == "" && p.NameEn == "" {
-		return ErrEmptyName
+	if params.Highlights != nil {
+		p.Highlights = params.Highlights
 	}
-	if params.DescriptionVi != nil {
-		p.DescriptionVi = *params.DescriptionVi
-	}
-	if params.DescriptionEn != nil {
-		p.DescriptionEn = *params.DescriptionEn
-	}
-	if params.Unit != nil {
-		p.Unit = *params.Unit
-	}
-	if params.BasePrice != nil {
-		if *params.BasePrice < 0 {
-			return ErrInvalidPrice
-		}
-		p.BasePrice = *params.BasePrice
-	}
-	if params.SalePrice != nil {
-		if *params.SalePrice < 0 {
-			return ErrInvalidPrice
-		}
-		p.SalePrice = *params.SalePrice
-	}
-	if params.IsActive != nil {
-		p.IsActive = *params.IsActive
-	}
-	if params.Variants != nil {
-		p.Variants = params.Variants
+	if params.Tags != nil {
+		p.Tags = params.Tags
 	}
 	if params.Images != nil {
 		p.Images = params.Images
+	}
+	if params.OptionTypes != nil {
+		p.OptionTypes = params.OptionTypes
+	}
+	if params.Variants != nil {
+		if len(params.Variants) == 0 {
+			return ErrProductRequiresVariant
+		}
+		p.Variants = params.Variants
+	}
+	if params.Specifications != nil {
+		p.Specifications = params.Specifications
+	}
+	if params.Shipping != nil {
+		p.Shipping = *params.Shipping
+	}
+	if params.Status != nil {
+		if !params.Status.IsValid() {
+			return ErrInvalidStatus
+		}
+		p.Status = *params.Status
 	}
 	p.UpdatedAt = time.Now()
 	return nil
@@ -162,17 +181,17 @@ func (p *Product) ApplyUpdate(params UpdateProductParams) error {
 type SearchProductParams struct {
 	Query      string
 	CategoryID string
-	MinPrice   *float64
-	MaxPrice   *float64
-	IsActive   *bool
+	MinPrice   *int64
+	MaxPrice   *int64
+	Status     *ProductStatus
 }
 
 type SearchProductsQuery struct {
-	Query      string   `form:"q"`
-	CategoryID string   `form:"category_id"`
-	MinPrice   *float64 `form:"min_price"`
-	MaxPrice   *float64 `form:"max_price"`
-	IsActive   *bool    `form:"is_active"`
+	Query      string         `form:"q"`
+	CategoryID string         `form:"category_id"`
+	MinPrice   *int64         `form:"min_price"`
+	MaxPrice   *int64         `form:"max_price"`
+	Status     *ProductStatus `form:"status"`
 }
 
 func (q SearchProductsQuery) ToDomainParams() SearchProductParams {
@@ -181,7 +200,7 @@ func (q SearchProductsQuery) ToDomainParams() SearchProductParams {
 		CategoryID: q.CategoryID,
 		MinPrice:   q.MinPrice,
 		MaxPrice:   q.MaxPrice,
-		IsActive:   q.IsActive,
+		Status:     q.Status,
 	}
 }
 
@@ -200,4 +219,22 @@ var ErrInvalidPriceRange = errors.New("min_price cannot be greater than max_pric
 type ProductListResult struct {
 	Products   []Product
 	TotalCount int64
+}
+
+type ProductStatus string
+
+const (
+	ProductStatusDraft    ProductStatus = "draft"
+	ProductStatusActive   ProductStatus = "active"
+	ProductStatusInactive ProductStatus = "inactive"
+	ProductStatusArchived ProductStatus = "archived"
+)
+
+func (s ProductStatus) IsValid() bool {
+	switch s {
+	case ProductStatusDraft, ProductStatusActive, ProductStatusInactive, ProductStatusArchived:
+		return true
+	default:
+		return false
+	}
 }
