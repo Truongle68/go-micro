@@ -13,8 +13,8 @@ type IdentityCacher interface {
 }
 
 type BlacklistCacher interface {
-	Blacklist(ctx context.Context, token string, ttl time.Duration) error
-	IsBlacklisted(ctx context.Context, token string) (bool, error)
+	Add(ctx context.Context, jti string, ttl time.Duration) error
+	IsBlacklisted(ctx context.Context, jti string) (bool, error)
 }
 
 type ProfileCacheReader interface {

@@ -35,4 +35,5 @@ var (
 	ErrCurrentEmailNotVerified              = errors.New("current email must be verified first")
 	ErrCurrentPhoneNotVerified              = errors.New("current phone must be verified first")
 	ErrInvalidOperation                     = errors.New("invalid operation or purpose")
+	ErrTokenAlreadyUsed                     = errors.New("token has already been used")
 )

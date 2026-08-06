@@ -109,7 +109,7 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token strin
 		cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, identifier)
 		if err != nil && !errors.Is(err, domain.ErrUserNotFound) {
 			return "", false, "", fmt.Errorf("finding credential by identifier: %w", err)
-		}
+		}	
 
 		if cred != nil {
 			exists = true
@@ -127,6 +127,15 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token strin
 func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthOutput, error) {
 	claims, err := uc.tokens.VerifyVerificationToken(in.Token)
 	if err != nil {
+		return AuthOutput{}, domain.ErrInvalidToken
+	}
+
+	isBlackList, err := uc.cache.IsBlacklisted(ctx, claims.JTI())
+	if err != nil {
+		return AuthOutput{}, fmt.Errorf("checking token blacklist: %w", err)
+	}
+
+	if isBlackList {
 		return AuthOutput{}, domain.ErrInvalidToken
 	}
 
@@ -184,6 +193,10 @@ func (uc *AuthUC) CompleteRegister(ctx context.Context, in RegisterInput) (AuthO
 	refreshToken, err := uc.tokens.GenerateRefreshToken(user.ID)
 	if err != nil {
 		return AuthOutput{}, fmt.Errorf("generating refresh token: %w", err)
+	}
+
+	if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
+		return AuthOutput{}, fmt.Errorf("adding to black list: %w", err)
 	}
 
 	return AuthOutput{
@@ -314,6 +327,15 @@ func (uc *AuthUC) ChangePassword(ctx context.Context, in ChangePasswordInput) er
 		return domain.ErrInvalidToken
 	}
 
+	isBlacklist, err := uc.cache.IsBlacklisted(ctx, claims.JTI())
+	if err != nil {
+		return fmt.Errorf("checking token blacklist: %w", err)
+	}
+
+	if isBlacklist {
+		return domain.ErrInvalidToken
+	}
+
 	if in.UserID != "" && claims.UserID != in.UserID {
 		return domain.ErrInvalidToken
 	}
@@ -336,6 +358,9 @@ func (uc *AuthUC) ChangePassword(ctx context.Context, in ChangePasswordInput) er
 		return fmt.Errorf("updating password: %w", err)
 	}
 
+	if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
+		return fmt.Errorf("adding to blacklist: %w", err)
+	}
 	uc.cache.InvalidateProfile(ctx, claims.UserID)
 
 	return nil
@@ -372,6 +397,15 @@ func (uc *AuthUC) ResetPassword(ctx context.Context, in ResetPasswordInput) erro
 		return domain.ErrInvalidToken
 	}
 
+	isBlacklist, err := uc.cache.IsBlacklisted(ctx, claims.JTI())
+	if err != nil {
+		return fmt.Errorf("checking token blacklist: %w", err)
+	}
+
+	if isBlacklist {
+		return domain.ErrInvalidToken
+	}
+
 	if err := domain.ValidatePassword(in.NewPassword); err != nil {
 		return err
 	}
@@ -386,6 +420,9 @@ func (uc *AuthUC) ResetPassword(ctx context.Context, in ResetPasswordInput) erro
 		return fmt.Errorf("updating password: %w", err)
 	}
 
+	if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
+		return fmt.Errorf("adding to blacklist: %w", err)
+	}
 	uc.cache.InvalidateProfile(ctx, claims.UserID)
 
 	return nil
@@ -395,9 +432,9 @@ func (uc *AuthUC) Logout(ctx context.Context, in LogoutInput) error {
 	// blacklist access token
 	accClaims, err := uc.tokens.VerifyAccessToken(in.AccessToken)
 	if err == nil {
-		accTtl := time.Until(accClaims.ExpiresAt.Time)
+		accTtl := time.Until(accClaims.ExpiresAtTime())
 		if accTtl > 0 {
-			err = uc.cache.Blacklist(ctx, in.AccessToken, accTtl)
+			err = uc.cache.Add(ctx, accClaims.JTI(), accTtl)
 			if err != nil {
 				return fmt.Errorf("blacklisting access token: %w", err)
 			}
@@ -407,9 +444,9 @@ func (uc *AuthUC) Logout(ctx context.Context, in LogoutInput) error {
 	// blacklist refresh token
 	refClaims, err := uc.tokens.VerifyRefreshToken(in.RefreshToken)
 	if err == nil {
-		refTtl := time.Until(refClaims.ExpiresAt.Time)
+		refTtl := time.Until(refClaims.ExpiresAtTime())
 		if refTtl > 0 {
-			err = uc.cache.Blacklist(ctx, in.RefreshToken, refTtl)
+			err = uc.cache.Add(ctx, refClaims.JTI(), refTtl)
 			if err != nil {
 				return fmt.Errorf("blacklisting refresh token: %w", err)
 			}
@@ -460,9 +497,9 @@ func (uc *AuthUC) RefreshToken(ctx context.Context, refreshTokenStr string) (Aut
 		return AuthOutput{}, fmt.Errorf("generating refresh token: %w", err)
 	}
 
-	refTtl := time.Until(claims.ExpiresAt.Time)
+	refTtl := time.Until(claims.ExpiresAtTime())
 	if refTtl > 0 {
-		_ = uc.cache.Blacklist(ctx, refreshTokenStr, refTtl)
+		_ = uc.cache.Add(ctx, claims.JTI(), refTtl)
 	}
 
 	return AuthOutput{

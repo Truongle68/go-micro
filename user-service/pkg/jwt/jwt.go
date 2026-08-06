@@ -9,6 +9,7 @@ import (
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 var (
@@ -39,6 +40,17 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+func (c *Claims) JTI() string {
+	return c.ID
+}
+
+func (c *Claims) ExpiresAtTime() time.Time {
+	if c.ExpiresAt == nil {
+		return time.Time{}
+	}
+	return c.ExpiresAt.Time
+}
+
 type JWT struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
@@ -67,52 +79,101 @@ func New(privateKey, publicKey string, accessTTL, refreshTTL, actionTTL time.Dur
 
 var _ TokenService = (*JWT)(nil)
 
+type generateParams struct {
+	UserID  string
+	Email   string
+	Phone   string
+	Purpose string
+	Role    domain.UserRole
+	Type    TokenType
+	Expiry  time.Duration
+}
+
 func (j *JWT) GenerateAccessToken(userID string, role domain.UserRole) (string, error) {
-	return j.generate(userID, "", "", "", role, AccessToken, j.accessTTL)
+	return j.generate(generateParams{
+		UserID: userID,
+		Role:   role,
+		Type:   AccessToken,
+		Expiry: j.accessTTL,
+	})
 }
 
 func (j *JWT) GenerateRefreshToken(userID string) (string, error) {
-	return j.generate(userID, "", "", "", "", RefreshToken, j.refreshTTL)
+	return j.generate(generateParams{
+		UserID: userID,
+		Type:   RefreshToken,
+		Expiry: j.refreshTTL,
+	})
 }
 
 func (j *JWT) GenerateResetToken(userID string) (string, error) {
-	return j.generate(userID, "", "", "", "", ResetToken, j.actionTTL)
+	return j.generate(generateParams{
+		UserID: userID,
+		Type:   ResetToken,
+		Expiry: j.actionTTL,
+	})
 }
 
 func (j *JWT) GenerateVerificationToken(phone string, purpose domain.VerifyPurpose) (string, error) {
-	return j.generate("", "", phone, string(purpose), "", VerifyOTPToken, j.actionTTL)
+	return j.generate(generateParams{
+		Phone:   phone,
+		Purpose: string(purpose),
+		Type:    VerifyOTPToken,
+		Expiry:  j.actionTTL,
+	})
 }
 
 func (j *JWT) GenerateChangeEmailToken(userID string) (string, error) {
-	return j.generate(userID, "", "", string(domain.VerifyPurposeChangeEmail), "", ChangeEmailToken, j.actionTTL)
+	return j.generate(generateParams{
+		UserID:  userID,
+		Purpose: string(domain.VerifyPurposeChangeEmail),
+		Type:    ChangeEmailToken,
+		Expiry:  j.actionTTL,
+	})
 }
 
 func (j *JWT) GenerateChangePhoneToken(userID string) (string, error) {
-	return j.generate(userID, "", "", string(domain.VerifyPurposeChangePhone), "", ChangePhoneToken, j.actionTTL)
+	return j.generate(generateParams{
+		UserID:  userID,
+		Purpose: string(domain.VerifyPurposeChangePhone),
+		Type:    ChangePhoneToken,
+		Expiry:  j.actionTTL,
+	})
 }
 
 func (j *JWT) GenerateChangePasswordToken(userID string) (string, error) {
-	return j.generate(userID, "", "", "", "", ChangePasswordToken, j.actionTTL)
+	return j.generate(generateParams{
+		UserID: userID,
+		Type:   ChangePasswordToken,
+		Expiry: j.actionTTL,
+	})
 }
 
 func (j *JWT) GenerateEmailLinkToken(userID, email string, purpose domain.EmailLinkPurpose, ttl time.Duration) (string, error) {
 	if ttl == 0 {
 		ttl = j.actionTTL
 	}
-	return j.generate(userID, email, "", string(purpose), "", EmailLinkToken, ttl)
-}
-
-func (j *JWT) generate(userID, email, phone string, purpose string, role domain.UserRole, tokenType TokenType, expiry time.Duration) (string, error) {
-	now := time.Now()
-	claims := &Claims{
+	return j.generate(generateParams{
 		UserID:  userID,
 		Email:   email,
-		Phone:   phone,
-		Role:    string(role),
-		Type:    tokenType,
-		Purpose: purpose,
+		Purpose: string(purpose),
+		Type:    EmailLinkToken,
+		Expiry:  ttl,
+	})
+}
+
+func (j *JWT) generate(params generateParams) (string, error) {
+	now := time.Now()
+	claims := &Claims{
+		UserID:  params.UserID,
+		Email:   params.Email,
+		Phone:   params.Phone,
+		Role:    string(params.Role),
+		Type:    params.Type,
+		Purpose: params.Purpose,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
+			ID:        uuid.NewString(),
+			ExpiresAt: jwt.NewNumericDate(now.Add(params.Expiry)),
 			IssuedAt:  jwt.NewNumericDate(now),
 		},
 	}
@@ -159,7 +220,7 @@ func (j *JWT) VerifyEmailLinkToken(tokenStr string) (*Claims, error) {
 func (j *JWT) verify(tokenStr string, expectedType TokenType) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+		if t.Method != jwt.SigningMethodRS256 {
 			return nil, ErrUnexpectedSigningMethod
 		}
 		return j.publicKey, nil

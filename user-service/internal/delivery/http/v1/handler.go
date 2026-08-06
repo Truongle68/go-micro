@@ -25,6 +25,7 @@ func (r *V1) handleError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrWeakPassword),
 		errors.Is(err, domain.ErrEmailRequired),
 		errors.Is(err, domain.ErrInvalidToken),
+		errors.Is(err, domain.ErrTokenAlreadyUsed),
 		errors.Is(err, domain.ErrInvalidOTP),
 		errors.Is(err, domain.ErrOTPExpired),
 		errors.Is(err, domain.ErrNotMatchPassword),

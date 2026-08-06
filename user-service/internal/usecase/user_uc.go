@@ -262,6 +262,15 @@ func (uc *UserUC) ConfirmEmailLink(ctx context.Context, token string) (*ConfirmE
 		return nil, domain.ErrInvalidToken
 	}
 
+	isBlacklist, err := uc.cache.IsBlacklisted(ctx, claims.JTI())
+	if err != nil {
+		return nil, fmt.Errorf("checking token blacklist: %w", err)
+	}
+
+	if isBlacklist {
+		return nil, domain.ErrTokenAlreadyUsed
+	}
+
 	purpose := domain.EmailLinkPurpose(claims.Purpose)
 
 	switch purpose {
@@ -269,6 +278,11 @@ func (uc *UserUC) ConfirmEmailLink(ctx context.Context, token string) (*ConfirmE
 		if err := uc.attachVerifiedEmail(ctx, claims.UserID, claims.Email); err != nil {
 			return nil, err
 		}
+
+		if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
+			return nil, fmt.Errorf("adding to blacklist: %w", err)
+		}
+
 		return &ConfirmEmailLinkOutput{
 			Purpose: purpose,
 		}, nil
@@ -278,6 +292,11 @@ func (uc *UserUC) ConfirmEmailLink(ctx context.Context, token string) (*ConfirmE
 		if err != nil {
 			return nil, fmt.Errorf("generating change email token: %w", err)
 		}
+
+		if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
+			return nil, fmt.Errorf("adding to blacklist: %w", err)
+		}
+
 		return &ConfirmEmailLinkOutput{
 			Purpose:          purpose,
 			ChangeEmailToken: changeToken,
@@ -302,6 +321,15 @@ func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error 
 		claims, err := uc.tokens.VerifyChangeEmailToken(in.ChangeToken)
 		if err != nil || claims.UserID != in.ActorUserID {
 			return domain.ErrCurrentEmailNotVerified
+		}
+
+		isBlacklist, err := uc.cache.IsBlacklisted(ctx, claims.JTI())
+		if err != nil {
+			return fmt.Errorf("checking token blacklist: %w", err)
+		}
+
+		if isBlacklist {
+			return domain.ErrInvalidToken
 		}
 
 		if in.Identifier == "" {
@@ -337,6 +365,10 @@ func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error 
 				TTL:  p.OTPTTL,
 			},
 		})
+
+		if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
+			return fmt.Errorf("adding to blacklist: %w", err)
+		}
 		return nil
 	case domain.VerifyPurposeChangePhone:
 		if in.ChangeToken == "" {
@@ -346,6 +378,15 @@ func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error 
 		claims, err := uc.tokens.VerifyChangePhoneToken(in.ChangeToken)
 		if err != nil || claims.UserID != in.ActorUserID {
 			return domain.ErrCurrentPhoneNotVerified
+		}
+
+		isBlacklist, err := uc.cache.IsBlacklisted(ctx, claims.JTI())
+		if err != nil {
+			return fmt.Errorf("checking token blacklist: %w", err)
+		}
+
+		if isBlacklist {
+			return domain.ErrInvalidToken
 		}
 
 		if in.Identifier == "" {
@@ -370,6 +411,9 @@ func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error 
 		}
 
 		uc.logger.Info(" [OTP DEBUG] Generated Change Phone OTP for User %s (%s): %s", in.ActorUserID, in.Identifier, code)
+		if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
+			return fmt.Errorf("adding to blacklist: %w", err)
+		}
 		return nil
 	case domain.VerifyPurposeVerifyPhone:
 		creds, err := uc.repo.FindCredentialByTypeAndUserID(ctx, domain.CredentialTypePhone, in.ActorUserID)
