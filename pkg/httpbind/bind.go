@@ -1,7 +1,8 @@
 package httpbind
 
 import (
-	"net/http"
+	"fmt"
+	"strings"
 
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/response"
@@ -13,13 +14,27 @@ func BindAndValidate[T any](c *gin.Context, v *validator.Validate, l logger.Inte
 	var req T
 	if err := c.ShouldBindJSON(&req); err != nil {
 		l.Warn("restapi - v1 - %s - ShouldBindJSON: %v", handlerName, err)
-		response.Error(c, http.StatusBadRequest, "invalid request body")
+		response.InvalidRequestBody(c)
 		return req, false
 	}
 	if err := v.Struct(req); err != nil {
 		l.Warn("restapi - v1 - %s - validate: %v", handlerName, err)
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.ValidationError(c, formatValidationError(err))
 		return req, false
 	}
 	return req, true
+}
+
+func formatValidationError(err error) string {
+	var errMsgs []string
+
+	if ve, ok := err.(validator.ValidationErrors); ok {
+		for _, fe := range ve {
+			errMsgs = append(errMsgs,
+				fmt.Sprintf("%s is %s", fe.Field(), fe.Tag()))
+		}
+		return strings.Join(errMsgs, ", ")
+	}
+
+	return err.Error()
 }
