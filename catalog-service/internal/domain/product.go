@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"time"
 )
 
@@ -213,8 +212,6 @@ func (p SearchProductParams) Validate() error {
 	}
 	return nil
 }
-
-var ErrInvalidPriceRange = errors.New("min_price cannot be greater than max_price")
 
 type ProductListResult struct {
 	Products   []Product

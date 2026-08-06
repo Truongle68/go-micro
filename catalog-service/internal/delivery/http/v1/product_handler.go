@@ -101,7 +101,7 @@ func (r *V1) listProducts(c *gin.Context) {
 func (r *V1) searchProducts(c *gin.Context) {
 	var query domain.SearchProductsQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid query parameters")
+		response.InvalidQueryParams(c)
 		return
 	}
 	p := pagination.FromQuery(c)
