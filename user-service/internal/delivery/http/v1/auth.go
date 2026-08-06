@@ -59,7 +59,7 @@ func (r *V1) completeRegister(c *gin.Context) {
 	}
 
 	if !domain.IsConfirmMatch(request.Password, request.ConfirmedPassword) {
-		response.Error(c, http.StatusBadRequest, domain.ErrNotMatchPassword.Error())
+		response.Error(c, http.StatusBadRequest, string(domain.CodeNotMatchPassword), domain.ErrNotMatchPassword.Error())
 		return
 	}
 
@@ -77,7 +77,7 @@ func (r *V1) checkAvailableUsername(c *gin.Context) {
 	username := c.Query("username")
 	trimU := strings.TrimSpace(username)
 	if len(trimU) < 3 {
-		response.Error(c, http.StatusBadRequest, "username must have at least 3 characters")
+		response.Error(c, http.StatusBadRequest, "INVALID_USERNAME_LENGTH", "username must have at least 3 characters")
 		return
 	}
 
@@ -122,7 +122,7 @@ func (r *V1) logout(c *gin.Context) {
 
 	accessToken, ok := r.getToken(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -153,7 +153,7 @@ func (r *V1) forgotPassword(c *gin.Context) {
 func (r *V1) verifyPassword(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 	request, ok := httpbind.BindAndValidate[req.VerifyPassword](c, r.v, r.l, "verifyPassword")
@@ -173,7 +173,7 @@ func (r *V1) verifyPassword(c *gin.Context) {
 func (r *V1) changePassword(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 	request, ok := httpbind.BindAndValidate[req.ChangePassword](c, r.v, r.l, "changePassword")
@@ -182,7 +182,7 @@ func (r *V1) changePassword(c *gin.Context) {
 	}
 
 	if !domain.IsConfirmMatch(request.NewPassword, request.ConfirmedPassword) {
-		response.Error(c, http.StatusBadRequest, domain.ErrNotMatchPassword.Error())
+		response.Error(c, http.StatusBadRequest, string(domain.CodeNotMatchPassword), domain.ErrNotMatchPassword.Error())
 		return
 	}
 
@@ -202,7 +202,7 @@ func (r *V1) resetPassword(c *gin.Context) {
 	}
 
 	if !domain.IsConfirmMatch(request.NewPassword, request.ConfirmedPassword) {
-		response.Error(c, http.StatusBadRequest, domain.ErrNotMatchPassword.Error())
+		response.Error(c, http.StatusBadRequest, string(domain.CodeNotMatchPassword), domain.ErrNotMatchPassword.Error())
 		return
 	}
 

@@ -22,14 +22,14 @@ func Auth(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(authorizationHeader)
 		if authHeader == "" {
-			response.Error(c, http.StatusUnauthorized, "empty auth header")
+			response.Unauthorized(c, "empty auth header")
 			c.Abort()
 			return
 		}
 
 		headerParts := strings.Split(authHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			response.Error(c, http.StatusUnauthorized, "invalid auth header format")
+			response.Error(c, http.StatusUnauthorized, response.CodeInvalidAuthHeader, "invalid auth header format")
 			c.Abort()
 			return
 		}
@@ -39,20 +39,20 @@ func Auth(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc
 		// check if token is blacklisted in Redis
 		inBlacklist, err := bl.IsBlacklisted(c, tokenStr)
 		if err != nil {
-			response.Error(c, http.StatusUnauthorized, err.Error())
+			response.Unauthorized(c, err.Error())
 			c.Abort()
 			return
 		}
 
 		if inBlacklist {
-			response.Error(c, http.StatusUnauthorized, "token has been logged out")
+			response.Error(c, http.StatusUnauthorized, response.CodeTokenLoggedOut, "token has been logged out")
 			c.Abort()
 			return
 		}
 
 		claims, err := jwtService.VerifyAccessToken(tokenStr)
 		if err != nil {
-			response.Error(c, http.StatusUnauthorized, err.Error())
+			response.Error(c, http.StatusUnauthorized, response.CodeInvalidToken, err.Error())
 			c.Abort()
 			return
 		}

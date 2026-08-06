@@ -11,46 +11,32 @@ import (
 )
 
 func (r *V1) handleError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, domain.ErrEmailAlreadyExists),
-		errors.Is(err, domain.ErrPhoneAlreadyExists),
-		errors.Is(err, domain.ErrUsernameExists):
-		response.Error(c, http.StatusConflict, err.Error())
-	case errors.Is(err, domain.ErrInvalidCredentials):
-		response.Error(c, http.StatusUnauthorized, err.Error())
-	case errors.Is(err, domain.ErrUserBanned),
-		errors.Is(err, domain.ErrUnauthorizedUser),
-		errors.Is(err, domain.ErrUserInactive):
-		response.Error(c, http.StatusForbidden, err.Error())
-	case errors.Is(err, domain.ErrWeakPassword),
-		errors.Is(err, domain.ErrEmailRequired),
-		errors.Is(err, domain.ErrInvalidToken),
-		errors.Is(err, domain.ErrTokenAlreadyUsed),
-		errors.Is(err, domain.ErrInvalidOTP),
-		errors.Is(err, domain.ErrOTPExpired),
-		errors.Is(err, domain.ErrNotMatchPassword),
-		errors.Is(err, domain.ErrEmptyUsername),
-		errors.Is(err, domain.ErrEmptyEmail),
-		errors.Is(err, domain.ErrEmptyPhone),
-		errors.Is(err, domain.ErrEmptyAddressLine),
-		errors.Is(err, domain.ErrEmptyUserID),
-		errors.Is(err, domain.ErrEmptyCity),
-		errors.Is(err, domain.ErrSameEmail),
-		errors.Is(err, domain.ErrSamePhone),
-		errors.Is(err, domain.ErrEmailNotSet),
-		errors.Is(err, domain.ErrInvalidFullName),
-		errors.Is(err, domain.ErrInvalidGender),
-		errors.Is(err, domain.ErrInvalidDob),
-		errors.Is(err, domain.ErrVerifiedEmailCannotBeUpdatedDirectly),
-		errors.Is(err, domain.ErrNoFieldsToUpdate):
-		response.Error(c, http.StatusBadRequest, err.Error())
-	case errors.Is(err, domain.ErrUserNotFound),
-		errors.Is(err, domain.ErrAddressNotFound):
-		response.Error(c, http.StatusNotFound, err.Error())
-	default:
-		r.l.Error("auth handler unexpected error: %v", err)
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+	appErr := domain.ToAppError(err)
+	if appErr != nil {
+		var status int
+		switch {
+		case errors.Is(err, domain.ErrEmailAlreadyExists),
+			errors.Is(err, domain.ErrPhoneAlreadyExists),
+			errors.Is(err, domain.ErrUsernameExists):
+			status = http.StatusConflict
+		case errors.Is(err, domain.ErrInvalidCredentials):
+			status = http.StatusUnauthorized
+		case errors.Is(err, domain.ErrUserBanned),
+			errors.Is(err, domain.ErrUnauthorizedUser),
+			errors.Is(err, domain.ErrUserInactive):
+			status = http.StatusForbidden
+		case errors.Is(err, domain.ErrUserNotFound),
+			errors.Is(err, domain.ErrAddressNotFound):
+			status = http.StatusNotFound
+		default:
+			status = http.StatusBadRequest
+		}
+		response.Error(c, status, string(appErr.Code), appErr.Message)
+		return
 	}
+
+	r.l.Error("auth handler unexpected error: %v", err)
+	response.InternalServerError(c)
 }
 
 func (r *V1) getUserId(c *gin.Context) (string, bool) {

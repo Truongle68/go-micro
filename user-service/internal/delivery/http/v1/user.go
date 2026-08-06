@@ -14,7 +14,7 @@ import (
 func (r *V1) getProfile(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -30,7 +30,7 @@ func (r *V1) getProfile(c *gin.Context) {
 func (r *V1) updateProfile(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -51,7 +51,7 @@ func (r *V1) updateProfile(c *gin.Context) {
 func (r *V1) requestEmailLink(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -72,7 +72,7 @@ func (r *V1) requestEmailLink(c *gin.Context) {
 func (r *V1) confirmEmailLink(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
-		response.Error(c, http.StatusBadRequest, "token is required")
+		response.Error(c, http.StatusBadRequest, response.CodeMissingToken, "token is required")
 		return
 	}
 
@@ -95,7 +95,7 @@ func (r *V1) confirmEmailLink(c *gin.Context) {
 func (r *V1) changeEmail(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -116,7 +116,7 @@ func (r *V1) changeEmail(c *gin.Context) {
 func (r *V1) changeEmailVerify(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -136,7 +136,7 @@ func (r *V1) changeEmailVerify(c *gin.Context) {
 func (r *V1) requestPhoneVerification(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (r *V1) requestPhoneVerification(c *gin.Context) {
 func (r *V1) verifyPhone(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -175,7 +175,7 @@ func (r *V1) verifyPhone(c *gin.Context) {
 func (r *V1) changePhone(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -196,7 +196,7 @@ func (r *V1) changePhone(c *gin.Context) {
 func (r *V1) changePhoneVerify(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -217,7 +217,7 @@ func (r *V1) changePhoneVerify(c *gin.Context) {
 func (r *V1) getAddressList(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -233,7 +233,7 @@ func (r *V1) getAddressList(c *gin.Context) {
 func (r *V1) addAddress(c *gin.Context) {
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -255,7 +255,7 @@ func (r *V1) setDefaultAddress(c *gin.Context) {
 	id := c.Param("id")
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -272,7 +272,7 @@ func (r *V1) updateAddress(c *gin.Context) {
 	id := c.Param("id")
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
@@ -294,7 +294,7 @@ func (r *V1) deleteAddress(c *gin.Context) {
 	id := c.Param("id")
 	userID, ok := r.getUserId(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		response.Unauthorized(c)
 		return
 	}
 
