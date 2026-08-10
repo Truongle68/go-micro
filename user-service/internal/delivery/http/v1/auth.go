@@ -6,6 +6,8 @@ import (
 	"user-service/internal/delivery/http/v1/req"
 	"user-service/internal/delivery/http/v1/res"
 	"user-service/internal/domain"
+	"user-service/internal/usecase"
+	"user-service/pkg/jwt"
 
 	"github.com/TruongLe68/go-micro/pkg/httpbind"
 	"github.com/TruongLe68/go-micro/pkg/response"
@@ -70,6 +72,7 @@ func (r *V1) completeRegister(c *gin.Context) {
 		return
 	}
 
+	setAuthCookies(c, out.AccessToken, out.RefreshToken)
 	response.Success(c, http.StatusOK, "register success", res.ToAuthResponse(out))
 }
 
@@ -111,27 +114,32 @@ func (r *V1) executeLoginFlow(c *gin.Context, contextTag string, requiredRoles [
 		return
 	}
 
+	setAuthCookies(c, out.AccessToken, out.RefreshToken)
 	response.Success(c, http.StatusOK, "login success", res.ToAuthResponse(out))
 }
 
 func (r *V1) logout(c *gin.Context) {
-	request, ok := httpbind.BindAndValidate[req.Logout](c, r.v, r.l, "logout")
-	if !ok {
+	cookieAccessToken, err := c.Cookie("access_token")
+	if err != nil || cookieAccessToken == "" {
+		response.Unauthorized(c, "missing access token cookie")
+		return
+	}
+	cookieRefreshToken, err := c.Cookie("refresh_token")
+	if err != nil || cookieRefreshToken == "" {
+		response.Unauthorized(c, "missing refresh token cookie")
 		return
 	}
 
-	accessToken, ok := r.getToken(c)
-	if !ok {
-		response.Unauthorized(c)
-		return
-	}
-
-	err := r.a.Logout(c.Request.Context(), request.ToInput(accessToken))
+	err = r.a.Logout(c.Request.Context(), usecase.LogoutInput{
+		AccessToken:  cookieAccessToken,
+		RefreshToken: cookieRefreshToken,
+	})
 	if err != nil {
 		r.handleError(c, err)
 		return
 	}
 
+	clearAuthCookies(c)
 	response.Success(c, http.StatusOK, "logout success", nil)
 }
 
@@ -216,17 +224,29 @@ func (r *V1) resetPassword(c *gin.Context) {
 }
 
 func (r *V1) refreshToken(c *gin.Context) {
-	request, ok := httpbind.BindAndValidate[req.RefreshToken](c, r.v, r.l, "refreshToken")
-	if !ok {
+	cookieRefreshToken, err := c.Cookie("refresh_token")
+	if err != nil || cookieRefreshToken == "" {
+		response.Unauthorized(c, "missing refresh token cookie")
 		return
 	}
 
-	authOut, err := r.a.RefreshToken(c.Request.Context(), request.RefreshToken)
+	authOut, err := r.a.RefreshToken(c.Request.Context(), cookieRefreshToken)
 	if err != nil {
 		r.l.Error(err, "restapi - v1 - refreshToken - usecase failed")
 		r.handleError(c, err)
 		return
 	}
 
+	setAuthCookies(c, authOut.AccessToken, authOut.RefreshToken)
 	response.Success(c, http.StatusOK, "token refreshed successfully", res.ToAuthResponse(authOut))
+}
+
+func setAuthCookies(c *gin.Context, accessToken, refreshToken jwt.GeneratedTokenOutput) {
+	c.SetCookie("access_token", accessToken.Token, int(accessToken.Exp.Seconds()), "/", "", false, true)
+	c.SetCookie("refresh_token", refreshToken.Token, int(refreshToken.Exp.Seconds()), "/", "", false, true)
+}
+
+func clearAuthCookies(c *gin.Context) {
+	c.SetCookie("access_token", "", -1, "/", "", false, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", false, true)
 }

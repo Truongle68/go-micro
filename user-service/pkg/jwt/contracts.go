@@ -5,9 +5,14 @@ import (
 	"user-service/internal/domain"
 )
 
+type GeneratedTokenOutput struct {
+	Token string
+	Exp   time.Duration
+}
+
 type TokenService interface {
-	GenerateAccessToken(userID string, role domain.UserRole) (string, error)
-	GenerateRefreshToken(userID string) (string, error)
+	GenerateAccessToken(userID string, role domain.UserRole) (GeneratedTokenOutput, error)
+	GenerateRefreshToken(userID string) (GeneratedTokenOutput, error)
 	GenerateResetToken(userID string) (string, error)
 	GenerateVerificationToken(phone string, purpose domain.VerifyPurpose) (string, error)
 	GenerateChangeEmailToken(userID string) (string, error)

@@ -89,21 +89,29 @@ type generateParams struct {
 	Expiry  time.Duration
 }
 
-func (j *JWT) GenerateAccessToken(userID string, role domain.UserRole) (string, error) {
-	return j.generate(generateParams{
+func (j *JWT) GenerateAccessToken(userID string, role domain.UserRole) (GeneratedTokenOutput, error) {
+	tok, err := j.generate(generateParams{
 		UserID: userID,
 		Role:   role,
 		Type:   AccessToken,
 		Expiry: j.accessTTL,
 	})
+	if err != nil {
+		return GeneratedTokenOutput{}, err
+	}
+	return GeneratedTokenOutput{Token: tok, Exp: j.accessTTL}, nil
 }
 
-func (j *JWT) GenerateRefreshToken(userID string) (string, error) {
-	return j.generate(generateParams{
+func (j *JWT) GenerateRefreshToken(userID string) (GeneratedTokenOutput, error) {
+	tok, err := j.generate(generateParams{
 		UserID: userID,
 		Type:   RefreshToken,
 		Expiry: j.refreshTTL,
 	})
+	if err != nil {
+		return GeneratedTokenOutput{}, err
+	}
+	return GeneratedTokenOutput{Token: tok, Exp: j.refreshTTL}, nil
 }
 
 func (j *JWT) GenerateResetToken(userID string) (string, error) {

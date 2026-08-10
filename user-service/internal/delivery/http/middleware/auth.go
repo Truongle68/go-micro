@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 	"user-service/pkg/jwt"
 	"user-service/pkg/redis"
 
@@ -12,32 +11,31 @@ import (
 )
 
 const (
-	authorizationHeader = "Authorization"
-	userCtx             = "userId"
-	userRoleCtx         = "userRole"
-	tokenCtx            = "token"
+	authorizationHeader    = "Authorization"
+	userCtx                = "userId"
+	userRoleCtx            = "userRole"
+	tokenCtx               = "token"
+	AccessTokenCookieName  = "access_token"
+	RefreshTokenCookieName = "refresh_token"
 )
 
 func Auth(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader(authorizationHeader)
-		if authHeader == "" {
-			response.Unauthorized(c, "empty auth header")
+		cookieToken, err := c.Cookie(AccessTokenCookieName)
+		if err != nil || cookieToken == "" {
+			response.Unauthorized(c, "missing access token cookie")
 			c.Abort()
 			return
 		}
 
-		headerParts := strings.Split(authHeader, " ")
-		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			response.Error(c, http.StatusUnauthorized, response.CodeInvalidAuthHeader, "invalid auth header format")
+		claims, err := jwtService.VerifyAccessToken(cookieToken)
+		if err != nil {
+			response.Error(c, http.StatusUnauthorized, response.CodeInvalidToken, err.Error())
 			c.Abort()
 			return
 		}
-
-		tokenStr := headerParts[1]
-
 		// check if token is blacklisted in Redis
-		inBlacklist, err := bl.IsBlacklisted(c, tokenStr)
+		inBlacklist, err := bl.IsBlacklisted(c, claims.JTI())
 		if err != nil {
 			response.Unauthorized(c, err.Error())
 			c.Abort()
@@ -50,16 +48,9 @@ func Auth(jwtService jwt.TokenService, bl redis.BlacklistCacher) gin.HandlerFunc
 			return
 		}
 
-		claims, err := jwtService.VerifyAccessToken(tokenStr)
-		if err != nil {
-			response.Error(c, http.StatusUnauthorized, response.CodeInvalidToken, err.Error())
-			c.Abort()
-			return
-		}
-
 		c.Set(userCtx, claims.UserID)
 		c.Set(userRoleCtx, claims.Role)
-		c.Set(tokenCtx, tokenStr)
+		c.Set(tokenCtx, cookieToken)
 		c.Next()
 	}
 }
@@ -90,4 +81,3 @@ func GetToken(c *gin.Context) (string, bool) {
 	tokStr, ok := tok.(string)
 	return tokStr, ok
 }
-

@@ -53,21 +53,6 @@ func (req *ResetPassword) ToInput() usecase.ResetPasswordInput {
 	}
 }
 
-type Logout struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
-}
-
-func (req *Logout) ToInput(accessToken string) usecase.LogoutInput {
-	return usecase.LogoutInput{
-		AccessToken:  accessToken,
-		RefreshToken: req.RefreshToken,
-	}
-}
-
-type RefreshToken struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
-}
-
 type RequestOTP struct {
 	Identifier string `json:"identifier"`
 	Phone      string `json:"phone"`

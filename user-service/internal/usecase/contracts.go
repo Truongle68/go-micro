@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 	"user-service/internal/domain"
+	"user-service/pkg/jwt"
 )
 
 type UserProfileDTO struct {
@@ -129,8 +130,8 @@ type RegisterInput struct {
 }
 
 type AuthOutput struct {
-	AccessToken  string
-	RefreshToken string
+	AccessToken  jwt.GeneratedTokenOutput
+	RefreshToken jwt.GeneratedTokenOutput
 	UserID       string
 }
 

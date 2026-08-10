@@ -1,18 +1,21 @@
 package res
 
-import "user-service/internal/usecase"
+import (
+	"time"
+	"user-service/internal/usecase"
+)
 
 type AuthResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	UserID       string `json:"user_id"`
+	UserID     string        `json:"user_id"`
+	AccessExp  time.Duration `json:"access_exp"`
+	RefreshExp time.Duration `json:"refresh_exp"`
 }
 
 func ToAuthResponse(res usecase.AuthOutput) AuthResponse {
 	return AuthResponse{
-		AccessToken:  res.AccessToken,
-		RefreshToken: res.RefreshToken,
-		UserID:       res.UserID,
+		UserID:     res.UserID,
+		AccessExp:  res.AccessToken.Exp,
+		RefreshExp: res.RefreshToken.Exp,
 	}
 }
 
