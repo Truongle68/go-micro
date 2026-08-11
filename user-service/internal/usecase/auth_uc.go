@@ -109,7 +109,7 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token strin
 		cred, err := uc.userRepo.FindCredentialByIdentifier(ctx, identifier)
 		if err != nil && !errors.Is(err, domain.ErrUserNotFound) {
 			return "", false, "", fmt.Errorf("finding credential by identifier: %w", err)
-		}	
+		}
 
 		if cred != nil {
 			exists = true
@@ -282,31 +282,8 @@ func (uc *AuthUC) Login(ctx context.Context, in LoginInput) (AuthOutput, error) 
 }
 
 func (uc *AuthUC) VerifyPassword(ctx context.Context, in VerifyPasswordInput) (string, error) {
-	if in.UserID == "" {
-		return "", domain.ErrEmptyUserID
-	}
-	if in.Password == "" {
-		return "", domain.ErrInvalidCredentials
-	}
-
-	creds, err := uc.userRepo.FindCredentialsByUserID(ctx, in.UserID)
-	if err != nil {
-		return "", domain.ErrUserNotFound
-	}
-
-	var cred *domain.UserCredential
-	for _, c := range creds {
-		if c.IsPrimary {
-			cred = &c
-			break
-		}
-	}
-	if cred == nil {
-		return "", domain.ErrUserNotFound
-	}
-
-	if !cred.CheckPassword(in.Password) {
-		return "", domain.ErrInvalidCredentials
+	if err := uc.verifyCurrentPassword(ctx, in.UserID, in.Password); err != nil {
+		return "", err
 	}
 
 	changePasswordToken, err := uc.tokens.GenerateChangePasswordToken(in.UserID)
@@ -317,29 +294,37 @@ func (uc *AuthUC) VerifyPassword(ctx context.Context, in VerifyPasswordInput) (s
 	return changePasswordToken, nil
 }
 
+func (uc *AuthUC) verifyCurrentPassword(ctx context.Context, userID, password string) error {
+	if userID == "" {
+		return domain.ErrEmptyUserID
+	}
+	if password == "" {
+		return domain.ErrInvalidCredentials
+	}
+
+	creds, err := uc.userRepo.FindCredentialsByUserID(ctx, userID)
+	if err != nil {
+		return domain.ErrUserNotFound
+	}
+
+	var cred *domain.UserCredential
+	for _, c := range creds {
+		if c.IsPrimary {
+			cred = &c
+			break
+		}
+	}
+	if cred == nil {
+		return domain.ErrUserNotFound
+	}
+
+	if !cred.CheckPassword(password) {
+		return domain.ErrIncorrectPassword
+	}
+	return nil
+}
+
 func (uc *AuthUC) ChangePassword(ctx context.Context, in ChangePasswordInput) error {
-	if in.Token == "" {
-		return domain.ErrInvalidToken
-	}
-
-	claims, err := uc.tokens.VerifyChangePasswordToken(in.Token)
-	if err != nil {
-		return domain.ErrInvalidToken
-	}
-
-	isBlacklist, err := uc.cache.IsBlacklisted(ctx, claims.JTI())
-	if err != nil {
-		return fmt.Errorf("checking token blacklist: %w", err)
-	}
-
-	if isBlacklist {
-		return domain.ErrInvalidToken
-	}
-
-	if in.UserID != "" && claims.UserID != in.UserID {
-		return domain.ErrInvalidToken
-	}
-
 	if !domain.IsConfirmMatch(in.NewPassword, in.ConfirmedPassword) {
 		return domain.ErrNotMatchPassword
 	}
@@ -347,22 +332,26 @@ func (uc *AuthUC) ChangePassword(ctx context.Context, in ChangePasswordInput) er
 	if err := domain.ValidatePassword(in.NewPassword); err != nil {
 		return err
 	}
-
+	
 	hash, err := domain.HashPassword(in.NewPassword)
 	if err != nil {
 		return fmt.Errorf("hashing password: %w", err)
 	}
 
-	err = uc.userRepo.UpdatePassword(ctx, claims.UserID, hash)
+	if err := uc.verifyCurrentPassword(ctx, in.UserID, in.CurrentPassword); err != nil {
+		return err
+	}
+
+	if in.NewPassword == in.CurrentPassword {
+		return domain.ErrMatchCurrentPassword
+	}
+	
+	err = uc.userRepo.UpdatePassword(ctx, in.UserID, hash)
 	if err != nil {
 		return fmt.Errorf("updating password: %w", err)
 	}
 
-	if err := uc.cache.Add(ctx, claims.JTI(), time.Until(claims.ExpiresAtTime())); err != nil {
-		return fmt.Errorf("adding to blacklist: %w", err)
-	}
-	uc.cache.InvalidateProfile(ctx, claims.UserID)
-
+	uc.cache.InvalidateProfile(ctx, in.UserID)
 	return nil
 }
 

@@ -17,20 +17,15 @@ func (req *VerifyPassword) ToInput(userID string) usecase.VerifyPasswordInput {
 }
 
 type ChangePassword struct {
-	Token               string `json:"token,omitempty"`
-	ChangePasswordToken string `json:"change_password_token,omitempty"`
-	NewPassword         string `json:"new_password" validate:"required,min=8"`
-	ConfirmedPassword   string `json:"confirmed_password" validate:"required"`
+	CurrentPassword   string `json:"current_password" validate:"required"`
+	NewPassword       string `json:"new_password" validate:"required,min=8"`
+	ConfirmedPassword string `json:"confirmed_password" validate:"required"`
 }
 
 func (req *ChangePassword) ToInput(userID string) usecase.ChangePasswordInput {
-	token := req.ChangePasswordToken
-	if token == "" {
-		token = req.Token
-	}
 	return usecase.ChangePasswordInput{
 		UserID:            userID,
-		Token:             token,
+		CurrentPassword:   req.CurrentPassword,
 		NewPassword:       req.NewPassword,
 		ConfirmedPassword: req.ConfirmedPassword,
 	}

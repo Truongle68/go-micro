@@ -196,7 +196,7 @@ type VerifyPasswordInput struct {
 
 type ChangePasswordInput struct {
 	UserID            string
-	Token             string
+	CurrentPassword   string
 	NewPassword       string
 	ConfirmedPassword string
 }

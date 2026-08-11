@@ -189,11 +189,6 @@ func (r *V1) changePassword(c *gin.Context) {
 		return
 	}
 
-	if !domain.IsConfirmMatch(request.NewPassword, request.ConfirmedPassword) {
-		response.Error(c, http.StatusBadRequest, string(domain.CodeNotMatchPassword), domain.ErrNotMatchPassword.Error())
-		return
-	}
-
 	err := r.a.ChangePassword(c.Request.Context(), request.ToInput(userID))
 	if err != nil {
 		r.handleError(c, err)

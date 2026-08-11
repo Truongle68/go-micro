@@ -7,7 +7,9 @@ type ErrorCode string
 const (
 	CodeEmailRequired                        ErrorCode = "EMAIL_REQUIRED"
 	CodeWeakPassword                         ErrorCode = "WEAK_PASSWORD"
+	CodeIncorrectPassword                    ErrorCode = "INCORRECT_PASSWORD"
 	CodeNotMatchPassword                     ErrorCode = "NOT_MATCH_PASSWORD"
+	CodeMatchCurrentPassword                 ErrorCode = "MATCH_CURRENT_PASSWORD"
 	CodeEmailAlreadyExists                   ErrorCode = "EMAIL_ALREADY_EXISTS"
 	CodeUserNotFound                         ErrorCode = "USER_NOT_FOUND"
 	CodeInvalidCredentials                   ErrorCode = "INVALID_CREDENTIALS"
@@ -57,9 +59,11 @@ var (
 	ErrEmailRequired                        = errors.New("email is required")
 	ErrWeakPassword                         = errors.New("password must be at least 8 characters")
 	ErrNotMatchPassword                     = errors.New("confirmed password is not match")
+	ErrMatchCurrentPassword                 = errors.New("new password can not coincide with current one")
 	ErrEmailAlreadyExists                   = errors.New("email already registered")
 	ErrUserNotFound                         = errors.New("user not found")
 	ErrInvalidCredentials                   = errors.New("invalid credentials")
+	ErrIncorrectPassword                    = errors.New("incorrect password")
 	ErrUserBanned                           = errors.New("user account is banned")
 	ErrUserInactive                         = errors.New("user account is inactive")
 	ErrInvalidToken                         = errors.New("invalid or expired token")
@@ -92,7 +96,9 @@ var (
 var sentinelToCodeMap = map[error]ErrorCode{
 	ErrEmailRequired:                        CodeEmailRequired,
 	ErrWeakPassword:                         CodeWeakPassword,
+	ErrIncorrectPassword:                    CodeIncorrectPassword,
 	ErrNotMatchPassword:                     CodeNotMatchPassword,
+	ErrMatchCurrentPassword:                 CodeMatchCurrentPassword,
 	ErrEmailAlreadyExists:                   CodeEmailAlreadyExists,
 	ErrUserNotFound:                         CodeUserNotFound,
 	ErrInvalidCredentials:                   CodeInvalidCredentials,
