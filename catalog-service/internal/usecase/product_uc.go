@@ -78,6 +78,7 @@ type CreateProductInput struct {
 	Variants        []CreateVariantInput
 	Specifications  []SpecGroupInput
 	Shipping        ShippingInput
+	Status          string
 }
 
 type UpdateProductInput struct {
@@ -138,6 +139,11 @@ func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain
 
 	safeHTML := uc.sanitizer.Sanitize(in.DescriptionHTML)
 
+	status := domain.ProductStatus(in.Status)
+	if !status.IsValid() {
+		return nil, domain.ErrInvalidProductStatus
+	}
+
 	now := time.Now()
 	product := &domain.Product{
 		Slug:            generateUniqueSlug(in.Name),
@@ -160,7 +166,7 @@ func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain
 			Fragile:        in.Shipping.Fragile,
 			ShippingClass:  in.Shipping.ShippingClass,
 		},
-		Status:    domain.ProductStatusDraft,
+		Status:    status,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -202,7 +208,7 @@ func validateVariantOptions(variants []CreateVariantInput, optionTypes []OptionT
 			return fmt.Errorf("%w: product has no option types, but variant %s contains attributes", domain.ErrInvalidVariantAttribute, variants[0].SKU)
 		}
 		return nil
-	} 
+	}
 
 	expectedVariantCount := 1
 	for _, ot := range optionTypes {

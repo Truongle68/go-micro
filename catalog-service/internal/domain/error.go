@@ -15,7 +15,7 @@ const (
 	CodeInvalidPriceRange          ErrorCode = "INVALID_PRICE_RANGE"
 	CodeInvalidCategoryID          ErrorCode = "INVALID_CATEGORY_ID"
 	CodeInvalidProductID           ErrorCode = "INVALID_PRODUCT_ID"
-	CodeInvalidStatus              ErrorCode = "INVALID_STATUS"
+	CodeInvalidProductStatus       ErrorCode = "INVALID_PRODUCT_STATUS"
 	CodeNoFieldsToUpdate           ErrorCode = "NO_FIELDS_TO_UPDATE"
 	CodeDuplicateField             ErrorCode = "DUPLICATE_FIELD"
 	CodeDuplicateSKU               ErrorCode = "DUPLICATE_SKU"
@@ -55,7 +55,7 @@ var (
 	ErrInvalidPriceRange          = errors.New("min_price cannot be greater than max_price")
 	ErrInvalidCategoryID          = errors.New("invalid category id")
 	ErrInvalidProductID           = errors.New("invalid product id")
-	ErrInvalidStatus              = errors.New("invalid product status")
+	ErrInvalidProductStatus       = errors.New("invalid product status")
 	ErrNoFieldsToUpdate           = errors.New("no fields provided to update")
 	ErrDuplicateField             = errors.New("field duplicated")
 	ErrDuplicateSKU               = errors.New("duplicated SKU")
@@ -82,7 +82,7 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrInvalidPriceRange:          CodeInvalidPriceRange,
 	ErrInvalidCategoryID:          CodeInvalidCategoryID,
 	ErrInvalidProductID:           CodeInvalidProductID,
-	ErrInvalidStatus:              CodeInvalidStatus,
+	ErrInvalidProductStatus:       CodeInvalidProductStatus,
 	ErrNoFieldsToUpdate:           CodeNoFieldsToUpdate,
 	ErrDuplicateField:             CodeDuplicateField,
 	ErrDuplicateSKU:               CodeDuplicateSKU,

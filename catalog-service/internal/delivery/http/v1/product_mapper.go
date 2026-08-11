@@ -54,6 +54,7 @@ func toCreateProductInput(req req.CreateProduct) usecase.CreateProductInput {
 			Fragile:        req.Shipping.Fragile,
 			ShippingClass:  req.Shipping.ShippingClass,
 		},
+		Status: req.Status,
 	}
 }
 

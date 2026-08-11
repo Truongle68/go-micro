@@ -169,7 +169,7 @@ func (p *Product) ApplyUpdate(params UpdateProductParams) error {
 	}
 	if params.Status != nil {
 		if !params.Status.IsValid() {
-			return ErrInvalidStatus
+			return ErrInvalidProductStatus
 		}
 		p.Status = *params.Status
 	}

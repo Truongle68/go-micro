@@ -12,6 +12,7 @@ type CreateProduct struct {
 	Variants        []CreateVariantInput `json:"variants" validate:"required,min=1,dive"`
 	Specifications  []SpecGroupInput     `json:"specifications,omitempty"`
 	Shipping        ShippingInput        `json:"shipping" validate:"required"`
+	Status          string               `json:"status" validate:"required,oneof=draft active"`
 }
 
 type ImageInput struct {

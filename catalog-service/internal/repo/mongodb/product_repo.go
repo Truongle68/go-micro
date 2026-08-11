@@ -509,7 +509,7 @@ func (r *ProductRepo) findByFilter(ctx context.Context, filter bson.M, p paginat
 	}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "_id", Value: 1}}).
+		SetSort(bson.D{{Key: "_id", Value: -1}}).
 		SetSkip(p.Skip()).
 		SetLimit(p.Limit)
 
