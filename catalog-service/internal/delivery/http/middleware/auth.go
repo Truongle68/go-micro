@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	authorizationHeader = "Authorization"
-	userCtx             = "userId"
-	userRoleCtx         = "userRole"
+	authorizationHeader   = "Authorization"
+	userCtx               = "userId"
+	userRoleCtx           = "userRole"
+	AccessTokenCookieName = "access_token"
 )
 
 var (
@@ -25,21 +26,26 @@ var (
 
 func Auth(v jwtmanager.JWTManager, bl redis.BlacklistCacher) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader(authorizationHeader)
-		if authHeader == "" {
-			response.Unauthorized(c, "empty auth header")
-			c.Abort()
-			return
-		}
+		var tokenStr string
 
-		headerParts := strings.Split(authHeader, " ")
-		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			response.Error(c, http.StatusUnauthorized, response.CodeInvalidAuthHeader, "invalid auth header format")
-			c.Abort()
-			return
-		}
+		if cookieToken, err := c.Cookie(AccessTokenCookieName); err == nil && cookieToken != "" {
+			tokenStr = cookieToken
+		} else {
+			authHeader := c.GetHeader(authorizationHeader)
+			if authHeader == "" {
+				response.Unauthorized(c, "empty auth header or cookie")
+				c.Abort()
+				return
+			}
 
-		tokenStr := headerParts[1]
+			headerParts := strings.Split(authHeader, " ")
+			if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+				response.Error(c, http.StatusUnauthorized, response.CodeInvalidAuthHeader, "invalid auth header format")
+				c.Abort()
+				return
+			}
+			tokenStr = headerParts[1]
+		}
 
 		// check if token is blacklisted in Redis
 		inBlacklist, err := bl.IsBlacklisted(c, tokenStr)
