@@ -1,15 +1,15 @@
 package http
 
 import (
-	"user-service/internal/delivery/http/middleware"
 	v1 "user-service/internal/delivery/http/v1"
 
+	"github.com/TruongLe68/go-micro/pkg/ginmw"
 	"github.com/gin-gonic/gin"
 )
 
 func NewRouter(engine *gin.Engine, deps *v1.Dependencies) {
-	engine.Use(middleware.Recovery(deps.Logger))
-	engine.Use(middleware.Logger(deps.Logger))
+	engine.Use(ginmw.Recovery(deps.Logger))
+	engine.Use(ginmw.Logger(deps.Logger))
 	engine.Use(corsMiddleware())
 
 	apiV1Group := engine.Group("/api/v1")

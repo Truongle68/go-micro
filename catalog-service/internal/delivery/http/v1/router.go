@@ -1,12 +1,12 @@
 package v1
 
 import (
-	"catalog-service/internal/delivery/http/middleware"
 	"catalog-service/internal/domain"
 	"catalog-service/internal/usecase"
-	"catalog-service/pkg/redis"
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
+	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
+	"github.com/TruongLe68/go-micro/pkg/ginmw"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -24,7 +24,7 @@ type Dependencies struct {
 	Category usecase.CategoryUsecase
 	Logger   logger.Interface
 	Verifier jwtmanager.JWTManager
-	Cache    redis.IdentityCacher
+	Cache    redismanager.IdentityCacher
 }
 
 func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
@@ -35,8 +35,8 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
 		v:        validator.New(),
 	}
 
-	authMid := middleware.Auth(deps.Verifier, deps.Cache)
-	adminMid := middleware.Role(string(domain.UserRoleAdmin))
+	authMid := ginmw.Auth(deps.Verifier, deps.Cache)
+	adminMid := ginmw.Role(string(domain.UserRoleAdmin))
 
 	products := apiV1Group.Group("/products")
 	{

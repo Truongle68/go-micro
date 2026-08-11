@@ -4,7 +4,6 @@ import (
 	"catalog-service/config"
 	repo "catalog-service/internal/repo/mongodb"
 	"catalog-service/internal/usecase"
-	cataredis "catalog-service/pkg/redis"
 	"context"
 	"fmt"
 	"log"
@@ -16,6 +15,7 @@ import (
 	v1 "catalog-service/internal/delivery/http/v1"
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
+	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/mongo"
@@ -47,7 +47,7 @@ func initUsecases(db *mongodrv.Database) useCases {
 	}
 }
 
-func initServers(l logger.Interface, uc useCases, cfg *config.Config, v jwtmanager.JWTManager, cache cataredis.IdentityCacher) *servers {
+func initServers(l logger.Interface, uc useCases, cfg *config.Config, v jwtmanager.JWTManager, cache redismanager.IdentityCacher) *servers {
 	http := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 	deps := v1.Dependencies{
 		Product:  uc.product,
@@ -109,7 +109,7 @@ func Run(cfg *config.Config) {
 	}
 	defer red.Close()
 
-	identityCache := cataredis.NewIdentityCache(red.Client)
+	identityCache := redismanager.NewIdentityCache(red.Client)
 	// init usecase
 	uc := initUsecases(m.Database)
 	// init server

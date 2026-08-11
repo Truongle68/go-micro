@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"catalog-service/internal/delivery/http/middleware"
 	"catalog-service/internal/domain"
 	"errors"
 	"net/http"
 
+	"github.com/TruongLe68/go-micro/pkg/ginmw"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -35,5 +35,5 @@ func (r *V1) handleError(c *gin.Context, err error) {
 }
 
 func (r *V1) getUserID(c *gin.Context) (string, bool) {
-	return middleware.GetUserID(c)
+	return ginmw.GetUserID(c)
 }

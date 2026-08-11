@@ -3,9 +3,9 @@ package v1
 import (
 	"errors"
 	"net/http"
-	"user-service/internal/delivery/http/middleware"
 	"user-service/internal/domain"
 
+	"github.com/TruongLe68/go-micro/pkg/ginmw"
 	"github.com/TruongLe68/go-micro/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -40,13 +40,9 @@ func (r *V1) handleError(c *gin.Context, err error) {
 }
 
 func (r *V1) getUserId(c *gin.Context) (string, bool) {
-	return middleware.GetUserID(c)
-}
-
-func (r *V1) getToken(c *gin.Context) (string, bool) {
-	return middleware.GetToken(c)
+	return ginmw.GetUserID(c)
 }
 
 func (r *V1) getRole(c *gin.Context) (string, bool) {
-	return middleware.GetRole(c)
+	return ginmw.GetRole(c)
 }

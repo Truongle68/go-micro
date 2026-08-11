@@ -10,15 +10,15 @@ import (
 	"user-service/internal/repo"
 	"user-service/pkg/jwt"
 	"user-service/pkg/postgres"
-	"user-service/pkg/redis"
 	"user-service/worker"
 
+	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 )
 
 type UserUC struct {
 	repo       repo.UserRepository
-	cache      redis.IdentityCacher
+	cache      redismanager.IdentityCacher
 	transactor postgres.Transactor
 	tokens     jwt.TokenService
 	email      worker.EmailDispatcher
@@ -29,7 +29,7 @@ type UserUC struct {
 func NewUserUC(
 	repo repo.UserRepository,
 	tokens jwt.TokenService,
-	cache redis.IdentityCacher,
+	cache redismanager.IdentityCacher,
 	transactor postgres.Transactor,
 	email worker.EmailDispatcher,
 	logger logger.Interface,
@@ -344,12 +344,12 @@ func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error 
 			return domain.ErrEmailAlreadyExists
 		}
 
-		code, err := redis.GenOTPCode()
+		code, err := redismanager.GenOTPCode()
 		if err != nil {
 			return err
 		}
 
-		if err := uc.cache.SetOTP(ctx, in.ActorUserID, in.Purpose, code, p.OTPTTL); err != nil {
+		if err := uc.cache.SetOTP(ctx, in.ActorUserID, string(in.Purpose), code, p.OTPTTL); err != nil {
 			return fmt.Errorf("caching OTP: %w", err)
 		}
 
@@ -401,12 +401,12 @@ func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error 
 			return domain.ErrPhoneAlreadyExists
 		}
 
-		code, err := redis.GenOTPCode()
+		code, err := redismanager.GenOTPCode()
 		if err != nil {
 			return err
 		}
 
-		if err := uc.cache.SetOTP(ctx, in.ActorUserID, in.Purpose, code, p.OTPTTL); err != nil {
+		if err := uc.cache.SetOTP(ctx, in.ActorUserID, string(in.Purpose), code, p.OTPTTL); err != nil {
 			return fmt.Errorf("caching OTP: %w", err)
 		}
 
@@ -421,12 +421,12 @@ func (uc *UserUC) sendAccountOTP(ctx context.Context, in RequestOTPInput) error 
 			return fmt.Errorf("finding credentials by type and userID: %w", err)
 		}
 
-		code, err := redis.GenOTPCode()
+		code, err := redismanager.GenOTPCode()
 		if err != nil {
 			return err
 		}
 
-		if err := uc.cache.SetOTP(ctx, in.ActorUserID, in.Purpose, code, p.OTPTTL); err != nil {
+		if err := uc.cache.SetOTP(ctx, in.ActorUserID, string(in.Purpose), code, p.OTPTTL); err != nil {
 			return fmt.Errorf("caching OTP: %w", err)
 		}
 
@@ -463,14 +463,14 @@ func (uc *UserUC) SendPhoneVerificationOTP(ctx context.Context, userID string) e
 }
 
 func (uc *UserUC) verifyAccountOTP(ctx context.Context, in VerifyOTPInput) (string, error) {
-	cachedCode, err := uc.cache.GetOTP(ctx, in.ActorUserID, in.Purpose)
+	cachedCode, err := uc.cache.GetOTP(ctx, in.ActorUserID, string(in.Purpose))
 	if err != nil {
 		return "", domain.ErrOTPExpired
 	}
 	if cachedCode != in.Code {
 		return "", domain.ErrInvalidOTP
 	}
-	_ = uc.cache.DeleteOTP(ctx, in.ActorUserID, in.Purpose)
+	_ = uc.cache.DeleteOTP(ctx, in.ActorUserID, string(in.Purpose))
 
 	switch in.Purpose {
 	case domain.VerifyPurposeChangeEmail:

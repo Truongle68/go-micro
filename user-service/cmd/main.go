@@ -15,10 +15,11 @@ import (
 	"user-service/pkg/jwt"
 	"user-service/pkg/mailer"
 	userpg "user-service/pkg/postgres"
-	userredis "user-service/pkg/redis"
 	"user-service/pkg/sms"
 	"user-service/worker"
 
+	"github.com/GoProOrg/core-go-pkg/jwtmanager"
+	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/postgres"
@@ -54,10 +55,15 @@ func main() {
 		l.Fatal("failed to initialize jwt: %v", err)
 	}
 
+	jwtVerifier, err := jwtmanager.NewVerifier(cfg.JWT.PublicKey)
+	if err != nil {
+		l.Fatal("failed to initialize jwt verifier: %v", err)
+	}
+
 	// init repo, cache
 	userRepo := repo.NewUserRepo(pg.DB)
 
-	cache := userredis.NewIdentityCache(redisClient.Client)
+	cache := redismanager.NewIdentityCache(redisClient.Client)
 
 	// init mailer, worker
 	emailMailer := mailer.New(cfg.Email.SMTPHost, cfg.Email.SMTPPort, cfg.Email.SMTPUser, cfg.Email.SMTPPassword, cfg.Email.SenderEmail, l)
@@ -74,7 +80,7 @@ func main() {
 	// init server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 
-	v1Deps := v1.NewDependencies(authUC, userUC, jwtManager, cache.TokenBlacklist, l)
+	v1Deps := v1.NewDependencies(authUC, userUC, jwtVerifier, cache.TokenBlacklist, l)
 	http.NewRouter(httpserver.Engine, v1Deps)
 
 	// start server

@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/GoProOrg/core-go-pkg v1.0.3 // indirect
+	github.com/GoProOrg/core-go-pkg v1.0.4 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/gosimple/slug v1.15.0 // indirect

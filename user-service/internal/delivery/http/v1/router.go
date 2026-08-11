@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"user-service/internal/delivery/http/middleware"
 	"user-service/internal/usecase"
-	"user-service/pkg/jwt"
-	"user-service/pkg/redis"
 
+	"github.com/GoProOrg/core-go-pkg/jwtmanager"
+	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
+	"github.com/TruongLe68/go-micro/pkg/ginmw"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -19,20 +19,20 @@ type V1 struct {
 }
 
 type Dependencies struct {
-	Auth   usecase.Auth
-	User   usecase.User
-	JWT    jwt.TokenService
-	Cache  redis.BlacklistCacher
-	Logger logger.Interface
+	Auth     usecase.Auth
+	User     usecase.User
+	Verifier jwtmanager.JWTManager
+	Cache    redismanager.BlacklistCacher
+	Logger   logger.Interface
 }
 
-func NewDependencies(auth usecase.Auth, user usecase.User, jwt jwt.TokenService, cache redis.BlacklistCacher, l logger.Interface) *Dependencies {
+func NewDependencies(auth usecase.Auth, user usecase.User, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
 	return &Dependencies{
-		Auth:   auth,
-		User:   user,
-		JWT:    jwt,
-		Cache:  cache,
-		Logger: l,
+		Auth:     auth,
+		User:     user,
+		Verifier: verifier,
+		Cache:    cache,
+		Logger:   l,
 	}
 }
 
@@ -61,7 +61,7 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 
 	// protected routes
 	protected := apiV1Group.Group("")
-	protected.Use(middleware.Auth(deps.JWT, deps.Cache))
+	protected.Use(ginmw.Auth(deps.Verifier, deps.Cache))
 
 	protected.POST("/auth/logout", r.logout)
 	protected.POST("/auth/password/verify", r.verifyPassword)

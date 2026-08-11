@@ -10,16 +10,16 @@ import (
 	"user-service/internal/repo"
 	"user-service/pkg/jwt"
 	"user-service/pkg/postgres"
-	"user-service/pkg/redis"
 	"user-service/worker"
 
+	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 )
 
 type AuthUC struct {
 	userRepo      repo.UserRepository
 	tokens        jwt.TokenService
-	cache         redis.IdentityCacher
+	cache         redismanager.IdentityCacher
 	transactor    postgres.Transactor
 	email         worker.EmailDispatcher
 	otpDispatcher worker.OTPDispatcher
@@ -30,7 +30,7 @@ type AuthUC struct {
 func NewAuthUC(
 	repo repo.UserRepository,
 	tokens jwt.TokenService,
-	cache redis.IdentityCacher,
+	cache redismanager.IdentityCacher,
 	transactor postgres.Transactor,
 	email worker.EmailDispatcher,
 	otpDispatcher worker.OTPDispatcher,
@@ -62,12 +62,12 @@ func (uc *AuthUC) RequestOTP(ctx context.Context, in RequestOTPInput) error {
 		return domain.ErrEmptyPhone
 	}
 
-	code, err := redis.GenOTPCode()
+	code, err := redismanager.GenOTPCode()
 	if err != nil {
 		return err
 	}
 
-	err = uc.cache.SetOTP(ctx, identifier, in.Purpose, code, p.OTPTTL)
+	err = uc.cache.SetOTP(ctx, identifier, string(in.Purpose), code, p.OTPTTL)
 	if err != nil {
 		return fmt.Errorf("caching OTP: %w", err)
 	}
@@ -88,7 +88,7 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token strin
 		return "", false, "", domain.ErrInvalidOTP
 	}
 
-	cachedCode, err := uc.cache.GetOTP(ctx, identifier, in.Purpose)
+	cachedCode, err := uc.cache.GetOTP(ctx, identifier, string(in.Purpose))
 	if err != nil {
 		return "", false, "", domain.ErrOTPExpired
 	}
@@ -97,7 +97,7 @@ func (uc *AuthUC) VerifyOTP(ctx context.Context, in VerifyOTPInput) (token strin
 		return "", false, "", domain.ErrInvalidOTP
 	}
 
-	_ = uc.cache.DeleteOTP(ctx, identifier, in.Purpose)
+	_ = uc.cache.DeleteOTP(ctx, identifier, string(in.Purpose))
 
 	token, err = uc.tokens.GenerateVerificationToken(identifier, in.Purpose)
 	if err != nil {
@@ -332,7 +332,7 @@ func (uc *AuthUC) ChangePassword(ctx context.Context, in ChangePasswordInput) er
 	if err := domain.ValidatePassword(in.NewPassword); err != nil {
 		return err
 	}
-	
+
 	hash, err := domain.HashPassword(in.NewPassword)
 	if err != nil {
 		return fmt.Errorf("hashing password: %w", err)
@@ -345,7 +345,7 @@ func (uc *AuthUC) ChangePassword(ctx context.Context, in ChangePasswordInput) er
 	if in.NewPassword == in.CurrentPassword {
 		return domain.ErrMatchCurrentPassword
 	}
-	
+
 	err = uc.userRepo.UpdatePassword(ctx, in.UserID, hash)
 	if err != nil {
 		return fmt.Errorf("updating password: %w", err)
