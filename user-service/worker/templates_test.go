@@ -14,7 +14,7 @@ func TestTemplatesRendering(t *testing.T) {
 		{
 			name:     "change_email_otp",
 			template: "change_email_otp.html",
-			data:     struct{ Code string }{Code: "123456"},
+			data:     struct{ Code, TTL string }{Code: "123456", TTL: "5"},
 		},
 		{
 			name:     "otp_code",
@@ -24,7 +24,7 @@ func TestTemplatesRendering(t *testing.T) {
 		{
 			name:     "verify_email",
 			template: "verify_email.html",
-			data:     struct{ Link string }{Link: "http://example.com"},
+			data:     struct{ Link, TTL string }{Link: "http://example.com", TTL: "5"},
 		},
 		{
 			name:     "forgot_password",
