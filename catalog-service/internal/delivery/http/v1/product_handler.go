@@ -23,7 +23,7 @@ func (r *V1) createProduct(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusCreated, "create product success", toProductResponse(product))
+	response.Success(c, http.StatusCreated, "create product success", toProductRead(product))
 }
 
 func (r *V1) getProduct(c *gin.Context) {
