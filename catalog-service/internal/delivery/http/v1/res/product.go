@@ -17,19 +17,11 @@ type VariantResponse struct {
 	ID    string `json:"id"`
 	SKU   string `json:"sku"`
 	Price int64  `json:"price"`
-	Stock int    `json:"stock"`
 }
 
 type CategoryRefRead struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
-}
-
-type ImageRead struct {
-	URL       string `json:"url"`
-	IsPrimary bool   `json:"is_primary"`
-	SortOrder int    `json:"sort_order"`
-	AltText   string `json:"alt_text"`
 }
 
 type OptionTypeRead struct {
@@ -42,21 +34,14 @@ type PriceRead struct {
 	Currency string `json:"currency"`
 }
 
-type InventoryRead struct {
-	TotalAvailable int `json:"total_available"`
-	Reserved       int `json:"reserved"`
-}
-
 type VariantRead struct {
-	ID          string            `json:"id,omitempty"`
-	SKU         string            `json:"sku"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
-	Price       PriceRead         `json:"price"`
-	Inventory   InventoryRead     `json:"inventory"`
-	WeightGrams int               `json:"weight_grams,omitempty"`
-	Images      []ImageRead       `json:"images,omitempty"`
-	IsActive    bool              `json:"is_active"`
-	CreatedAt   time.Time         `json:"created_at"`
+	ID         string            `json:"id,omitempty"`
+	SKU        string            `json:"sku"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+	Price      PriceRead         `json:"price"`
+	Image      string            `json:"image,omitempty"`
+	IsActive   bool              `json:"is_active"`
+	CreatedAt  time.Time         `json:"created_at"`
 }
 
 type SpecItemRead struct {
@@ -67,24 +52,6 @@ type SpecItemRead struct {
 type SpecGroupRead struct {
 	Group string         `json:"group"`
 	Items []SpecItemRead `json:"items"`
-}
-
-type RatingSummaryRead struct {
-	Average   float64          `json:"average"`
-	Count     int              `json:"count"`
-	Breakdown map[string]int64 `json:"breakdown,omitempty"`
-}
-
-type ShipsFromRead struct {
-	WarehouseID string `json:"warehouse_id,omitempty"`
-	Region      string `json:"region,omitempty"`
-}
-
-type ShippingInfoRead struct {
-	IsFreeShipping bool          `json:"is_free_shipping"`
-	ShipsFrom      ShipsFromRead `json:"ships_from,omitempty"`
-	Fragile        bool          `json:"fragile"`
-	ShippingClass  string        `json:"shipping_class,omitempty"`
 }
 
 type ProductCategoryRead struct {
@@ -110,13 +77,10 @@ type ProductRead struct {
 	DescriptionHTML string               `json:"description_html,omitempty"`
 	Highlights      []string             `json:"highlights,omitempty"`
 	Tags            []string             `json:"tags,omitempty"`
-	Images          []ImageRead          `json:"images,omitempty"`
+	Images          []string             `json:"images,omitempty"`
 	OptionTypes     []OptionTypeRead     `json:"option_types,omitempty"`
 	Variants        []VariantRead        `json:"variants,omitempty"`
 	Specifications  []SpecGroupRead      `json:"specifications,omitempty"`
-	RatingSummary   RatingSummaryRead    `json:"rating_summary"`
-	SalesCount      int64                `json:"sales_count"`
-	Shipping        ShippingInfoRead     `json:"shipping"`
 	Status          string               `json:"status"`
 	CreatedAt       time.Time            `json:"created_at"`
 	UpdatedAt       time.Time            `json:"updated_at"`

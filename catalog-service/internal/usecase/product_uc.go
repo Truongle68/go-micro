@@ -3,6 +3,7 @@ package usecase
 import (
 	"catalog-service/internal/domain"
 	"catalog-service/internal/repo"
+	"catalog-service/pkg/sliceutil"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -22,26 +23,17 @@ type DetailedProduct struct {
 	Category *domain.Category
 }
 
-type ImageInput struct {
-	URL       string
-	IsPrimary bool
-	SortOrder int
-	AltText   string
-}
-
 type OptionTypeInput struct {
 	Name   string
 	Values []string
 }
 
 type CreateVariantInput struct {
-	ID          string
-	SKU         string
-	Attributes  map[string]string
-	Price       PriceInput
-	Stock       int
-	WeightGrams int
-	Images      []ImageInput
+	ID         string
+	SKU        string
+	Attributes map[string]string
+	Price      PriceInput
+	Image      string
 }
 
 type PriceInput struct {
@@ -59,12 +51,6 @@ type SpecItemInput struct {
 	Value string
 }
 
-type ShippingInput struct {
-	IsFreeShipping bool
-	Fragile        bool
-	ShippingClass  string
-}
-
 type CreateProductInput struct {
 	Name            string
 	NameTranslation map[string]string
@@ -73,11 +59,10 @@ type CreateProductInput struct {
 	DescriptionHTML string
 	Highlights      []string
 	Tags            []string
-	Images          []ImageInput
+	Images          []string
 	OptionTypes     []OptionTypeInput
 	Variants        []CreateVariantInput
 	Specifications  []SpecGroupInput
-	Shipping        ShippingInput
 	Status          string
 }
 
@@ -91,11 +76,10 @@ type UpdateProductInput struct {
 	DescriptionHTML *string
 	Highlights      []string
 	Tags            []string
-	Images          []ImageInput
+	Images          []string
 	OptionTypes     []OptionTypeInput
 	Variants        []CreateVariantInput
 	Specifications  []SpecGroupInput
-	Shipping        *ShippingInput
 	Status          *domain.ProductStatus
 }
 
@@ -144,6 +128,13 @@ func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain
 		return nil, domain.ErrInvalidProductStatus
 	}
 
+	images := in.Images
+	if len(images) == 0 && len(in.Variants) > 0 {
+		images = sliceutil.DedupeString(in.Variants, func(v CreateVariantInput) string {
+			return v.Image
+		})
+	}
+
 	now := time.Now()
 	product := &domain.Product{
 		Slug:            generateUniqueSlug(in.Name),
@@ -156,19 +147,13 @@ func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain
 		Description:     in.Description,
 		DescriptionHTML: safeHTML,
 		Highlights:      in.Highlights,
-		Images:          toDomainImages(in.Images),
+		Images:          images,
 		OptionTypes:     toDomainOptionTypes(in.OptionTypes),
 		Variants:        toDomainVariants(in.Variants, now),
 		Specifications:  toDomainSpecifications(in.Specifications),
-		RatingSummary:   domain.RatingSummary{Breakdown: map[string]int64{}},
-		Shipping: domain.ShippingInfo{
-			IsFreeShipping: in.Shipping.IsFreeShipping,
-			Fragile:        in.Shipping.Fragile,
-			ShippingClass:  in.Shipping.ShippingClass,
-		},
-		Status:    status,
-		CreatedAt: now,
-		UpdatedAt: now,
+		Status:          status,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	maxRetries := 3
@@ -304,34 +289,10 @@ func toDomainVariants(in []CreateVariantInput, now time.Time) []domain.Variant {
 				Amount:   v.Price.Amount,
 				Currency: v.Price.Currency,
 			},
-			Inventory: domain.Inventory{
-				TotalAvailable: v.Stock,
-			},
-			WeightGrams: v.WeightGrams,
-			Images:      toDomainImages(v.Images),
-			IsActive:    true,
-			CreatedAt:   now,
+			Image:     v.Image,
+			IsActive:  true,
+			CreatedAt: now,
 		}
-	}
-	return out
-}
-
-func toDomainImages(in []ImageInput) []domain.Image {
-	out := make([]domain.Image, len(in))
-	hasPrimary := false
-	for i, img := range in {
-		if img.IsPrimary {
-			hasPrimary = true
-		}
-		out[i] = domain.Image{
-			URL:       img.URL,
-			IsPrimary: img.IsPrimary,
-			SortOrder: img.SortOrder,
-			AltText:   img.AltText,
-		}
-	}
-	if len(out) > 0 && !hasPrimary {
-		out[0].IsPrimary = true
 	}
 	return out
 }
@@ -465,7 +426,6 @@ func (in UpdateProductInput) isEmpty() bool {
 		in.OptionTypes == nil &&
 		in.Variants == nil &&
 		in.Specifications == nil &&
-		in.Shipping == nil &&
 		in.Status == nil
 }
 
@@ -514,10 +474,6 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 	}
 
 	now := time.Now()
-	var images []domain.Image
-	if in.Images != nil {
-		images = toDomainImages(in.Images)
-	}
 	var optionTypes []domain.OptionType
 	if in.OptionTypes != nil {
 		optionTypes = toDomainOptionTypes(in.OptionTypes)
@@ -530,14 +486,6 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 	if in.Specifications != nil {
 		specs = toDomainSpecifications(in.Specifications)
 	}
-	var shipping *domain.ShippingInfo
-	if in.Shipping != nil {
-		shipping = &domain.ShippingInfo{
-			IsFreeShipping: in.Shipping.IsFreeShipping,
-			Fragile:        in.Shipping.Fragile,
-			ShippingClass:  in.Shipping.ShippingClass,
-		}
-	}
 
 	if err := p.ApplyUpdate(domain.UpdateProductParams{
 		Name:            in.Name,
@@ -548,11 +496,9 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 		DescriptionHTML: descHTML,
 		Highlights:      in.Highlights,
 		Tags:            in.Tags,
-		Images:          images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,
-		Shipping:        shipping,
 		Status:          in.Status,
 	}); err != nil {
 		return nil, err

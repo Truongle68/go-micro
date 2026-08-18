@@ -38,9 +38,6 @@ func TestApplyUpdate(t *testing.T) {
 					Amount:   1000,
 					Currency: "USD",
 				},
-				Inventory: domain.Inventory{
-					TotalAvailable: 10,
-				},
 			},
 		},
 	}

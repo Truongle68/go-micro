@@ -7,19 +7,10 @@ type CreateProduct struct {
 	DescriptionHTML string               `json:"description_html,omitempty"`
 	Highlights      []string             `json:"highlights,omitempty"`
 	Tags            []string             `json:"tags,omitempty"`
-	Images          []ImageInput         `json:"images" validate:"required,min=1,dive"`
 	OptionTypes     []OptionTypeInput    `json:"option_types,omitempty"`
 	Variants        []CreateVariantInput `json:"variants" validate:"required,min=1,dive"`
 	Specifications  []SpecGroupInput     `json:"specifications,omitempty"`
-	Shipping        ShippingInput        `json:"shipping" validate:"required"`
 	Status          string               `json:"status" validate:"required,oneof=draft active"`
-}
-
-type ImageInput struct {
-	URL       string `json:"url" validate:"required,url"`
-	IsPrimary bool   `json:"is_primary"`
-	SortOrder int    `json:"sort_order"`
-	AltText   string `json:"alt_text,omitempty"`
 }
 
 type OptionTypeInput struct {
@@ -28,13 +19,11 @@ type OptionTypeInput struct {
 }
 
 type CreateVariantInput struct {
-	ID          string            `json:"id,omitempty"`
-	SKU         string            `json:"sku" validate:"required"`
-	Attributes  map[string]string `json:"attributes"`
-	Price       PriceInput        `json:"price" validate:"required"`
-	Stock       int               `json:"stock" validate:"gte=0"`
-	WeightGrams int               `json:"weight_grams,omitempty"`
-	Images      []ImageInput      `json:"images,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	SKU        string            `json:"sku" validate:"required"`
+	Attributes map[string]string `json:"attributes"`
+	Price      PriceInput        `json:"price" validate:"required"`
+	Image      string            `json:"image,omitempty"`
 }
 
 type PriceInput struct {
@@ -52,12 +41,6 @@ type SpecItemInput struct {
 	Value string `json:"value" validate:"required"`
 }
 
-type ShippingInput struct {
-	IsFreeShipping bool   `json:"is_free_shipping"`
-	Fragile        bool   `json:"fragile"`
-	ShippingClass  string `json:"shipping_class,omitempty"`
-}
-
 type UpdateProduct struct {
 	Version         int                  `json:"version" validate:"required,min=1"`
 	Name            *string              `json:"name,omitempty" validate:"omitempty,min=3,max=200"`
@@ -67,11 +50,9 @@ type UpdateProduct struct {
 	DescriptionHTML *string              `json:"description_html,omitempty"`
 	Highlights      []string             `json:"highlights,omitempty"`
 	Tags            []string             `json:"tags,omitempty"`
-	Images          []ImageInput         `json:"images,omitempty" validate:"omitempty,dive"`
 	OptionTypes     []OptionTypeInput    `json:"option_types,omitempty"`
 	Variants        []CreateVariantInput `json:"variants,omitempty" validate:"omitempty,dive"`
 	Specifications  []SpecGroupInput     `json:"specifications,omitempty"`
-	Shipping        *ShippingInput       `json:"shipping,omitempty"`
 	Status          *string              `json:"status,omitempty" validate:"omitempty,oneof=draft active inactive archived"`
 }
 

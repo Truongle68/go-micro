@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"catalog-service/pkg/sliceutil"
 	"time"
 )
 
@@ -16,28 +17,23 @@ type Product struct {
 	DescriptionHTML string
 	Highlights      []string
 	Tags            []string
-	Images          []Image
+	Images          []string
 	OptionTypes     []OptionType
 	Variants        []Variant
 	Specifications  []SpecGroup
-	RatingSummary   RatingSummary
-	SalesCount      int64
-	Shipping        ShippingInfo
 	Status          ProductStatus
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
 
 type Variant struct {
-	ID          string
-	SKU         string
-	Attributes  map[string]string
-	Price       Price
-	Inventory   Inventory
-	WeightGrams int
-	Images      []Image
-	IsActive    bool
-	CreatedAt   time.Time
+	ID         string
+	SKU        string
+	Attributes map[string]string
+	Price      Price
+	Image      string
+	IsActive   bool
+	CreatedAt  time.Time
 }
 
 type OptionType struct {
@@ -60,45 +56,9 @@ type SpecItem struct {
 	Value string
 }
 
-type Inventory struct {
-	TotalAvailable int
-	Reserved       int
-	Warehouses     []WarehouseStock
-}
-
-type WarehouseStock struct {
-	WarehouseID string
-	Quantity    int
-}
-
 type CategoryRef struct {
 	ID   string
 	Name string
-}
-
-type Image struct {
-	URL       string
-	IsPrimary bool
-	SortOrder int
-	AltText   string
-}
-
-type RatingSummary struct {
-	Average   float64
-	Count     int
-	Breakdown map[string]int64
-}
-
-type ShippingInfo struct {
-	IsFreeShipping bool
-	ShipsFrom      ShipsFrom
-	Fragile        bool
-	ShippingClass  string
-}
-
-type ShipsFrom struct {
-	WarehouseID string
-	Region      string
 }
 
 type UpdateProductParams struct {
@@ -110,11 +70,9 @@ type UpdateProductParams struct {
 	DescriptionHTML *string
 	Highlights      []string
 	Tags            []string
-	Images          []Image
 	OptionTypes     []OptionType
 	Variants        []Variant
 	Specifications  []SpecGroup
-	Shipping        *ShippingInfo
 	Status          *ProductStatus
 }
 
@@ -149,9 +107,6 @@ func (p *Product) ApplyUpdate(params UpdateProductParams) error {
 	if params.Tags != nil {
 		p.Tags = params.Tags
 	}
-	if params.Images != nil {
-		p.Images = params.Images
-	}
 	if params.OptionTypes != nil {
 		p.OptionTypes = params.OptionTypes
 	}
@@ -160,12 +115,12 @@ func (p *Product) ApplyUpdate(params UpdateProductParams) error {
 			return ErrProductRequiresVariant
 		}
 		p.Variants = params.Variants
+		p.Images = sliceutil.DedupeString(params.Variants, func(v Variant) string {
+			return v.Image
+		})
 	}
 	if params.Specifications != nil {
 		p.Specifications = params.Specifications
-	}
-	if params.Shipping != nil {
-		p.Shipping = *params.Shipping
 	}
 	if params.Status != nil {
 		if !params.Status.IsValid() {

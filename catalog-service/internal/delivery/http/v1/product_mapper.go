@@ -5,6 +5,7 @@ import (
 	"catalog-service/internal/delivery/http/v1/res"
 	"catalog-service/internal/domain"
 	"catalog-service/internal/usecase"
+	"catalog-service/pkg/sliceutil"
 )
 
 func toCreateProductInput(req req.CreateProduct) usecase.CreateProductInput {
@@ -18,11 +19,13 @@ func toCreateProductInput(req req.CreateProduct) usecase.CreateProductInput {
 				Amount:   vr.Price.Amount,
 				Currency: vr.Price.Currency,
 			},
-			Stock:       vr.Stock,
-			WeightGrams: vr.WeightGrams,
-			Images:      toImageInputs(vr.Images),
+			Image: vr.Image,
 		}
 	}
+
+	images := sliceutil.DedupeString(variants, func(v usecase.CreateVariantInput) string {
+		return v.Image
+	})
 
 	optionTypes := make([]usecase.OptionTypeInput, len(req.OptionTypes))
 	for i, ot := range req.OptionTypes {
@@ -45,25 +48,12 @@ func toCreateProductInput(req req.CreateProduct) usecase.CreateProductInput {
 		DescriptionHTML: req.DescriptionHTML,
 		Highlights:      req.Highlights,
 		Tags:            req.Tags,
-		Images:          toImageInputs(req.Images),
+		Images:          images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,
-		Shipping: usecase.ShippingInput{
-			IsFreeShipping: req.Shipping.IsFreeShipping,
-			Fragile:        req.Shipping.Fragile,
-			ShippingClass:  req.Shipping.ShippingClass,
-		},
-		Status: req.Status,
+		Status:          req.Status,
 	}
-}
-
-func toImageInputs(in []req.ImageInput) []usecase.ImageInput {
-	out := make([]usecase.ImageInput, len(in))
-	for i, img := range in {
-		out[i] = usecase.ImageInput{URL: img.URL, IsPrimary: img.IsPrimary, SortOrder: img.SortOrder, AltText: img.AltText}
-	}
-	return out
 }
 
 func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProductInput {
@@ -71,19 +61,6 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 	if req.Status != nil {
 		s := domain.ProductStatus(*req.Status)
 		status = &s
-	}
-
-	var images []usecase.ImageInput
-	if req.Images != nil {
-		images = make([]usecase.ImageInput, len(req.Images))
-		for i, img := range req.Images {
-			images[i] = usecase.ImageInput{
-				URL:       img.URL,
-				IsPrimary: img.IsPrimary,
-				SortOrder: img.SortOrder,
-				AltText:   img.AltText,
-			}
-		}
 	}
 
 	var optionTypes []usecase.OptionTypeInput
@@ -98,21 +75,10 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 	}
 
 	var variants []usecase.CreateVariantInput
+	var images []string
 	if req.Variants != nil {
 		variants = make([]usecase.CreateVariantInput, len(req.Variants))
 		for i, v := range req.Variants {
-			var vImages []usecase.ImageInput
-			if v.Images != nil {
-				vImages = make([]usecase.ImageInput, len(v.Images))
-				for j, img := range v.Images {
-					vImages[j] = usecase.ImageInput{
-						URL:       img.URL,
-						IsPrimary: img.IsPrimary,
-						SortOrder: img.SortOrder,
-						AltText:   img.AltText,
-					}
-				}
-			}
 			variants[i] = usecase.CreateVariantInput{
 				ID:         v.ID,
 				SKU:        v.SKU,
@@ -121,10 +87,12 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 					Amount:   v.Price.Amount,
 					Currency: v.Price.Currency,
 				},
-				Stock:       v.Stock,
-				WeightGrams: v.WeightGrams,
-				Images:      vImages,
+				Image: v.Image,
 			}
+			if v.Image == "" {
+				continue
+			}
+			images = append(images, v.Image)
 		}
 	}
 
@@ -146,15 +114,6 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 		}
 	}
 
-	var shipping *usecase.ShippingInput
-	if req.Shipping != nil {
-		shipping = &usecase.ShippingInput{
-			IsFreeShipping: req.Shipping.IsFreeShipping,
-			Fragile:        req.Shipping.Fragile,
-			ShippingClass:  req.Shipping.ShippingClass,
-		}
-	}
-
 	return usecase.UpdateProductInput{
 		ID:              id,
 		Version:         req.Version,
@@ -169,9 +128,21 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,
-		Shipping:        shipping,
 		Status:          status,
 	}
+}
+
+func toUniqueImage(variants []req.CreateVariantInput) []string {
+	seen := make(map[string]bool)
+	var images []string
+	for _, v := range variants {
+		if v.Image == "" || seen[v.Image] {
+			continue
+		}
+		seen[v.Image] = true
+		images = append(images, v.Image)
+	}
+	return images
 }
 
 func toProductResponse(p *domain.Product) res.ProductResponse {
@@ -181,7 +152,6 @@ func toProductResponse(p *domain.Product) res.ProductResponse {
 			ID:    v.ID,
 			SKU:   v.SKU,
 			Price: v.Price.Amount,
-			Stock: v.Inventory.TotalAvailable,
 		}
 	}
 	return res.ProductResponse{
@@ -219,16 +189,6 @@ func toProductRead(p *domain.Product) res.ProductRead {
 		}
 	}
 
-	images := make([]res.ImageRead, len(p.Images))
-	for i, img := range p.Images {
-		images[i] = res.ImageRead{
-			URL:       img.URL,
-			IsPrimary: img.IsPrimary,
-			SortOrder: img.SortOrder,
-			AltText:   img.AltText,
-		}
-	}
-
 	optionTypes := make([]res.OptionTypeRead, len(p.OptionTypes))
 	for i, ot := range p.OptionTypes {
 		optionTypes[i] = res.OptionTypeRead{
@@ -239,16 +199,6 @@ func toProductRead(p *domain.Product) res.ProductRead {
 
 	variants := make([]res.VariantRead, len(p.Variants))
 	for i, v := range p.Variants {
-		vImages := make([]res.ImageRead, len(v.Images))
-		for j, img := range v.Images {
-			vImages[j] = res.ImageRead{
-				URL:       img.URL,
-				IsPrimary: img.IsPrimary,
-				SortOrder: img.SortOrder,
-				AltText:   img.AltText,
-			}
-		}
-
 		variants[i] = res.VariantRead{
 			ID:         v.ID,
 			SKU:        v.SKU,
@@ -257,14 +207,9 @@ func toProductRead(p *domain.Product) res.ProductRead {
 				Amount:   v.Price.Amount,
 				Currency: v.Price.Currency,
 			},
-			Inventory: res.InventoryRead{
-				TotalAvailable: v.Inventory.TotalAvailable,
-				Reserved:       v.Inventory.Reserved,
-			},
-			WeightGrams: v.WeightGrams,
-			Images:      vImages,
-			IsActive:    v.IsActive,
-			CreatedAt:   v.CreatedAt,
+			Image:     v.Image,
+			IsActive:  v.IsActive,
+			CreatedAt: v.CreatedAt,
 		}
 	}
 
@@ -295,28 +240,13 @@ func toProductRead(p *domain.Product) res.ProductRead {
 		DescriptionHTML: p.DescriptionHTML,
 		Highlights:      p.Highlights,
 		Tags:            p.Tags,
-		Images:          images,
+		Images:          p.Images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,
-		RatingSummary: res.RatingSummaryRead{
-			Average:   p.RatingSummary.Average,
-			Count:     p.RatingSummary.Count,
-			Breakdown: p.RatingSummary.Breakdown,
-		},
-		SalesCount: p.SalesCount,
-		Shipping: res.ShippingInfoRead{
-			IsFreeShipping: p.Shipping.IsFreeShipping,
-			ShipsFrom: res.ShipsFromRead{
-				WarehouseID: p.Shipping.ShipsFrom.WarehouseID,
-				Region:      p.Shipping.ShipsFrom.Region,
-			},
-			Fragile:       p.Shipping.Fragile,
-			ShippingClass: p.Shipping.ShippingClass,
-		},
-		Status:    string(p.Status),
-		CreatedAt: p.CreatedAt,
-		UpdatedAt: p.UpdatedAt,
+		Status:          string(p.Status),
+		CreatedAt:       p.CreatedAt,
+		UpdatedAt:       p.UpdatedAt,
 	}
 }
 

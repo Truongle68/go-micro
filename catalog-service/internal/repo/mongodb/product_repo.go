@@ -38,13 +38,6 @@ type categoryRefModel struct {
 	Name string        `bson:"name"`
 }
 
-type imageModel struct {
-	URL       string `bson:"url"`
-	IsPrimary bool   `bson:"is_primary"`
-	SortOrder int    `bson:"sort_order"`
-	AltText   string `bson:"alt_text"`
-}
-
 type optionTypeModel struct {
 	Name   string   `bson:"name"`
 	Values []string `bson:"values"`
@@ -55,27 +48,14 @@ type priceModel struct {
 	Currency string `bson:"currency"`
 }
 
-type warehouseStockModel struct {
-	WarehouseID string `bson:"warehouse_id"`
-	Quantity    int    `bson:"quantity"`
-}
-
-type inventoryModel struct {
-	TotalAvailable int                   `bson:"total_available"`
-	Reserved       int                   `bson:"reserved"`
-	Warehouses     []warehouseStockModel `bson:"warehouses,omitempty"`
-}
-
 type variantModel struct {
-	ID          bson.ObjectID     `bson:"_id,omitempty"`
-	SKU         string            `bson:"sku"`
-	Attributes  map[string]string `bson:"attributes,omitempty"`
-	Price       priceModel        `bson:"price"`
-	Inventory   inventoryModel    `bson:"inventory"`
-	WeightGrams int               `bson:"weight_grams,omitempty"`
-	Images      []imageModel      `bson:"images,omitempty"`
-	IsActive    bool              `bson:"is_active"`
-	CreatedAt   time.Time         `bson:"created_at"`
+	ID         bson.ObjectID     `bson:"_id,omitempty"`
+	SKU        string            `bson:"sku"`
+	Attributes map[string]string `bson:"attributes,omitempty"`
+	Price      priceModel        `bson:"price"`
+	Image      string            `bson:"images"`
+	IsActive   bool              `bson:"is_active"`
+	CreatedAt  time.Time         `bson:"created_at"`
 }
 
 type specItemModel struct {
@@ -86,24 +66,6 @@ type specItemModel struct {
 type specGroupModel struct {
 	Group string          `bson:"group"`
 	Items []specItemModel `bson:"items"`
-}
-
-type ratingSummaryModel struct {
-	Average   float64          `bson:"average"`
-	Count     int              `bson:"count"`
-	Breakdown map[string]int64 `bson:"breakdown,omitempty"`
-}
-
-type shipsFromModel struct {
-	WarehouseID string `bson:"warehouse_id,omitempty"`
-	Region      string `bson:"region,omitempty"`
-}
-
-type shippingInfoModel struct {
-	IsFreeShipping bool           `bson:"is_free_shipping"`
-	ShipsFrom      shipsFromModel `bson:"ships_from,omitempty"`
-	Fragile        bool           `bson:"fragile"`
-	ShippingClass  string         `bson:"shipping_class,omitempty"`
 }
 
 type productModel struct {
@@ -118,13 +80,10 @@ type productModel struct {
 	DescriptionHTML string             `bson:"description_html,omitempty"`
 	Highlights      []string           `bson:"highlights,omitempty"`
 	Tags            []string           `bson:"tags,omitempty"`
-	Images          []imageModel       `bson:"images,omitempty"`
+	Images          []string           `bson:"images,omitempty"`
 	OptionTypes     []optionTypeModel  `bson:"option_types,omitempty"`
 	Variants        []variantModel     `bson:"variants,omitempty"`
 	Specifications  []specGroupModel   `bson:"specifications,omitempty"`
-	RatingSummary   ratingSummaryModel `bson:"rating_summary,omitempty"`
-	SalesCount      int64              `bson:"sales_count"`
-	Shipping        shippingInfoModel  `bson:"shipping"`
 	Status          string             `bson:"status"`
 	CreatedAt       time.Time          `bson:"created_at"`
 	UpdatedAt       time.Time          `bson:"updated_at"`
@@ -139,16 +98,6 @@ func (m productModel) toDomain() *domain.Product {
 		}
 	}
 
-	images := make([]domain.Image, len(m.Images))
-	for i, img := range m.Images {
-		images[i] = domain.Image{
-			URL:       img.URL,
-			IsPrimary: img.IsPrimary,
-			SortOrder: img.SortOrder,
-			AltText:   img.AltText,
-		}
-	}
-
 	optionTypes := make([]domain.OptionType, len(m.OptionTypes))
 	for i, ot := range m.OptionTypes {
 		optionTypes[i] = domain.OptionType{
@@ -159,24 +108,6 @@ func (m productModel) toDomain() *domain.Product {
 
 	variants := make([]domain.Variant, len(m.Variants))
 	for i, v := range m.Variants {
-		vImages := make([]domain.Image, len(v.Images))
-		for j, img := range v.Images {
-			vImages[j] = domain.Image{
-				URL:       img.URL,
-				IsPrimary: img.IsPrimary,
-				SortOrder: img.SortOrder,
-				AltText:   img.AltText,
-			}
-		}
-
-		warehouses := make([]domain.WarehouseStock, len(v.Inventory.Warehouses))
-		for j, w := range v.Inventory.Warehouses {
-			warehouses[j] = domain.WarehouseStock{
-				WarehouseID: w.WarehouseID,
-				Quantity:    w.Quantity,
-			}
-		}
-
 		var vID string
 		if !v.ID.IsZero() {
 			vID = v.ID.Hex()
@@ -190,15 +121,9 @@ func (m productModel) toDomain() *domain.Product {
 				Amount:   v.Price.Amount,
 				Currency: v.Price.Currency,
 			},
-			Inventory: domain.Inventory{
-				TotalAvailable: v.Inventory.TotalAvailable,
-				Reserved:       v.Inventory.Reserved,
-				Warehouses:     warehouses,
-			},
-			WeightGrams: v.WeightGrams,
-			Images:      vImages,
-			IsActive:    v.IsActive,
-			CreatedAt:   v.CreatedAt,
+			Image:     v.Image,
+			IsActive:  v.IsActive,
+			CreatedAt: v.CreatedAt,
 		}
 	}
 
@@ -229,28 +154,13 @@ func (m productModel) toDomain() *domain.Product {
 		DescriptionHTML: m.DescriptionHTML,
 		Highlights:      m.Highlights,
 		Tags:            m.Tags,
-		Images:          images,
+		Images:          m.Images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,
-		RatingSummary: domain.RatingSummary{
-			Average:   m.RatingSummary.Average,
-			Count:     m.RatingSummary.Count,
-			Breakdown: m.RatingSummary.Breakdown,
-		},
-		SalesCount: m.SalesCount,
-		Shipping: domain.ShippingInfo{
-			IsFreeShipping: m.Shipping.IsFreeShipping,
-			ShipsFrom: domain.ShipsFrom{
-				WarehouseID: m.Shipping.ShipsFrom.WarehouseID,
-				Region:      m.Shipping.ShipsFrom.Region,
-			},
-			Fragile:       m.Shipping.Fragile,
-			ShippingClass: m.Shipping.ShippingClass,
-		},
-		Status:    domain.ProductStatus(m.Status),
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
+		Status:          domain.ProductStatus(m.Status),
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
 	}
 }
 
@@ -275,16 +185,6 @@ func productModelFromDomain(p *domain.Product) (*productModel, error) {
 		}
 	}
 
-	images := make([]imageModel, len(p.Images))
-	for i, img := range p.Images {
-		images[i] = imageModel{
-			URL:       img.URL,
-			IsPrimary: img.IsPrimary,
-			SortOrder: img.SortOrder,
-			AltText:   img.AltText,
-		}
-	}
-
 	optionTypes := make([]optionTypeModel, len(p.OptionTypes))
 	for i, ot := range p.OptionTypes {
 		optionTypes[i] = optionTypeModel{
@@ -295,24 +195,6 @@ func productModelFromDomain(p *domain.Product) (*productModel, error) {
 
 	variants := make([]variantModel, len(p.Variants))
 	for i, v := range p.Variants {
-		vImages := make([]imageModel, len(v.Images))
-		for j, img := range v.Images {
-			vImages[j] = imageModel{
-				URL:       img.URL,
-				IsPrimary: img.IsPrimary,
-				SortOrder: img.SortOrder,
-				AltText:   img.AltText,
-			}
-		}
-
-		warehouses := make([]warehouseStockModel, len(v.Inventory.Warehouses))
-		for j, w := range v.Inventory.Warehouses {
-			warehouses[j] = warehouseStockModel{
-				WarehouseID: w.WarehouseID,
-				Quantity:    w.Quantity,
-			}
-		}
-
 		var vID bson.ObjectID
 		if v.ID != "" {
 			if oid, err := bson.ObjectIDFromHex(v.ID); err == nil {
@@ -331,15 +213,9 @@ func productModelFromDomain(p *domain.Product) (*productModel, error) {
 				Amount:   v.Price.Amount,
 				Currency: v.Price.Currency,
 			},
-			Inventory: inventoryModel{
-				TotalAvailable: v.Inventory.TotalAvailable,
-				Reserved:       v.Inventory.Reserved,
-				Warehouses:     warehouses,
-			},
-			WeightGrams: v.WeightGrams,
-			Images:      vImages,
-			IsActive:    v.IsActive,
-			CreatedAt:   v.CreatedAt,
+			Image:     v.Image,
+			IsActive:  v.IsActive,
+			CreatedAt: v.CreatedAt,
 		}
 	}
 
@@ -369,28 +245,13 @@ func productModelFromDomain(p *domain.Product) (*productModel, error) {
 		DescriptionHTML: p.DescriptionHTML,
 		Highlights:      p.Highlights,
 		Tags:            p.Tags,
-		Images:          images,
+		Images:          p.Images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,
-		RatingSummary: ratingSummaryModel{
-			Average:   p.RatingSummary.Average,
-			Count:     p.RatingSummary.Count,
-			Breakdown: p.RatingSummary.Breakdown,
-		},
-		SalesCount: p.SalesCount,
-		Shipping: shippingInfoModel{
-			IsFreeShipping: p.Shipping.IsFreeShipping,
-			ShipsFrom: shipsFromModel{
-				WarehouseID: p.Shipping.ShipsFrom.WarehouseID,
-				Region:      p.Shipping.ShipsFrom.Region,
-			},
-			Fragile:       p.Shipping.Fragile,
-			ShippingClass: p.Shipping.ShippingClass,
-		},
-		Status:    string(p.Status),
-		CreatedAt: p.CreatedAt,
-		UpdatedAt: p.UpdatedAt,
+		Status:          string(p.Status),
+		CreatedAt:       p.CreatedAt,
+		UpdatedAt:       p.UpdatedAt,
 	}
 
 	if p.ID != "" {
@@ -574,9 +435,6 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product, expectedVer
 			"option_types":     m.OptionTypes,
 			"variants":         m.Variants,
 			"specifications":   m.Specifications,
-			"rating_summary":   m.RatingSummary,
-			"sales_count":      m.SalesCount,
-			"shipping":         m.Shipping,
 			"status":           m.Status,
 			"updated_at":       m.UpdatedAt,
 		},

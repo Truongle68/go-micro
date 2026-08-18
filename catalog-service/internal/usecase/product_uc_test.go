@@ -73,7 +73,7 @@ func (m *mockCategoryRepo) BuildBreadcrumb(ctx context.Context, id string) ([]do
 	return []domain.CategoryRef{{ID: id, Name: "Electronics"}}, nil
 }
 
-func TestCreateProduct_PrimaryImageFallback(t *testing.T) {
+func TestCreateProduct_ImageExtraction(t *testing.T) {
 	pRepo := &mockProductRepo{}
 	cRepo := &mockCategoryRepo{}
 	uc := usecase.NewProductUC(pRepo, cRepo)
@@ -81,21 +81,16 @@ func TestCreateProduct_PrimaryImageFallback(t *testing.T) {
 	input := usecase.CreateProductInput{
 		Name:       "Test Laptop",
 		CategoryID: "507f1f77bcf86cd799439011",
-		Images: []usecase.ImageInput{
-			{URL: "https://example.com/img1.png", IsPrimary: false},
-			{URL: "https://example.com/img2.png", IsPrimary: false},
-		},
 		Variants: []usecase.CreateVariantInput{
-			{SKU: "SKU-001", Stock: 10, Price: usecase.PriceInput{Amount: 1000, Currency: "USD"}},
+			{SKU: "SKU-001", Price: usecase.PriceInput{Amount: 1000, Currency: "USD"}, Image: "https://example.com/img1.png"},
 		},
-		Shipping: usecase.ShippingInput{},
-		Status:   string(domain.ProductStatusDraft),
+		Status: string(domain.ProductStatusDraft),
 	}
 
 	product, err := uc.Create(context.Background(), input)
 	assert.NoError(t, err)
 	assert.NotNil(t, product)
-	assert.True(t, product.Images[0].IsPrimary, "first image should be set to primary when none specified")
+	assert.Equal(t, "https://example.com/img1.png", product.Images[0])
 }
 
 func TestCreateProduct_InvalidAttributeValue(t *testing.T) {
@@ -113,7 +108,6 @@ func TestCreateProduct_InvalidAttributeValue(t *testing.T) {
 			{
 				SKU:        "SHIRT-GREEN",
 				Attributes: map[string]string{"Color": "Green"},
-				Stock:      5,
 				Price:      usecase.PriceInput{Amount: 2000, Currency: "USD"},
 			},
 		},
@@ -144,7 +138,7 @@ func TestCreateProduct_SlugCollisionRetry(t *testing.T) {
 		Name:       "Sample Item",
 		CategoryID: "507f1f77bcf86cd799439011",
 		Variants: []usecase.CreateVariantInput{
-			{SKU: "ITEM-001", Stock: 1, Price: usecase.PriceInput{Amount: 500, Currency: "USD"}},
+			{SKU: "ITEM-001", Price: usecase.PriceInput{Amount: 500, Currency: "USD"}},
 		},
 		Status: string(domain.ProductStatusDraft),
 	}
