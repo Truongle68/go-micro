@@ -9,13 +9,14 @@ import (
 
 type (
 	Config struct {
-		HTTP  http
-		GRPC  grpc
-		PG    pg
-		JWT   jwt
-		Redis redis
-		Log   log
-		Email email
+		HTTP    http
+		GRPC    grpc
+		PG      pg
+		JWT     jwt
+		Redis   redis
+		Log     log
+		Email   email
+		SerpAPI serpAPI
 	}
 
 	http struct {
@@ -60,6 +61,10 @@ type (
 
 	log struct {
 		Level string `env:"LOG_LEVEL" envDefault:"debug"`
+	}
+
+	serpAPI struct {
+		PrivateKey string `env:"SERP_PRIVATE_KEY,required"`
 	}
 )
 

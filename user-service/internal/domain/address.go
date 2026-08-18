@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type AddressLabel string
 
@@ -105,4 +108,8 @@ func (a *Address) ApplyUpdate(params UpdateAddressParams) error {
 	}
 	a.UpdatedAt = time.Now()
 	return nil
+}
+
+func (a *Address) FullAddress() string {
+	return fmt.Sprintf("%s, %s, %s", a.AddressLine, a.District, a.City)
 }

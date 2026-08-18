@@ -635,6 +635,7 @@ func (uc *UserUC) GetAddressList(ctx context.Context, userID string) ([]*Address
 			Ward:        a.Ward,
 			District:    a.District,
 			City:        a.City,
+			FullAddress: a.FullAddress(),
 			Lat:         a.Lat,
 			Lng:         a.Lng,
 			IsDefault:   a.IsDefault,

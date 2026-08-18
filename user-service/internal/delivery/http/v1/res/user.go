@@ -49,6 +49,7 @@ type AddressResponse struct {
 	Ward        string    `json:"ward"`
 	District    string    `json:"district"`
 	City        string    `json:"city"`
+	FullAddress string    `json:"full_address,omitempty"`
 	Lat         float64   `json:"lat"`
 	Lng         float64   `json:"lng"`
 	IsDefault   bool      `json:"is_default"`
@@ -65,6 +66,7 @@ func ToAddressResponse(dto *usecase.AddressDTO) AddressResponse {
 		Ward:        dto.Ward,
 		District:    dto.District,
 		City:        dto.City,
+		FullAddress: dto.FullAddress,
 		Lat:         dto.Lat,
 		Lng:         dto.Lng,
 		IsDefault:   dto.IsDefault,

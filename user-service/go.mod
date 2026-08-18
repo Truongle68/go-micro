@@ -9,6 +9,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/redis/go-redis/v9 v9.21.0 // indirect
+	github.com/serpapi/serpapi-golang v0.0.0-20260126142127-0e41c7993cda // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect

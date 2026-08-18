@@ -76,6 +76,7 @@ type AddressDTO struct {
 	Ward        string              `json:"ward"`
 	District    string              `json:"district"`
 	City        string              `json:"city"`
+	FullAddress string              `json:"full_address,omitempty"`
 	Lat         float64             `json:"lat"`
 	Lng         float64             `json:"lng"`
 	IsDefault   bool                `json:"is_default"`
