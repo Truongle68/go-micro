@@ -41,7 +41,7 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	}
 
 	cartGroup := apiV1Group.Group("/cart")
-	cartGroup.Use(ginmw.Auth(deps.Verifier, deps.Cache, ginmw.Bearer()))
+	cartGroup.Use(ginmw.Auth(deps.Verifier, deps.Cache))
 
 	cartGroup.GET("", r.getCart)
 	cartGroup.POST("/items", r.addItem)

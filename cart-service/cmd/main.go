@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"cart-service/config"
+	grpcv1 "cart-service/internal/delivery/grpc/v1"
 	"cart-service/internal/delivery/http"
 	v1 "cart-service/internal/delivery/http/v1"
 	redisrepo "cart-service/internal/repo/redis"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
+	cartv1 "github.com/TruongLe68/go-micro/pkg/gen/proto/go/cart/v1"
+	"github.com/TruongLe68/go-micro/pkg/grpcserver"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/redis"
@@ -48,13 +51,19 @@ func main() {
 	cartUC := usecase.NewCartUC(cartRepo, l)
 
 	// init http server & router
-	server := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
+	httpServer := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 
 	v1Deps := v1.NewDependencies(cartUC, jwtVerifier, cache.TokenBlacklist, l)
-	http.NewRouter(server.Engine, v1Deps)
+	http.NewRouter(httpServer.Engine, v1Deps)
 
-	// start http server
-	server.Start()
+	// init grpc server
+	grpcServer := grpcserver.New(l, grpcserver.Port(cfg.GRPC.Port))
+	cartGrpcServer := grpcv1.NewCartServer(cartUC, l)
+	cartv1.RegisterCartServiceServer(grpcServer.App, cartGrpcServer)
+
+	// start servers
+	httpServer.Start()
+	grpcServer.Start()
 
 	// graceful shutdown
 	interrupt := make(chan os.Signal, 1)
@@ -63,11 +72,16 @@ func main() {
 	select {
 	case sig := <-interrupt:
 		l.Info("app - Run - interrupt: %s", sig.String())
-	case err = <-server.Notify():
-		l.Error(fmt.Errorf("app - Run - server.Notify: %w", err))
+	case err = <-httpServer.Notify():
+		l.Error(fmt.Errorf("app - Run - httpServer.Notify: %w", err))
+	case err = <-grpcServer.Notify():
+		l.Error(fmt.Errorf("app - Run - grpcServer.Notify: %w", err))
 	}
 
-	if err := server.Shutdown(); err != nil {
-		l.Error(fmt.Errorf("app - Run - server.Shutdown: %w", err))
+	if err := httpServer.Shutdown(); err != nil {
+		l.Error(fmt.Errorf("app - Run - httpServer.Shutdown: %w", err))
+	}
+	if err := grpcServer.Shutdown(); err != nil {
+		l.Error(fmt.Errorf("app - Run - grpcServer.Shutdown: %w", err))
 	}
 }

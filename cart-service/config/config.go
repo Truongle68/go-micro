@@ -10,6 +10,7 @@ import (
 type (
 	Config struct {
 		HTTP  HTTP
+		GRPC  GRPC
 		Redis Redis
 		JWT   JWT
 		Log   Log
@@ -18,6 +19,10 @@ type (
 
 	HTTP struct {
 		Port string `env:"HTTP_PORT" envDefault:"4003"`
+	}
+
+	GRPC struct {
+		Port string `env:"GRPC_PORT" envDefault:"50053"`
 	}
 
 	Redis struct {
