@@ -57,10 +57,30 @@ services:
     networks:
       - catalog-net
 
+  order-db:
+    container_name: order-db
+    image: postgres:18-alpine
+    volumes:
+      - order-data:/var/lib/postgresql
+      - ./order-service/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    environment:
+      - POSTGRES_USER=${ORDER_POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${ORDER_POSTGRES_PW:-postgres}
+      - POSTGRES_DB=${ORDER_POSTGRES_DB:-order-db}
+    ports:
+      - "5434:5432"
+    restart: always
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   identity-data:
   catalog-data:
   redis-data:
+  order-data:
 
 networks:
   catalog-net:
