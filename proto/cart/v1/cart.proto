@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package cart.v1;
+
+option go_package = "github.com/TruongLe68/go-micro/pkg/gen/proto/go/cart/v1;cartv1";
+
+service CartService {
+  rpc GetCart (GetCartRequest) returns (GetCartResponse);
+  rpc AddItem (AddItemRequest) returns (AddItemResponse);
+  rpc UpdateItemQuantity (UpdateItemQuantityRequest) returns (UpdateItemQuantityResponse);
+  rpc RemoveItem (RemoveItemRequest) returns (RemoveItemResponse);
+  rpc ClearCart (ClearCartRequest) returns (ClearCartResponse);
+}
+
+message CartItem {
+  string sku = 1;
+  int32 quantity = 2;
+}
+
+message Cart {
+  string user_id = 1;
+  repeated CartItem items = 2;
+  string updated_at = 3;
+}
+
+message GetCartRequest {
+  string user_id = 1;
+}
+
+message GetCartResponse {
+  Cart cart = 1;
+}
+
+message AddItemRequest {
+  string user_id = 1;
+  string sku = 2;
+  int32 quantity = 3;
+}
+
+message AddItemResponse {
+  Cart cart = 1;
+}
+
+message UpdateItemQuantityRequest {
+  string user_id = 1;
+  string sku = 2;
+  int32 quantity = 3;
+}
+
+message UpdateItemQuantityResponse {
+  Cart cart = 1;
+}
+
+message RemoveItemRequest {
+  string user_id = 1;
+  string sku = 2;
+}
+
+message RemoveItemResponse {
+  Cart cart = 1;
+}
+
+message ClearCartRequest {
+  string user_id = 1;
+}
+
+message ClearCartResponse {
+  bool success = 1;
+}
