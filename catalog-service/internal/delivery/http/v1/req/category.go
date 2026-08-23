@@ -8,7 +8,7 @@ type CreateCategory struct {
 	NameTranslation map[string]string `json:"name_translation,omitempty"`
 	Slug            string            `json:"slug" validate:"required"`
 	Icon            string            `json:"icon"`
-	SortOrder       int64             `json:"sort_order"`
+	SortOrder       int               `json:"sort_order"`
 	IsActive        *bool             `json:"is_active,omitempty"`
 }
 
@@ -30,7 +30,7 @@ type UpdateCategory struct {
 	NameTranslation map[string]string `json:"name_translation,omitempty"`
 	Slug            *string           `json:"slug,omitempty"`
 	Icon            *string           `json:"icon,omitempty"`
-	SortOrder       *int64            `json:"sort_order,omitempty"`
+	SortOrder       *int              `json:"sort_order,omitempty"`
 	IsActive        *bool             `json:"is_active,omitempty"`
 }
 

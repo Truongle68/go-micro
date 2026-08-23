@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/internal/repo"
 	"catalog-service/pkg/sliceutil"
 	"context"
 	"crypto/rand"
@@ -37,7 +36,7 @@ type CreateVariantInput struct {
 }
 
 type PriceInput struct {
-	Amount   int64
+	Amount   int
 	Currency string
 }
 
@@ -89,14 +88,12 @@ type ProductList struct {
 }
 
 type ProductUC struct {
-	repo      repo.ProductRepository
-	cateRepo  repo.CategoryRepository
+	repo      ProductRepository
+	cateRepo  CategoryRepository
 	sanitizer *bluemonday.Policy
 }
 
-var _ ProductUsecase = (*ProductUC)(nil)
-
-func NewProductUC(repo repo.ProductRepository, cateRepo repo.CategoryRepository) *ProductUC {
+func NewProductUC(repo ProductRepository, cateRepo CategoryRepository) *ProductUC {
 	return &ProductUC{
 		repo:      repo,
 		cateRepo:  cateRepo,
@@ -572,4 +569,12 @@ func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductPar
 	}
 
 	return uc.loadDetailedProductList(ctx, result)
+}
+
+func (uc *ProductUC) GetVariantsBySKUs(ctx context.Context, skus []string) ([]domain.Variant, error) {
+	variants, err := uc.repo.FindVariantsBySKUs(ctx, skus)
+	if err != nil {
+		return []domain.Variant{}, fmt.Errorf("finding variants: %w", err)
+	}
+	return variants, nil
 }

@@ -1,8 +1,7 @@
-package repo
+package mongorepo
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/internal/repo"
 	"context"
 	"errors"
 	"fmt"
@@ -18,7 +17,7 @@ type CategoryRepo struct {
 	collection *mongo.Collection
 }
 
-var _ repo.CategoryRepository = (*CategoryRepo)(nil)
+// var _ repo.CategoryRepository = (*CategoryRepo)(nil)
 
 func NewCategoryRepo(db *mongo.Database) *CategoryRepo {
 	return &CategoryRepo{
@@ -33,7 +32,7 @@ type categoryModel struct {
 	NameTranslation map[string]string  `bson:"name_translation,omitempty"`
 	Slug            string             `bson:"slug"`
 	Icon            string             `bson:"icon"`
-	SortOrder       int64              `bson:"sort_order"`
+	SortOrder       int                `bson:"sort_order"`
 	IsActive        bool               `bson:"is_active"`
 	Ancestors       []categoryRefModel `bson:"ancestors,omitempty"`
 	CreatedAt       time.Time          `bson:"created_at"`
@@ -231,7 +230,6 @@ func (r *CategoryRepo) FindByIDs(ctx context.Context, ids []string) (*domain.Lis
 	}
 	return r.findWithFilter(ctx, filter, nil)
 }
-
 
 func (r *CategoryRepo) FindChildren(ctx context.Context, parentID string, p pagination.Params) (*domain.ListCategoryResult, error) {
 	poid, err := bson.ObjectIDFromHex(parentID)

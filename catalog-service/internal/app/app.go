@@ -2,7 +2,7 @@ package app
 
 import (
 	"catalog-service/config"
-	repo "catalog-service/internal/repo/mongodb"
+	"catalog-service/internal/repo/mongorepo"
 	"catalog-service/internal/usecase"
 	"context"
 	"fmt"
@@ -11,11 +11,14 @@ import (
 	"os/signal"
 	"syscall"
 
+	grpcv1 "catalog-service/internal/delivery/grpc/v1"
 	httpr "catalog-service/internal/delivery/http"
 	v1 "catalog-service/internal/delivery/http/v1"
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
+	catalogv1 "github.com/TruongLe68/go-micro/pkg/gen/proto/go/catalog/v1"
+	"github.com/TruongLe68/go-micro/pkg/grpcserver"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/mongo"
@@ -25,25 +28,28 @@ import (
 
 type servers struct {
 	http *httpserver.Server
+	grpc *grpcserver.Server
 }
 
 type useCases struct {
-	product  usecase.ProductUsecase
-	category usecase.CategoryUsecase
+	product     v1.ProductUsecase
+	grpcProduct grpcv1.ProductGRPCUsecase
+	category    v1.CategoryUsecase
 }
 
 func initUsecases(db *mongodrv.Database) useCases {
-	productRepo := repo.NewProductRepo(db)
+	productRepo := mongorepo.NewProductRepo(db)
 	if err := productRepo.EnsureIndexes(context.Background()); err != nil {
 		log.Printf("failed to ensure product indexes: %v", err)
 	}
-	categoryRepo := repo.NewCategoryRepo(db)
+	categoryRepo := mongorepo.NewCategoryRepo(db)
 	productUC := usecase.NewProductUC(productRepo, categoryRepo)
 	categoryUC := usecase.NewCategoryUC(categoryRepo)
 
 	return useCases{
-		product:  productUC,
-		category: categoryUC,
+		product:     productUC,
+		grpcProduct: productUC,
+		category:    categoryUC,
 	}
 }
 
@@ -58,13 +64,19 @@ func initServers(l logger.Interface, uc useCases, cfg *config.Config, v jwtmanag
 	}
 	httpr.NewRouter(http.Engine, deps)
 
+	grpcServer := grpcserver.New(l, grpcserver.Port(cfg.GRPC.Port))
+	productServer := grpcv1.NewProductServer(uc.grpcProduct, l)
+	catalogv1.RegisterProductServiceServer(grpcServer.App, productServer)
+
 	return &servers{
 		http: http,
+		grpc: grpcServer,
 	}
 }
 
 func (s *servers) startServer() {
 	s.http.Start()
+	s.grpc.Start()
 }
 
 func (s *servers) waitForShutdown(l logger.Interface) {
@@ -78,7 +90,9 @@ func (s *servers) waitForShutdown(l logger.Interface) {
 		l.Info("app - Run - interrupt: %s", sig.String())
 	case err = <-s.http.Notify():
 		l.Error(fmt.Errorf("app - Run - s.http.Notify: %w", err))
-
+		s.shutdownServers(l)
+	case err = <-s.grpc.Notify():
+		l.Error(fmt.Errorf("app - Run - s.grpc.Notify: %w", err))
 		s.shutdownServers(l)
 	}
 }
@@ -86,6 +100,9 @@ func (s *servers) waitForShutdown(l logger.Interface) {
 func (s *servers) shutdownServers(l logger.Interface) {
 	if err := s.http.Shutdown(); err != nil {
 		l.Error(fmt.Errorf("app - Run - s.http.Shutdown: %w", err))
+	}
+	if err := s.grpc.Shutdown(); err != nil {
+		l.Error(fmt.Errorf("app - Run - s.grpc.Shutdown: %w", err))
 	}
 }
 

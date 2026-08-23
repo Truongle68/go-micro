@@ -2,7 +2,6 @@ package usecase_test
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/internal/repo"
 	"catalog-service/internal/usecase"
 	"context"
 	"errors"
@@ -12,7 +11,7 @@ import (
 )
 
 type mockCategoryRepoForUC struct {
-	repo.CategoryRepository
+	usecase.CategoryRepository
 	categories map[string]*domain.Category
 	createFn   func(ctx context.Context, c *domain.Category) error
 	updateFn   func(ctx context.Context, c *domain.Category) (*domain.Category, error)
@@ -45,8 +44,8 @@ func (m *mockCategoryRepoForUC) Update(ctx context.Context, c *domain.Category) 
 
 func TestCategoryUC_CreateWithAncestors(t *testing.T) {
 	parent := &domain.Category{
-		ID:   "cat-parent",
-		Name: "Electronics",
+		ID:        "cat-parent",
+		Name:      "Electronics",
 		Ancestors: []domain.CategoryRef{},
 	}
 

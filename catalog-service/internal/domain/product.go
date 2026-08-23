@@ -42,7 +42,7 @@ type OptionType struct {
 }
 
 type Price struct {
-	Amount   int64
+	Amount   int
 	Currency string
 }
 
@@ -135,16 +135,16 @@ func (p *Product) ApplyUpdate(params UpdateProductParams) error {
 type SearchProductParams struct {
 	Query      string
 	CategoryID string
-	MinPrice   *int64
-	MaxPrice   *int64
+	MinPrice   *int
+	MaxPrice   *int
 	Status     *ProductStatus
 }
 
 type SearchProductsQuery struct {
 	Query      string         `form:"q"`
 	CategoryID string         `form:"category_id"`
-	MinPrice   *int64         `form:"min_price"`
-	MaxPrice   *int64         `form:"max_price"`
+	MinPrice   *int         `form:"min_price"`
+	MaxPrice   *int         `form:"max_price"`
 	Status     *ProductStatus `form:"status"`
 }
 

@@ -1,8 +1,7 @@
-package repo
+package mongorepo
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/internal/repo"
 	"context"
 	"errors"
 	"fmt"
@@ -25,8 +24,6 @@ type ProductRepo struct {
 	productColl *mongo.Collection
 }
 
-var _ repo.ProductRepository = (*ProductRepo)(nil)
-
 func NewProductRepo(db *mongo.Database) *ProductRepo {
 	return &ProductRepo{
 		productColl: db.Collection("products"),
@@ -44,7 +41,7 @@ type optionTypeModel struct {
 }
 
 type priceModel struct {
-	Amount   int64  `bson:"amount"`
+	Amount   int    `bson:"amount"`
 	Currency string `bson:"currency"`
 }
 
@@ -161,6 +158,21 @@ func (m productModel) toDomain() *domain.Product {
 		Status:          domain.ProductStatus(m.Status),
 		CreatedAt:       m.CreatedAt,
 		UpdatedAt:       m.UpdatedAt,
+	}
+}
+
+func (vm variantModel) toDomain() domain.Variant {
+	return domain.Variant{
+		ID:         vm.ID.Hex(),
+		SKU:        vm.SKU,
+		Attributes: vm.Attributes,
+		Price: domain.Price{
+			Amount:   vm.Price.Amount,
+			Currency: vm.Price.Currency,
+		},
+		Image:     vm.Image,
+		IsActive:  vm.IsActive,
+		CreatedAt: vm.CreatedAt,
 	}
 }
 
@@ -488,7 +500,6 @@ func (r *ProductRepo) List(ctx context.Context, p pagination.Params) (*domain.Pr
 }
 
 func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*domain.ProductListResult, error) {
-
 	filter, err := buildQueryFilter(sParams)
 	if err != nil {
 		return nil, err
@@ -499,6 +510,44 @@ func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductPa
 	}
 
 	return r.findByFilter(ctx, filter, pParams)
+}
+
+func (r *ProductRepo) FindVariantsBySKUs(ctx context.Context, skus []string) ([]domain.Variant, error) {
+	filter := bson.M{
+		"variants.sku": bson.M{
+			"$in": skus,
+		},
+	}
+	total, err := r.productColl.CountDocuments(ctx, filter)
+	if err != nil {
+		return []domain.Variant{}, fmt.Errorf("counting variants: %w", err)
+	}
+
+	if total == 0 {
+		return []domain.Variant{}, nil
+	}
+
+	if total < int64(len(skus)) {
+		return []domain.Variant{}, fmt.Errorf("some not found: %w", err)
+	}
+
+	cursor, err := r.productColl.Find(ctx, filter)
+	if err != nil {
+		return []domain.Variant{}, fmt.Errorf("finding variants by skus: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var models []variantModel
+	if err := cursor.All(ctx, &models); err != nil {
+		return []domain.Variant{}, fmt.Errorf("decoding variants: %w", err)
+	}
+
+	results := make([]domain.Variant, len(models))
+	for i, m := range models {
+		results[i] = m.toDomain()
+	}
+
+	return results, nil
 }
 
 func buildQueryFilter(params domain.SearchProductParams) (bson.M, error) {

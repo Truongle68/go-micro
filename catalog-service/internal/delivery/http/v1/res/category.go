@@ -7,17 +7,17 @@ import (
 )
 
 type CategoryRead struct {
-	ID              string                `json:"id"`
-	ParentID        *string               `json:"parent_id"`
-	Name            string                `json:"name"`
-	NameTranslation map[string]string     `json:"name_translation,omitempty"`
-	Slug            string                `json:"slug"`
-	Icon            string                `json:"icon,omitempty"`
-	SortOrder       int64                 `json:"sort_order"`
-	IsActive        bool                  `json:"is_active"`
-	Ancestors       []domain.CategoryRef  `json:"ancestors,omitempty"`
-	CreatedAt       time.Time             `json:"created_at"`
-	UpdatedAt       time.Time             `json:"updated_at"`
+	ID              string               `json:"id"`
+	ParentID        *string              `json:"parent_id"`
+	Name            string               `json:"name"`
+	NameTranslation map[string]string    `json:"name_translation,omitempty"`
+	Slug            string               `json:"slug"`
+	Icon            string               `json:"icon,omitempty"`
+	SortOrder       int                  `json:"sort_order"`
+	IsActive        bool                 `json:"is_active"`
+	Ancestors       []domain.CategoryRef `json:"ancestors,omitempty"`
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
 }
 
 func ToCategoryRead(dto *usecase.CategoryDTO) CategoryRead {

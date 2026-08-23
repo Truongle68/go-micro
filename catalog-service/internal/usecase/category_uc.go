@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/internal/repo"
 	"context"
 	"fmt"
 	"time"
@@ -17,7 +16,7 @@ type CategoryDTO struct {
 	NameTranslation map[string]string    `json:"name_translation"`
 	Slug            string               `json:"slug"`
 	Icon            string               `json:"icon"`
-	SortOrder       int64                `json:"sort_order"`
+	SortOrder       int                  `json:"sort_order"`
 	IsActive        bool                 `json:"is_active"`
 	Ancestors       []domain.CategoryRef `json:"ancestors"`
 	CreatedAt       time.Time            `json:"created_at"`
@@ -30,7 +29,7 @@ type CreateCategoryInput struct {
 	NameTranslation map[string]string
 	Slug            string
 	Icon            string
-	SortOrder       int64
+	SortOrder       int
 	IsActive        *bool
 }
 
@@ -41,22 +40,20 @@ type UpdateCategoryInput struct {
 	NameTranslation map[string]string
 	Slug            *string
 	Icon            *string
-	SortOrder       *int64
+	SortOrder       *int
 	IsActive        *bool
 }
 
 type CategoryList struct {
 	Categories []CategoryDTO `json:"categories"`
-	TotalCount int64         `json:"total_count"`
+	TotalCount int64           `json:"total_count"`
 }
 
 type CategoryUC struct {
-	repo repo.CategoryRepository
+	repo CategoryRepository
 }
 
-var _ CategoryUsecase = (*CategoryUC)(nil)
-
-func NewCategoryUC(repo repo.CategoryRepository) *CategoryUC {
+func NewCategoryUC(repo CategoryRepository) *CategoryUC {
 	return &CategoryUC{
 		repo: repo,
 	}

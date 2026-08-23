@@ -9,7 +9,7 @@ type Category struct {
 	NameTranslation map[string]string
 	Slug            string
 	Icon            string
-	SortOrder       int64
+	SortOrder       int
 	IsActive        bool
 	Ancestors       []CategoryRef
 	CreatedAt       time.Time
@@ -22,7 +22,7 @@ type NewCategoryParams struct {
 	NameTranslation map[string]string
 	Slug            string
 	Icon            string
-	SortOrder       int64
+	SortOrder       int
 	IsActive        *bool
 	Ancestors       []CategoryRef
 }
@@ -63,7 +63,7 @@ type UpdateCategoryParams struct {
 	NameTranslation map[string]string
 	Slug            *string
 	Icon            *string
-	SortOrder       *int64
+	SortOrder       *int
 	IsActive        *bool
 	Ancestors       []CategoryRef
 }

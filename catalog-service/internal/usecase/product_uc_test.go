@@ -2,7 +2,6 @@ package usecase_test
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/internal/repo"
 	"catalog-service/internal/usecase"
 	"context"
 	"errors"
@@ -12,7 +11,7 @@ import (
 )
 
 type mockProductRepo struct {
-	repo.ProductRepository
+	usecase.ProductRepository
 	createFn    func(ctx context.Context, p *domain.Product) error
 	existSlugFn func(ctx context.Context, name string) (bool, error)
 	findByIDFn  func(ctx context.Context, id string) (*domain.Product, error)
@@ -62,7 +61,7 @@ func (m *mockProductRepo) Update(ctx context.Context, p *domain.Product, expecte
 }
 
 type mockCategoryRepo struct {
-	repo.CategoryRepository
+	usecase.CategoryRepository
 }
 
 func (m *mockCategoryRepo) FindByID(ctx context.Context, id string) (*domain.Category, error) {

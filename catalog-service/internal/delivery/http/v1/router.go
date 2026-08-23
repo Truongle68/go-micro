@@ -2,7 +2,6 @@ package v1
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/internal/usecase"
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
@@ -13,15 +12,15 @@ import (
 )
 
 type V1 struct {
-	product  usecase.ProductUsecase
-	category usecase.CategoryUsecase
+	product  ProductUsecase
+	category CategoryUsecase
 	l        logger.Interface
 	v        *validator.Validate
 }
 
 type Dependencies struct {
-	Product  usecase.ProductUsecase
-	Category usecase.CategoryUsecase
+	Product  ProductUsecase
+	Category CategoryUsecase
 	Logger   logger.Interface
 	Verifier jwtmanager.JWTManager
 	Cache    redismanager.IdentityCacher

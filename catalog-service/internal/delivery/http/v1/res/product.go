@@ -16,7 +16,7 @@ type ProductResponse struct {
 type VariantResponse struct {
 	ID    string `json:"id"`
 	SKU   string `json:"sku"`
-	Price int64  `json:"price"`
+	Price int    `json:"price"`
 }
 
 type CategoryRefRead struct {
@@ -30,7 +30,7 @@ type OptionTypeRead struct {
 }
 
 type PriceRead struct {
-	Amount   int64  `json:"amount"`
+	Amount   int    `json:"amount"`
 	Currency string `json:"currency"`
 }
 
@@ -60,7 +60,7 @@ type ProductCategoryRead struct {
 	NameTranslation map[string]string `json:"name_translation,omitempty"`
 	Slug            string            `json:"slug"`
 	Icon            string            `json:"icon,omitempty"`
-	SortOrder       int64             `json:"sort_order"`
+	SortOrder       int               `json:"sort_order"`
 	IsActive        bool              `json:"is_active"`
 }
 
