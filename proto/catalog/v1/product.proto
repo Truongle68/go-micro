@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package catalog.v1;
+
+option go_package = "github.com/TruongLe68/go-micro/pkg/gen/proto/go/catalog/v1;catalogv1";
+
+service ProductService {
+    rpc GetVariantsBySKUs(GetVariantsBySKURequest) returns (GetVariantsBySKUResponse);
+}
+
+message Variant {
+    string sku = 1;
+    map<string, string> attributes = 2;
+    Price price = 3;
+    string image = 4;
+    bool is_active = 5;
+}
+
+message Price {
+    string currency = 1;
+    int32 amount = 2;
+}
+
+message GetVariantsBySKUResponse {
+    repeated Variant variants = 1;
+}
+
+message GetVariantsBySKURequest {
+    repeated string sku = 1;
+}
