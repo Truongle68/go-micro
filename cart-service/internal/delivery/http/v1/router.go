@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"cart-service/internal/usecase"
-
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	"github.com/TruongLe68/go-micro/pkg/ginmw"
@@ -12,19 +10,19 @@ import (
 )
 
 type V1 struct {
-	c usecase.Cart
+	c CartUC
 	l logger.Interface
 	v *validator.Validate
 }
 
 type Dependencies struct {
-	Cart     usecase.Cart
+	Cart     CartUC
 	Verifier jwtmanager.JWTManager
 	Cache    redismanager.BlacklistCacher
 	Logger   logger.Interface
 }
 
-func NewDependencies(cart usecase.Cart, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
+func NewDependencies(cart CartUC, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
 	return &Dependencies{
 		Cart:     cart,
 		Verifier: verifier,

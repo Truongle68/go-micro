@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"cart-service/internal/client"
 	"cart-service/internal/domain"
 	"cart-service/internal/usecase"
 
@@ -19,6 +20,34 @@ func newMockCartRepo() *mockCartRepo {
 	return &mockCartRepo{
 		carts: make(map[string]*domain.Cart),
 	}
+}
+
+type mockCatalogClient struct {
+	variants map[string]client.VariantDTO
+	err      error
+}
+
+func newMockCatalogClient(variants ...client.VariantDTO) *mockCatalogClient {
+	m := &mockCatalogClient{
+		variants: make(map[string]client.VariantDTO),
+	}
+	for _, v := range variants {
+		m.variants[v.SKU] = v
+	}
+	return m
+}
+
+func (m *mockCatalogClient) GetVariantsBySKUs(ctx context.Context, skus []string) ([]client.VariantDTO, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	out := make([]client.VariantDTO, 0, len(skus))
+	for _, sku := range skus {
+		if v, ok := m.variants[sku]; ok {
+			out = append(out, v)
+		}
+	}
+	return out, nil
 }
 
 func (m *mockCartRepo) GetByUserID(ctx context.Context, userID string) (*domain.Cart, error) {
@@ -46,8 +75,9 @@ func (m *mockCartRepo) Delete(ctx context.Context, userID string) error {
 
 func TestCartUseCaseFlow(t *testing.T) {
 	repo := newMockCartRepo()
+	client := newMockCatalogClient()
 	l := logger.New("error")
-	uc := usecase.NewCartUC(repo, l)
+	uc := usecase.NewCartUC(repo, client, l)
 
 	ctx := context.Background()
 	userID := "user_test_1"

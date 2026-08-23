@@ -11,6 +11,7 @@ type (
 	Config struct {
 		HTTP  HTTP
 		GRPC  GRPC
+		Services Services
 		Redis Redis
 		JWT   JWT
 		Log   Log
@@ -23,6 +24,10 @@ type (
 
 	GRPC struct {
 		Port string `env:"GRPC_PORT" envDefault:"50053"`
+	}
+
+	Services struct {
+		CatalogServiceGRPCAddr string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
 	}
 
 	Redis struct {

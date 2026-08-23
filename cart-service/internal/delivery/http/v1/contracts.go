@@ -1,15 +1,17 @@
-package usecase
+package v1
 
 import (
-	"context"
-
 	"cart-service/internal/domain"
+	"cart-service/internal/usecase"
+	"context"
 )
 
-type Cart interface {
+type CartUC interface {
 	GetCart(ctx context.Context, userID string) (*domain.Cart, error)
 	AddItem(ctx context.Context, userID string, sku string, quantity int) (*domain.Cart, error)
 	UpdateItemQuantity(ctx context.Context, userID string, sku string, quantity int) (*domain.Cart, error)
 	RemoveItem(ctx context.Context, userID string, sku string) (*domain.Cart, error)
 	ClearCart(ctx context.Context, userID string) error
 }
+
+var _ CartUC = (*usecase.CartUC)(nil) 

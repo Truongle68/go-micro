@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"strings"
 	"time"
 )
@@ -15,12 +14,6 @@ type Cart struct {
 type CartItem struct {
 	SKU      string `json:"sku"`
 	Quantity int    `json:"quantity"`
-}
-
-type CartRepository interface {
-	GetByUserID(ctx context.Context, userID string) (*Cart, error)
-	Save(ctx context.Context, cart *Cart) error
-	Delete(ctx context.Context, userID string) error
 }
 
 func NewCart(userID string) *Cart {

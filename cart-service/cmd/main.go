@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"cart-service/config"
+	"cart-service/internal/client/grpc"
 	grpcv1 "cart-service/internal/delivery/grpc/v1"
 	"cart-service/internal/delivery/http"
 	v1 "cart-service/internal/delivery/http/v1"
@@ -46,9 +47,12 @@ func main() {
 
 	cache := redismanager.NewIdentityCache(redisClient.Client)
 
+	// init gRPC client
+	catalogClient, err := grpc.NewCatalogGRPCClient(cfg.Services.CatalogServiceGRPCAddr)
+
 	// init repo & usecase
 	cartRepo := redisrepo.NewCartRepo(redisClient.Client, cfg.Cart.TTL)
-	cartUC := usecase.NewCartUC(cartRepo, l)
+	cartUC := usecase.NewCartUC(cartRepo, catalogClient, l)
 
 	// init http server & router
 	httpServer := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
