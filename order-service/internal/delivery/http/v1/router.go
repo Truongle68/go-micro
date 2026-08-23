@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"order-service/internal/usecase"
-
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	"github.com/TruongLe68/go-micro/pkg/ginmw"
@@ -12,19 +10,19 @@ import (
 )
 
 type V1 struct {
-	o usecase.Order
+	o OrderUC
 	l logger.Interface
 	v *validator.Validate
 }
 
 type Dependencies struct {
-	Order    usecase.Order
+	Order    OrderUC
 	Verifier jwtmanager.JWTManager
 	Cache    redismanager.BlacklistCacher
 	Logger   logger.Interface
 }
 
-func NewDependencies(order usecase.Order, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
+func NewDependencies(order OrderUC, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
 	return &Dependencies{
 		Order:    order,
 		Verifier: verifier,

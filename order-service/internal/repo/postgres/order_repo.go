@@ -21,8 +21,6 @@ func NewOrderRepo(db *sql.DB) *OrderRepo {
 	}
 }
 
-var _ domain.OrderRepository = (*OrderRepo)(nil)
-
 func (r *OrderRepo) Create(ctx context.Context, order *domain.Order, history *domain.OrderStatusHistory) error {
 	executor := orderpg.GetExecutor(ctx, r.db)
 
@@ -52,8 +50,8 @@ func (r *OrderRepo) Create(ctx context.Context, order *domain.Order, history *do
 
 	queryItem := `
 		INSERT INTO order_items (
-			id, order_id, sku, product_name, variant_attrs, unit_price, quantity, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+			id, order_id, product_id, variant_id, sku, product_name, image, variant_attrs, unit_price, quantity, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
 	for _, item := range order.Items {
 		variantJSON, err := json.Marshal(item.VariantAttrs)
@@ -62,7 +60,7 @@ func (r *OrderRepo) Create(ctx context.Context, order *domain.Order, history *do
 		}
 
 		_, err = executor.ExecContext(ctx, queryItem,
-			item.ID, item.OrderID, item.SKU, item.ProductName, variantJSON, item.UnitPrice, item.Quantity, order.CreatedAt,
+			item.ID, item.OrderID, item.ProductID, item.VariantID, item.SKU, item.ProductName, item.Image, variantJSON, item.UnitPrice, item.Quantity, order.CreatedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("OrderRepo.Create - insert order item %s: %w", item.SKU, err)
@@ -184,7 +182,7 @@ func (r *OrderRepo) findItemsByOrderID(ctx context.Context, executor interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }, orderID string) ([]domain.OrderItem, error) {
 	queryItems := `
-		SELECT id, order_id, sku, product_name, variant_attrs, unit_price, quantity
+		SELECT id, order_id, product_id, variant_id, sku, product_name, image, variant_attrs, unit_price, quantity
 		FROM order_items
 		WHERE order_id = $1
 		ORDER BY created_at ASC`
@@ -199,7 +197,7 @@ func (r *OrderRepo) findItemsByOrderID(ctx context.Context, executor interface {
 	for rows.Next() {
 		var item domain.OrderItem
 		var variantJSON []byte
-		if err := rows.Scan(&item.ID, &item.OrderID, &item.SKU, &item.ProductName, &variantJSON, &item.UnitPrice, &item.Quantity); err != nil {
+		if err := rows.Scan(&item.ID, &item.OrderID, &item.ProductID, &item.VariantID, &item.SKU, &item.ProductName, &item.Image, &variantJSON, &item.UnitPrice, &item.Quantity); err != nil {
 			return nil, fmt.Errorf("OrderRepo.findItemsByOrderID - scan item: %w", err)
 		}
 		if len(variantJSON) > 0 {

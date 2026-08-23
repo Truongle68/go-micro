@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"strings"
 	"time"
 
@@ -35,8 +34,11 @@ type AddressSnapshot struct {
 type OrderItem struct {
 	ID           string            `json:"id"`
 	OrderID      string            `json:"order_id"`
+	ProductID    string            `json:"product_id"`
+	VariantID    string            `json:"variant_id"`
 	SKU          string            `json:"sku"`
 	ProductName  string            `json:"product_name"`
+	Image        string            `json:"image"`
 	VariantAttrs map[string]string `json:"variant_attrs,omitempty"`
 	UnitPrice    int64             `json:"unit_price"`
 	Quantity     int               `json:"quantity"`
@@ -67,14 +69,6 @@ type Order struct {
 	UpdatedAt       time.Time       `json:"updated_at"`
 }
 
-type OrderRepository interface {
-	Create(ctx context.Context, order *Order, history *OrderStatusHistory) error
-	FindByID(ctx context.Context, id string) (*Order, error)
-	FindByUserID(ctx context.Context, userID string, limit int64, offset int64) ([]Order, int64, error)
-	UpdateStatus(ctx context.Context, order *Order, history *OrderStatusHistory) error
-	GetTrackingHistory(ctx context.Context, orderID string) ([]OrderStatusHistory, error)
-}
-
 func NewOrder(userID string, items []OrderItem, address AddressSnapshot, shippingFee int64, paymentMethod string) (*Order, *OrderStatusHistory, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, nil, ErrInvalidUserID
@@ -100,8 +94,11 @@ func NewOrder(userID string, items []OrderItem, address AddressSnapshot, shippin
 		processedItems[i] = OrderItem{
 			ID:           itemID,
 			OrderID:      orderID,
+			ProductID:    item.ProductID,
+			VariantID:    item.VariantID,
 			SKU:          item.SKU,
 			ProductName:  item.ProductName,
+			Image:        item.Image,
 			VariantAttrs: item.VariantAttrs,
 			UnitPrice:    item.UnitPrice,
 			Quantity:     item.Quantity,

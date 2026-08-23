@@ -32,8 +32,11 @@ func (h *V1) checkout(c *gin.Context) {
 	itemsInput := make([]usecase.CheckoutItemInput, len(r.Items))
 	for i, item := range r.Items {
 		itemsInput[i] = usecase.CheckoutItemInput{
+			ProductID:    item.ProductID,
+			VariantID:    item.VariantID,
 			SKU:          item.SKU,
 			ProductName:  item.ProductName,
+			Image:        item.Image,
 			VariantAttrs: item.VariantAttrs,
 			UnitPrice:    item.UnitPrice,
 			Quantity:     item.Quantity,

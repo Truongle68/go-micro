@@ -27,8 +27,11 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id VARCHAR(255) DEFAULT '',
+    variant_id VARCHAR(255) DEFAULT '',
     sku VARCHAR(255) NOT NULL,
     product_name VARCHAR(255) NOT NULL,
+    image TEXT DEFAULT '',
     variant_attrs JSONB DEFAULT '{}'::jsonb,
     unit_price BIGINT NOT NULL DEFAULT 0,
     quantity INT NOT NULL DEFAULT 1,
