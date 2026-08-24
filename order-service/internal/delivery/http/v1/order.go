@@ -32,14 +32,8 @@ func (h *V1) checkout(c *gin.Context) {
 	itemsInput := make([]usecase.CheckoutItemInput, len(r.Items))
 	for i, item := range r.Items {
 		itemsInput[i] = usecase.CheckoutItemInput{
-			ProductID:    item.ProductID,
-			VariantID:    item.VariantID,
-			SKU:          item.SKU,
-			ProductName:  item.ProductName,
-			Image:        item.Image,
-			VariantAttrs: item.VariantAttrs,
-			UnitPrice:    item.UnitPrice,
-			Quantity:     item.Quantity,
+			SKU:      item.SKU,
+			Quantity: item.Quantity,
 		}
 	}
 
@@ -52,8 +46,20 @@ func (h *V1) checkout(c *gin.Context) {
 
 	order, err := h.o.Checkout(c.Request.Context(), userID, input, token)
 	if err != nil {
-		if errors.Is(err, domain.ErrEmptyOrderItems) || errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrCartEmpty) {
-			response.Error(c, http.StatusBadRequest, response.CodeValidationError, err.Error())
+		appErr := domain.ToAppError(err)
+		if appErr != nil {
+			var status int
+			switch {
+			case errors.Is(err, domain.ErrSKUNotFound):
+				status = http.StatusNotFound
+
+			case errors.Is(err, domain.ErrInactiveVariant):
+				status = http.StatusConflict
+
+			default:
+				status = http.StatusBadRequest
+			}
+			response.Error(c, status, string(appErr.Code), appErr.Message)
 			return
 		}
 		h.l.Error("h.checkout - h.o.Checkout: %v", err)

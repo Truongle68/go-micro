@@ -16,5 +16,6 @@ type CartDTO struct {
 
 type CartClient interface {
 	GetCart(ctx context.Context, userID string, token string) (*CartDTO, error)
+	RemoveItems(ctx context.Context, userID string, skus []string, token string) error
 	ClearCart(ctx context.Context, userID string, token string) error
 }

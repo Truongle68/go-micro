@@ -242,8 +242,15 @@ func (o *Order) Deliver() (*OrderStatusHistory, error) {
 }
 
 func (o *Order) Cancel(reason string) (*OrderStatusHistory, error) {
-	if o.Status == OrderStatusDelivered || o.Status == OrderStatusCancelled || o.Status == OrderStatusRefunded {
+	switch o.Status {
+	case OrderStatusCancelled:
 		return nil, ErrOrderAlreadyCancelled
+	case OrderStatusShipped:
+		return nil, ErrCannotCancelShippedOrder
+	case OrderStatusDelivered:
+		return nil, ErrCannotCancelDeliveriedOrder
+	case OrderStatusRefunded:
+		return nil, ErrOrderAlreadyRefunded
 	}
 
 	oldStatus := o.Status

@@ -52,6 +52,22 @@ func (c *cartGRPCClient) GetCart(ctx context.Context, userID string, token strin
 	}, nil
 }
 
+func (c *cartGRPCClient) RemoveItems(ctx context.Context, userID string, skus []string, token string) error {
+	if len(skus) == 0 {
+		return nil
+	}
+
+	_, err := c.client.RemoveItems(ctx, &cartv1.RemoveItemsRequest{
+		UserId: userID,
+		Skus:   skus,
+	})
+	if err != nil {
+		return fmt.Errorf("grpc RemoveItems failed for user %s: %w", userID, err)
+	}
+
+	return nil
+}
+
 func (c *cartGRPCClient) ClearCart(ctx context.Context, userID string, token string) error {
 	res, err := c.client.ClearCart(ctx, &cartv1.ClearCartRequest{
 		UserId: userID,

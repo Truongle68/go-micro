@@ -184,7 +184,7 @@ func (r *OrderRepo) findItemsByOrderID(ctx context.Context, executor interface {
 	queryItems := `
 		SELECT id, order_id, product_id, variant_id, sku, product_name, image, variant_attrs, unit_price, quantity
 		FROM order_items
-		WHERE order_id = $1
+		WHERE order_id=$1
 		ORDER BY created_at ASC`
 
 	rows, err := executor.QueryContext(ctx, queryItems, orderID)

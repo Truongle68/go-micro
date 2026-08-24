@@ -13,6 +13,7 @@ import (
 	v1 "order-service/internal/delivery/http/v1"
 	pgrepo "order-service/internal/repo/postgres"
 	"order-service/internal/usecase"
+	pgtransactor "order-service/pkg/postgres"
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
@@ -36,6 +37,7 @@ func main() {
 		l.Fatal("failed to initialize postgres: %v", err)
 	}
 	defer pg.Close()
+	transactor := pgtransactor.NewPostgresTransactor(pg.DB)
 
 	// optional redis connection for token blacklist checking
 	redisClient, err := redis.New("localhost:6379", "secretredispass", 0)
@@ -59,10 +61,14 @@ func main() {
 	if err != nil {
 		l.Fatal("failed to initialize cart gRPC client: %v", err)
 	}
+	catalogClient, err := grpcclient.NewCatalogGRPCClient(cfg.Services.CatalogServiceGRPCAddr)
+	if err != nil {
+		l.Fatal("failed to initialize catalog gRPC client: %v", err)
+	}
 
 	// init repo & usecase
 	orderRepo := pgrepo.NewOrderRepo(pg.DB)
-	orderUC := usecase.NewOrderUC(orderRepo, cartClient, l)
+	orderUC := usecase.NewOrderUC(orderRepo, cartClient, catalogClient, transactor, l)
 
 	// init http server & router
 	server := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))

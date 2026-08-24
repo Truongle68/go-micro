@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"order-service/internal/client"
 	"order-service/internal/domain"
 	"order-service/internal/usecase"
 
@@ -13,7 +14,7 @@ import (
 )
 
 type mockOrderRepo struct {
-	orders   map[string]*domain.Order
+	orders    map[string]*domain.Order
 	histories map[string][]domain.OrderStatusHistory
 }
 
@@ -66,10 +67,33 @@ func (m *mockOrderRepo) GetTrackingHistory(ctx context.Context, orderID string) 
 	return h, nil
 }
 
+type mockCatalogClient struct{}
+
+func (m *mockCatalogClient) GetVariantsBySKUs(ctx context.Context, skus []string) ([]client.VariantDTO, error) {
+	variants := make([]client.VariantDTO, len(skus))
+	for i, sku := range skus {
+		variants[i] = client.VariantDTO{
+			ID:          "var_1",
+			ProductID:   "prod_1",
+			ProductName: "Test Product",
+			SKU:         sku,
+			Price:       client.Price{Amount: 500000, Currency: "VND"},
+			IsActive:    true,
+		}
+	}
+	return variants, nil
+}
+
+type mockTransactor struct{}
+
+func (m *mockTransactor) WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	return fn(ctx)
+}
+
 func TestCheckoutAndOrderLifecycle(t *testing.T) {
 	repo := newMockOrderRepo()
 	l := logger.New("error")
-	uc := usecase.NewOrderUC(repo, nil, l)
+	uc := usecase.NewOrderUC(repo, nil, &mockCatalogClient{}, &mockTransactor{}, l)
 
 	ctx := context.Background()
 	userID := "usr_1001"
@@ -77,10 +101,8 @@ func TestCheckoutAndOrderLifecycle(t *testing.T) {
 	input := usecase.CheckoutInput{
 		Items: []usecase.CheckoutItemInput{
 			{
-				SKU:         "SKU-001",
-				ProductName: "Laptop Stand",
-				UnitPrice:   500000,
-				Quantity:    1,
+				SKU:      "SKU-001",
+				Quantity: 1,
 			},
 		},
 		ShippingAddress: domain.AddressSnapshot{
@@ -153,7 +175,7 @@ func TestCheckoutAndOrderLifecycle(t *testing.T) {
 
 	// 7. Cancel delivered order should fail
 	_, err = uc.CancelOrder(ctx, order.ID, userID, "Changed mind")
-	if !errors.Is(err, domain.ErrOrderAlreadyCancelled) {
-		t.Fatalf("expected ErrOrderAlreadyCancelled, got %v", err)
+	if !errors.Is(err, domain.ErrCannotCancelDeliveriedOrder) {
+		t.Fatalf("expected ErrCannotCancelDeliveriedOrder, got %v", err)
 	}
 }

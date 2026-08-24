@@ -24,8 +24,9 @@ type (
 	}
 
 	Services struct {
-		CartServiceURL      string `env:"CART_SERVICE_URL" envDefault:"http://localhost:4003"`
-		CartServiceGRPCAddr string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
+		CartServiceURL         string `env:"CART_SERVICE_URL" envDefault:"http://localhost:4003"`
+		CartServiceGRPCAddr    string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
+		CatalogServiceGRPCAddr string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
 	}
 
 	JWT struct {

@@ -5,17 +5,12 @@ import (
 
 	"order-service/internal/domain"
 	"order-service/internal/repo/postgres"
+	pgtransactor "order-service/pkg/postgres"
 )
 
 type CheckoutItemInput struct {
-	ProductID    string            `json:"product_id,omitempty"`
-	VariantID    string            `json:"variant_id,omitempty"`
-	SKU          string            `json:"sku"`
-	ProductName  string            `json:"product_name"`
-	Image        string            `json:"image,omitempty"`
-	VariantAttrs map[string]string `json:"variant_attrs,omitempty"`
-	UnitPrice    int64             `json:"unit_price"`
-	Quantity     int               `json:"quantity"`
+	SKU      string `json:"sku"`
+	Quantity int    `json:"quantity"`
 }
 
 type CheckoutInput struct {
@@ -34,3 +29,9 @@ type OrderRepository interface {
 }
 
 var _ OrderRepository = (*postgres.OrderRepo)(nil)
+
+type Transactor interface {
+	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+var _ Transactor = (*pgtransactor.PostgresTransactor)(nil)
