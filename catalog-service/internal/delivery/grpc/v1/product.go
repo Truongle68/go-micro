@@ -2,8 +2,10 @@ package v1
 
 import (
 	"catalog-service/internal/domain"
+	"catalog-service/internal/usecase"
 	"catalog-service/pkg/sliceutil"
 	"context"
+	"errors"
 
 	catalogv1 "github.com/TruongLe68/go-micro/pkg/gen/proto/go/catalog/v1"
 	"github.com/TruongLe68/go-micro/pkg/logger"
@@ -35,8 +37,17 @@ func (s *ProductServer) GetVariantsBySKUs(ctx context.Context, req *catalogv1.Ge
 
 	variants, err := s.uc.GetVariantsBySKUs(ctx, uniqueSKUs)
 	if err != nil {
-		s.l.Error("grpc.GetVariantsBySKUs - uc.GetVariantsBySKUs: %v", err)
-		return nil, status.Errorf(codes.Internal, "failed to get variants by skus: %v", err)
+		switch {
+		case errors.Is(err, domain.ErrSKUNotFound):
+			return nil, status.Errorf(codes.NotFound, "%v", err)
+		case errors.Is(err, domain.ErrInactiveVariant):
+			return nil, status.Errorf(codes.FailedPrecondition, "%v", err)
+		case errors.Is(err, domain.ErrEmptySKU):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			s.l.Error("grpc.GetVariantsBySKUs: %v", err)
+			return nil, status.Error(codes.Internal, "failed to get variants by skus")
+		}
 	}
 
 	return &catalogv1.GetVariantsBySKUResponse{
@@ -51,17 +62,20 @@ func mapPriceToProto(p domain.Price) *catalogv1.Price {
 	}
 }
 
-func mapVariantToProto(v domain.Variant) *catalogv1.Variant {
+func mapVariantToProto(v usecase.VariantView) *catalogv1.Variant {
 	return &catalogv1.Variant{
-		Sku:        v.SKU,
-		Attributes: v.Attributes,
-		Price:      mapPriceToProto(v.Price),
-		Image:      v.Image,
-		IsActive:   v.IsActive,
+		Id:          v.ID,
+		ProductId:   v.ProductID,
+		ProductName: v.ProductName,
+		Sku:         v.SKU,
+		Attributes:  v.Attributes,
+		Price:       mapPriceToProto(v.Price),
+		Image:       v.Image,
+		IsActive:    v.IsActive,
 	}
 }
 
-func mapVariantsToProto(variants []domain.Variant) []*catalogv1.Variant {
+func mapVariantsToProto(variants []usecase.VariantView) []*catalogv1.Variant {
 	protoVariants := make([]*catalogv1.Variant, 0, len(variants))
 	for _, v := range variants {
 		protoVariants = append(protoVariants, mapVariantToProto(v))

@@ -10,7 +10,8 @@ const (
 	CodeEmptyProductID             ErrorCode = "EMPTY_PRODUCT_ID"
 	CodeEmptyCategoryID            ErrorCode = "EMPTY_CATEGORY_ID"
 	CodeEmptyName                  ErrorCode = "EMPTY_NAME"
-	CodeEmptySku                   ErrorCode = "EMPTY_SKU"
+	CodeEmptySKU                   ErrorCode = "EMPTY_SKU"
+	CodeSKUNotFound                ErrorCode = "SKU_NOT_FOUND"
 	CodeInvalidPrice               ErrorCode = "INVALID_PRICE"
 	CodeInvalidPriceRange          ErrorCode = "INVALID_PRICE_RANGE"
 	CodeInvalidCategoryID          ErrorCode = "INVALID_CATEGORY_ID"
@@ -29,6 +30,7 @@ const (
 	CodeProductRequiresVariant     ErrorCode = "PRODUCT_REQUIRES_VARIANT"
 	CodeInvalidVersion             ErrorCode = "INVALID_VERSION"
 	CodeConcurrentUpdate           ErrorCode = "CONCURRENT_UPDATE"
+	CodeInactiveVariant            ErrorCode = "INACTIVE_VARIANT"
 )
 
 type AppError struct {
@@ -50,7 +52,8 @@ var (
 	ErrEmptyProductID             = errors.New("product id cannot be empty")
 	ErrEmptyCategoryID            = errors.New("category id cannot be empty")
 	ErrEmptyName                  = errors.New("name cannot be empty")
-	ErrEmptySku                   = errors.New("sku cannot be empty")
+	ErrEmptySKU                   = errors.New("sku cannot be empty")
+	ErrSKUNotFound                = errors.New("sku not found")
 	ErrInvalidPrice               = errors.New("price cannot be negative")
 	ErrInvalidPriceRange          = errors.New("min_price cannot be greater than max_price")
 	ErrInvalidCategoryID          = errors.New("invalid category id")
@@ -69,6 +72,7 @@ var (
 	ErrProductRequiresVariant     = errors.New("variant is required")
 	ErrInvalidVersion             = errors.New("invalid version")
 	ErrConcurrentUpdate           = errors.New("concurrent update")
+	ErrInactiveVariant            = errors.New("inactive variant")
 )
 
 var sentinelToCodeMap = map[error]ErrorCode{
@@ -77,7 +81,8 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrEmptyProductID:             CodeEmptyProductID,
 	ErrEmptyCategoryID:            CodeEmptyCategoryID,
 	ErrEmptyName:                  CodeEmptyName,
-	ErrEmptySku:                   CodeEmptySku,
+	ErrEmptySKU:                   CodeEmptySKU,
+	ErrSKUNotFound:                CodeSKUNotFound,
 	ErrInvalidPrice:               CodeInvalidPrice,
 	ErrInvalidPriceRange:          CodeInvalidPriceRange,
 	ErrInvalidCategoryID:          CodeInvalidCategoryID,
@@ -96,6 +101,7 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrProductRequiresVariant:     CodeProductRequiresVariant,
 	ErrInvalidVersion:             CodeInvalidVersion,
 	ErrConcurrentUpdate:           CodeConcurrentUpdate,
+	ErrInactiveVariant:            CodeInactiveVariant,
 }
 
 func ToAppError(err error) *AppError {

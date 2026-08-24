@@ -87,6 +87,12 @@ type ProductList struct {
 	TotalCount int64             `json:"total_count"`
 }
 
+type VariantView struct {
+	domain.Variant
+	ProductID   string
+	ProductName string
+}
+
 type ProductUC struct {
 	repo      ProductRepository
 	cateRepo  CategoryRepository
@@ -571,10 +577,38 @@ func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductPar
 	return uc.loadDetailedProductList(ctx, result)
 }
 
-func (uc *ProductUC) GetVariantsBySKUs(ctx context.Context, skus []string) ([]domain.Variant, error) {
-	variants, err := uc.repo.FindVariantsBySKUs(ctx, skus)
+func (uc *ProductUC) GetVariantsBySKUs(ctx context.Context, skus []string) ([]VariantView, error) {
+	products, err := uc.repo.FindByVariantSKUs(ctx, skus)
 	if err != nil {
-		return []domain.Variant{}, fmt.Errorf("finding variants: %w", err)
+		return nil, err
 	}
-	return variants, nil
+
+	want := make(map[string]struct{}, len(skus))
+	for _, sku := range skus {
+		want[sku] = struct{}{}
+	}
+
+	out := make([]VariantView, 0, len(skus))
+	found := make(map[string]struct{})
+	for _, p := range products {
+		for _, v := range p.Variants {
+			if _, ok := want[v.SKU]; !ok {
+				continue
+			}
+			found[v.SKU] = struct{}{}
+			out = append(out, VariantView{
+				Variant:     v,
+				ProductID:   p.ID,
+				ProductName: p.Name,
+			})
+		}
+	}
+
+	for _, sku := range skus {
+		if _, ok := found[sku]; !ok {
+			return nil, fmt.Errorf("%w: %s", domain.ErrSKUNotFound, sku)
+		}
+	}
+
+	return out, nil
 }

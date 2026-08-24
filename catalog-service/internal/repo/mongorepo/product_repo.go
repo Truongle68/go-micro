@@ -512,7 +512,7 @@ func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductPa
 	return r.findByFilter(ctx, filter, pParams)
 }
 
-func (r *ProductRepo) FindVariantsBySKUs(ctx context.Context, skus []string) ([]domain.Variant, error) {
+func (r *ProductRepo) FindByVariantSKUs(ctx context.Context, skus []string) ([]domain.Product, error) {
 	filter := bson.M{
 		"variants.sku": bson.M{
 			"$in": skus,
@@ -520,31 +520,30 @@ func (r *ProductRepo) FindVariantsBySKUs(ctx context.Context, skus []string) ([]
 	}
 	total, err := r.productColl.CountDocuments(ctx, filter)
 	if err != nil {
-		return []domain.Variant{}, fmt.Errorf("counting variants: %w", err)
+		return []domain.Product{}, fmt.Errorf("counting products: %w", err)
 	}
 
 	if total == 0 {
-		return []domain.Variant{}, nil
-	}
-
-	if total < int64(len(skus)) {
-		return []domain.Variant{}, fmt.Errorf("some not found: %w", err)
+		return []domain.Product{}, nil
 	}
 
 	cursor, err := r.productColl.Find(ctx, filter)
 	if err != nil {
-		return []domain.Variant{}, fmt.Errorf("finding variants by skus: %w", err)
+		return []domain.Product{}, fmt.Errorf("finding products by variant skus: %w", err)
 	}
 	defer cursor.Close(ctx)
 
-	var models []variantModel
+	var models []productModel
 	if err := cursor.All(ctx, &models); err != nil {
-		return []domain.Variant{}, fmt.Errorf("decoding variants: %w", err)
+		return []domain.Product{}, fmt.Errorf("decoding products: %w", err)
 	}
 
-	results := make([]domain.Variant, len(models))
+	results := make([]domain.Product, len(models))
 	for i, m := range models {
-		results[i] = m.toDomain()
+		d := m.toDomain()
+		if d != nil {
+			results[i] = *d
+		}
 	}
 
 	return results, nil

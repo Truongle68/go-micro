@@ -18,7 +18,7 @@ type ProductRepository interface {
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, p pagination.Params) (*domain.ProductListResult, error)
 	Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*domain.ProductListResult, error)
-	FindVariantsBySKUs(ctx context.Context, skus []string) ([]domain.Variant, error)
+	FindByVariantSKUs(ctx context.Context, skus []string) ([]domain.Product, error)
 }
 
 var _ ProductRepository = (*mongorepo.ProductRepo)(nil)
