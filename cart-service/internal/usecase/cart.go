@@ -115,6 +115,39 @@ func (uc *CartUC) RemoveItem(ctx context.Context, userID string, sku string) (*d
 	return cart, nil
 }
 
+func (uc *CartUC) RemoveItems(ctx context.Context, userID string, skus []string) (*domain.Cart, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, domain.ErrInvalidUserID
+	}
+
+	if len(skus) == 0 {
+		return uc.GetCart(ctx, userID)
+	}
+
+	cart, err := uc.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrCartNotFound) {
+			return nil, domain.ErrCartNotFound
+		}
+		return nil, fmt.Errorf("CartUC.RemoveItems - repo.GetByUserID: %w", err)
+	}
+
+	cart.RemoveItems(skus)
+
+	if len(cart.Items) == 0 {
+		if err := uc.repo.Delete(ctx, userID); err != nil {
+			return nil, fmt.Errorf("CartUC.RemoveItems - repo.Delete: %w", err)
+		}
+		return domain.NewCart(userID), nil
+	}
+
+	if err := uc.repo.Save(ctx, cart); err != nil {
+		return nil, fmt.Errorf("CartUC.RemoveItems - repo.Save: %w", err)
+	}
+
+	return cart, nil
+}
+
 func (uc *CartUC) ClearCart(ctx context.Context, userID string) error {
 	if strings.TrimSpace(userID) == "" {
 		return domain.ErrInvalidUserID

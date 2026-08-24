@@ -45,5 +45,6 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	cartGroup.POST("/items", r.addItem)
 	cartGroup.PUT("/items/:sku", r.updateItemQuantity)
 	cartGroup.DELETE("/items/:sku", r.removeItem)
+	cartGroup.DELETE("/items", r.removeItems)
 	cartGroup.DELETE("", r.clearCart)
 }

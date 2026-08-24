@@ -23,6 +23,7 @@ const (
 	CartService_AddItem_FullMethodName            = "/cart.v1.CartService/AddItem"
 	CartService_UpdateItemQuantity_FullMethodName = "/cart.v1.CartService/UpdateItemQuantity"
 	CartService_RemoveItem_FullMethodName         = "/cart.v1.CartService/RemoveItem"
+	CartService_RemoveItems_FullMethodName        = "/cart.v1.CartService/RemoveItems"
 	CartService_ClearCart_FullMethodName          = "/cart.v1.CartService/ClearCart"
 )
 
@@ -34,6 +35,7 @@ type CartServiceClient interface {
 	AddItem(ctx context.Context, in *AddItemRequest, opts ...grpc.CallOption) (*AddItemResponse, error)
 	UpdateItemQuantity(ctx context.Context, in *UpdateItemQuantityRequest, opts ...grpc.CallOption) (*UpdateItemQuantityResponse, error)
 	RemoveItem(ctx context.Context, in *RemoveItemRequest, opts ...grpc.CallOption) (*RemoveItemResponse, error)
+	RemoveItems(ctx context.Context, in *RemoveItemsRequest, opts ...grpc.CallOption) (*RemoveItemsResponse, error)
 	ClearCart(ctx context.Context, in *ClearCartRequest, opts ...grpc.CallOption) (*ClearCartResponse, error)
 }
 
@@ -85,6 +87,16 @@ func (c *cartServiceClient) RemoveItem(ctx context.Context, in *RemoveItemReques
 	return out, nil
 }
 
+func (c *cartServiceClient) RemoveItems(ctx context.Context, in *RemoveItemsRequest, opts ...grpc.CallOption) (*RemoveItemsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveItemsResponse)
+	err := c.cc.Invoke(ctx, CartService_RemoveItems_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *cartServiceClient) ClearCart(ctx context.Context, in *ClearCartRequest, opts ...grpc.CallOption) (*ClearCartResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ClearCartResponse)
@@ -103,6 +115,7 @@ type CartServiceServer interface {
 	AddItem(context.Context, *AddItemRequest) (*AddItemResponse, error)
 	UpdateItemQuantity(context.Context, *UpdateItemQuantityRequest) (*UpdateItemQuantityResponse, error)
 	RemoveItem(context.Context, *RemoveItemRequest) (*RemoveItemResponse, error)
+	RemoveItems(context.Context, *RemoveItemsRequest) (*RemoveItemsResponse, error)
 	ClearCart(context.Context, *ClearCartRequest) (*ClearCartResponse, error)
 	mustEmbedUnimplementedCartServiceServer()
 }
@@ -125,6 +138,9 @@ func (UnimplementedCartServiceServer) UpdateItemQuantity(context.Context, *Updat
 }
 func (UnimplementedCartServiceServer) RemoveItem(context.Context, *RemoveItemRequest) (*RemoveItemResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveItem not implemented")
+}
+func (UnimplementedCartServiceServer) RemoveItems(context.Context, *RemoveItemsRequest) (*RemoveItemsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveItems not implemented")
 }
 func (UnimplementedCartServiceServer) ClearCart(context.Context, *ClearCartRequest) (*ClearCartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClearCart not implemented")
@@ -222,6 +238,24 @@ func _CartService_RemoveItem_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CartService_RemoveItems_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveItemsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CartServiceServer).RemoveItems(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CartService_RemoveItems_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CartServiceServer).RemoveItems(ctx, req.(*RemoveItemsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CartService_ClearCart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ClearCartRequest)
 	if err := dec(in); err != nil {
@@ -262,6 +296,10 @@ var CartService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveItem",
 			Handler:    _CartService_RemoveItem_Handler,
+		},
+		{
+			MethodName: "RemoveItems",
+			Handler:    _CartService_RemoveItems_Handler,
 		},
 		{
 			MethodName: "ClearCart",

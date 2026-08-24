@@ -118,13 +118,24 @@ func TestCartUseCaseFlow(t *testing.T) {
 		t.Fatalf("expected 0 items after removal, got %d", len(cart.Items))
 	}
 
-	// 5. ClearCart
+	// 5. Add two items and test RemoveItems
+	_, _ = uc.AddItem(ctx, userID, "SKU-A", 2)
+	_, _ = uc.AddItem(ctx, userID, "SKU-B", 3)
+	cart, err = uc.RemoveItems(ctx, userID, []string{"SKU-A"})
+	if err != nil {
+		t.Fatalf("unexpected error removing items: %v", err)
+	}
+	if len(cart.Items) != 1 || cart.Items[0].SKU != "SKU-B" {
+		t.Fatalf("expected only SKU-B remaining, got %+v", cart.Items)
+	}
+
+	// 6. ClearCart
 	err = uc.ClearCart(ctx, userID)
 	if err != nil {
 		t.Fatalf("unexpected error clearing cart: %v", err)
 	}
 
-	// 6. UpdateItemQuantity on missing cart -> ErrCartNotFound
+	// 7. UpdateItemQuantity on missing cart -> ErrCartNotFound
 	_, err = uc.UpdateItemQuantity(ctx, userID, "SKU-B", 1)
 	if !errors.Is(err, domain.ErrCartNotFound) {
 		t.Fatalf("expected ErrCartNotFound, got %v", err)

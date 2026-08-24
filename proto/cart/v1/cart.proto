@@ -9,6 +9,7 @@ service CartService {
   rpc AddItem (AddItemRequest) returns (AddItemResponse);
   rpc UpdateItemQuantity (UpdateItemQuantityRequest) returns (UpdateItemQuantityResponse);
   rpc RemoveItem (RemoveItemRequest) returns (RemoveItemResponse);
+  rpc RemoveItems (RemoveItemsRequest) returns (RemoveItemsResponse);
   rpc ClearCart (ClearCartRequest) returns (ClearCartResponse);
 }
 
@@ -57,6 +58,15 @@ message RemoveItemRequest {
 }
 
 message RemoveItemResponse {
+  Cart cart = 1;
+}
+
+message RemoveItemsRequest {
+  string user_id = 1;
+  repeated string skus = 2;
+}
+
+message RemoveItemsResponse {
   Cart cart = 1;
 }
 

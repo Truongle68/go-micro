@@ -99,6 +99,29 @@ func (c *Cart) RemoveItem(sku string) error {
 	return nil
 }
 
+func (c *Cart) RemoveItems(skus []string) {
+	if len(skus) == 0 {
+		return
+	}
+	skuSet := make(map[string]bool, len(skus))
+	for _, s := range skus {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			skuSet[s] = true
+		}
+	}
+
+	n := 0
+	for _, item := range c.Items {
+		if !skuSet[item.SKU] {
+			c.Items[n] = item
+			n++
+		}
+	}
+	c.Items = c.Items[:n]
+	c.UpdatedAt = time.Now().UTC()
+}
+
 func (c *Cart) Clear() {
 	c.Items = make([]CartItem, 0)
 	c.UpdatedAt = time.Now().UTC()

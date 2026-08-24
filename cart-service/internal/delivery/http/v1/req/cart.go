@@ -8,3 +8,7 @@ type AddItemReq struct {
 type UpdateItemReq struct {
 	Quantity int `json:"quantity" binding:"min=0"`
 }
+
+type RemoveItemsReq struct {
+	SKUs []string `json:"skus" binding:"required,gt=0"`
+}

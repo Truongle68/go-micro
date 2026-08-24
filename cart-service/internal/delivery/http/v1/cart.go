@@ -119,6 +119,33 @@ func (h *V1) removeItem(c *gin.Context) {
 	response.Success(c, http.StatusOK, "item removed from cart", cart)
 }
 
+func (h *V1) removeItems(c *gin.Context) {
+	userID, ok := h.getUserID(c)
+	if !ok || userID == "" {
+		response.Unauthorized(c)
+		return
+	}
+
+	var r req.RemoveItemsReq
+	if err := c.ShouldBindJSON(&r); err != nil {
+		response.InvalidRequestBody(c, err.Error())
+		return
+	}
+
+	cart, err := h.c.RemoveItems(c.Request.Context(), userID, r.SKUs)
+	if err != nil {
+		if errors.Is(err, domain.ErrCartNotFound) {
+			response.Error(c, http.StatusNotFound, string(domain.CodeNotFound), err.Error())
+			return
+		}
+		h.l.Error("h.removeItems - h.c.RemoveItems: %v", err)
+		response.InternalServerError(c, domain.ErrFailedToRemoveItem.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "items removed from cart", cart)
+}
+
 func (h *V1) clearCart(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok || userID == "" {

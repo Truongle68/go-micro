@@ -22,6 +22,7 @@ type CartUseCase interface {
 	AddItem(ctx context.Context, userID string, sku string, quantity int) (*domain.Cart, error)
 	UpdateItemQuantity(ctx context.Context, userID string, sku string, quantity int) (*domain.Cart, error)
 	RemoveItem(ctx context.Context, userID string, sku string) (*domain.Cart, error)
+	RemoveItems(ctx context.Context, userID string, skus []string) (*domain.Cart, error)
 	ClearCart(ctx context.Context, userID string) error
 }
 
@@ -95,6 +96,22 @@ func (s *CartServer) RemoveItem(ctx context.Context, req *cartv1.RemoveItemReque
 	}
 
 	return &cartv1.RemoveItemResponse{
+		Cart: mapCartToProto(cart),
+	}, nil
+}
+
+func (s *CartServer) RemoveItems(ctx context.Context, req *cartv1.RemoveItemsRequest) (*cartv1.RemoveItemsResponse, error) {
+	if req.GetUserId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+
+	cart, err := s.uc.RemoveItems(ctx, req.GetUserId(), req.GetSkus())
+	if err != nil {
+		s.l.Error("grpc.RemoveItems - uc.RemoveItems: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to remove items: %v", err)
+	}
+
+	return &cartv1.RemoveItemsResponse{
 		Cart: mapCartToProto(cart),
 	}, nil
 }
