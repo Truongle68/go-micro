@@ -25,8 +25,10 @@ type ProductUsecase interface {
 	GetByCategory(ctx context.Context, categoryID string, params pagination.Params) (*usecase.ProductList, error)
 	Update(ctx context.Context, in usecase.UpdateProductInput) (*domain.Product, error)
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context, params pagination.Params) (*usecase.ProductList, error)
+	ListPublic(ctx context.Context, in usecase.PublicListInput) (*usecase.ProductList, error)
+	ListAdmin(ctx context.Context, in usecase.AdminListInput) (*usecase.ProductList, error)
 	Search(ctx context.Context, searchParams domain.SearchProductParams, paginatedParams pagination.Params) (*usecase.ProductList, error)
+	CountPerStatus(ctx context.Context, in usecase.AdminListInput) (*domain.ProductStatusCounts, error)
 }
 
 var _ ProductUsecase = (*usecase.ProductUC)(nil)

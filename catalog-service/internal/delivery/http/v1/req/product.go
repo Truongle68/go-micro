@@ -27,7 +27,7 @@ type CreateVariantInput struct {
 }
 
 type PriceInput struct {
-	Amount   int  `json:"amount" validate:"required,min=1"`
+	Amount   int    `json:"amount" validate:"required,min=1"`
 	Currency string `json:"currency" validate:"required,len=3"`
 }
 
@@ -59,9 +59,18 @@ type UpdateProduct struct {
 type SearchProduct struct {
 	Query      string  `json:"query"`
 	CategoryID string  `json:"category_id"`
-	MinPrice   *int  `json:"min_price"`
-	MaxPrice   *int  `json:"max_price"`
+	MinPrice   *int    `json:"min_price"`
+	MaxPrice   *int    `json:"max_price"`
 	Status     *string `json:"status"`
-	Page       int   `json:"page"`
-	Limit      int   `json:"limit"`
+	Page       int     `json:"page"`
+	Limit      int     `json:"limit"`
+}
+
+type ListProduct struct {
+	CategoryID *string `json:"category_id"`
+	MinPrice   *int    `json:"min_price"`
+	MaxPrice   *int    `json:"max_price"`
+	Status     *string `json:"status"`
+	Page       int     `json:"page"`
+	Limit      int     `json:"limit"`
 }

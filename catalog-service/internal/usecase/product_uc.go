@@ -17,82 +17,6 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 )
 
-type DetailedProduct struct {
-	Product  domain.Product
-	Category *domain.Category
-}
-
-type OptionTypeInput struct {
-	Name   string
-	Values []string
-}
-
-type CreateVariantInput struct {
-	ID         string
-	SKU        string
-	Attributes map[string]string
-	Price      PriceInput
-	Image      string
-}
-
-type PriceInput struct {
-	Amount   int
-	Currency string
-}
-
-type SpecGroupInput struct {
-	Group string
-	Items []SpecItemInput
-}
-
-type SpecItemInput struct {
-	Label string
-	Value string
-}
-
-type CreateProductInput struct {
-	Name            string
-	NameTranslation map[string]string
-	CategoryID      string
-	Description     string
-	DescriptionHTML string
-	Highlights      []string
-	Tags            []string
-	Images          []string
-	OptionTypes     []OptionTypeInput
-	Variants        []CreateVariantInput
-	Specifications  []SpecGroupInput
-	Status          string
-}
-
-type UpdateProductInput struct {
-	ID              string
-	Version         int
-	Name            *string
-	NameTranslation map[string]string
-	CategoryID      *string
-	Description     *string
-	DescriptionHTML *string
-	Highlights      []string
-	Tags            []string
-	Images          []string
-	OptionTypes     []OptionTypeInput
-	Variants        []CreateVariantInput
-	Specifications  []SpecGroupInput
-	Status          *domain.ProductStatus
-}
-
-type ProductList struct {
-	Products   []DetailedProduct `json:"products"`
-	TotalCount int64             `json:"total_count"`
-}
-
-type VariantView struct {
-	domain.Variant
-	ProductID   string
-	ProductName string
-}
-
 type ProductUC struct {
 	repo      ProductRepository
 	cateRepo  CategoryRepository
@@ -555,10 +479,30 @@ func (uc *ProductUC) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (uc *ProductUC) List(ctx context.Context, p pagination.Params) (*ProductList, error) {
-	result, err := uc.repo.List(ctx, p)
+func (uc *ProductUC) ListPublic(ctx context.Context, in PublicListInput) (*ProductList, error) {
+	in.Query = strings.TrimSpace(in.Query)
+	in.CategoryID = strings.TrimSpace(in.CategoryID)
+	p := in.Page.Normalize()
+
+	filter := applyPublicListPolicy(in)
+	result, err := uc.repo.List(ctx, filter, p)
 	if err != nil {
-		return nil, fmt.Errorf("listing products: %w", err)
+		return nil, fmt.Errorf("ProductUC.ListPublic: %w", err)
+	}
+
+	return uc.loadDetailedProductList(ctx, result)
+}
+
+func (uc *ProductUC) ListAdmin(ctx context.Context, in AdminListInput) (*ProductList, error) {
+	in.Query = strings.TrimSpace(in.Query)
+	in.CategoryID = strings.TrimSpace(in.CategoryID)
+	in.SKU = strings.TrimSpace(in.SKU)
+	p := in.Page.Normalize()
+
+	filter := applyAdminListPolicy(in)
+	result, err := uc.repo.List(ctx, filter, p)
+	if err != nil {
+		return nil, fmt.Errorf("ProductUC.ListAdmin: %w", err)
 	}
 
 	return uc.loadDetailedProductList(ctx, result)
@@ -571,7 +515,7 @@ func (uc *ProductUC) Search(ctx context.Context, sParams domain.SearchProductPar
 
 	result, err := uc.repo.Search(ctx, sParams, pParams)
 	if err != nil {
-		return nil, fmt.Errorf("searching product: %w", err)
+		return nil, fmt.Errorf("ProductUC.Search: %w", err)
 	}
 
 	return uc.loadDetailedProductList(ctx, result)
@@ -611,4 +555,13 @@ func (uc *ProductUC) GetVariantsBySKUs(ctx context.Context, skus []string) ([]Va
 	}
 
 	return out, nil
+}
+
+func (uc *ProductUC) CountPerStatus(ctx context.Context, in AdminListInput) (*domain.ProductStatusCounts, error) {
+	in.Query = strings.TrimSpace(in.Query)
+	in.CategoryID = strings.TrimSpace(in.CategoryID)
+	in.SKU = strings.TrimSpace(in.SKU)
+
+	filter := applyAdminListPolicy(in)
+	return uc.repo.CountPerStatus(ctx, filter)
 }

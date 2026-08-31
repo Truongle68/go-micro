@@ -324,21 +324,12 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 		m.ID = bson.NewObjectID()
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	m.CreatedAt, m.UpdatedAt = now, now
 
 	res, err := r.productColl.InsertOne(ctx, m)
 	if err != nil {
-		if field, val, ok := extractDuplicateField(err); ok {
-			if strings.Contains(field, "sku") {
-				return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSKU, field, val)
-			}
-			if field == "slug" {
-				return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSlug, field, val)
-			}
-			return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateField, field, val)
-		}
-		return fmt.Errorf("inserting product: %w", err)
+		return mapWriteError(err)
 	}
 
 	if oid, ok := res.InsertedID.(bson.ObjectID); ok {
@@ -368,67 +359,12 @@ func (r *ProductRepo) FindByID(ctx context.Context, id string) (*domain.Product,
 	return m.toDomain(), nil
 }
 
-func (r *ProductRepo) findByFilter(ctx context.Context, filter bson.M, p pagination.Params) (*domain.ProductListResult, error) {
-	total, err := r.productColl.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("counting products: %w", err)
-	}
-
-	if total == 0 {
-		return &domain.ProductListResult{
-			Products:   []domain.Product{},
-			TotalCount: 0,
-		}, nil
-	}
-
-	opts := options.Find().
-		SetSort(bson.D{{Key: "_id", Value: -1}}).
-		SetSkip(p.Skip()).
-		SetLimit(p.Limit)
-
-	cursor, err := r.productColl.Find(ctx, filter, opts)
-	if err != nil {
-		return nil, fmt.Errorf("finding products: %w", err)
-	}
-	defer cursor.Close(ctx)
-
-	return decodeProductList(ctx, cursor, total)
-}
-
-func decodeProductList(ctx context.Context, cursor *mongo.Cursor, total int64) (*domain.ProductListResult, error) {
-	var models []productModel
-	if err := cursor.All(ctx, &models); err != nil {
-		return nil, fmt.Errorf("decoding products: %w", err)
-	}
-	products := make([]domain.Product, len(models))
-	for i, m := range models {
-		if p := m.toDomain(); p != nil {
-			products[i] = *p
-		}
-	}
-
-	return &domain.ProductListResult{
-		Products:   products,
-		TotalCount: total,
-	}, nil
-}
-
-func (r *ProductRepo) FindByCategory(ctx context.Context, categoryID string, p pagination.Params) (*domain.ProductListResult, error) {
-	oid, err := bson.ObjectIDFromHex(categoryID)
-	if err != nil {
-		return nil, domain.ErrInvalidCategoryID
-	}
-
-	filter := bson.M{"category_id": oid}
-	return r.findByFilter(ctx, filter, p)
-}
-
 func (r *ProductRepo) Update(ctx context.Context, p *domain.Product, expectedVersion int) (*domain.Product, error) {
 	m, err := productModelFromDomain(p)
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now()
+	now := time.Now().UTC()
 	m.UpdatedAt = now
 
 	filter := bson.M{"_id": m.ID, "version": expectedVersion}
@@ -456,16 +392,7 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product, expectedVer
 	}
 	res, err := r.productColl.UpdateOne(ctx, filter, update)
 	if err != nil {
-		if field, val, ok := extractDuplicateField(err); ok {
-			if strings.Contains(field, "sku") {
-				return nil, fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSKU, field, val)
-			}
-			if field == "slug" {
-				return nil, fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSlug, field, val)
-			}
-			return nil, fmt.Errorf("%w: %s = %v", domain.ErrDuplicateField, field, val)
-		}
-		return nil, fmt.Errorf("updating product: %w", err)
+		return nil, mapWriteError(err)
 	}
 	if res.MatchedCount == 0 {
 		count, _ := r.productColl.CountDocuments(ctx, bson.M{"_id": m.ID})
@@ -476,7 +403,6 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product, expectedVer
 	}
 	p.Version++
 	p.UpdatedAt = now
-
 	return p, nil
 }
 
@@ -495,120 +421,275 @@ func (r *ProductRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *ProductRepo) List(ctx context.Context, p pagination.Params) (*domain.ProductListResult, error) {
-	return r.findByFilter(ctx, bson.M{}, p)
+func (r *ProductRepo) List(ctx context.Context, filter domain.ProductListFilter, page pagination.Params) (*domain.ProductListResult, error) {
+	return r.findByFilter(ctx, filter, page)
 }
 
-func (r *ProductRepo) Search(ctx context.Context, sParams domain.SearchProductParams, pParams pagination.Params) (*domain.ProductListResult, error) {
-	filter, err := buildQueryFilter(sParams)
+func (r *ProductRepo) FindByCategory(ctx context.Context, categoryID string, page pagination.Params) (*domain.ProductListResult, error) {
+	return r.findByFilter(ctx, domain.ProductListFilter{CategoryID: categoryID}, page)
+}
+
+func (r *ProductRepo) Search(ctx context.Context, s domain.SearchProductParams, page pagination.Params) (*domain.ProductListResult, error) {
+	f := domain.ProductListFilter{
+		CategoryID: strings.TrimSpace(s.CategoryID),
+		Query:      strings.TrimSpace(s.Query),
+		MinPrice:   s.MinPrice,
+		MaxPrice:   s.MaxPrice,
+	}
+	if s.Status != nil && *s.Status != "" {
+		f.Statuses = []domain.ProductStatus{*s.Status}
+	}
+	return r.findByFilter(ctx, f, page)
+}
+
+func (r *ProductRepo) findByFilter(ctx context.Context, filter domain.ProductListFilter, page pagination.Params) (*domain.ProductListResult, error) {
+	q, err := buildProductListQuery(filter)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(filter) == 0 {
-		return r.List(ctx, pParams)
+	total, err := r.productColl.CountDocuments(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("counting products: %w", err)
+	}
+	if total == 0 {
+		return &domain.ProductListResult{Products: []domain.Product{}, TotalCount: 0}, nil
 	}
 
-	return r.findByFilter(ctx, filter, pParams)
+	opts := options.Find().
+		SetSort(buildProductListSort(filter.Sort)).
+		SetSkip(page.Skip()).
+		SetLimit(page.Limit)
+
+	cur, err := r.productColl.Find(ctx, q, opts)
+	if err != nil {
+		return nil, fmt.Errorf("finding products: %w", err)
+	}
+	defer cur.Close(ctx)
+
+	return decodeProductList(ctx, cur, total)
+}
+
+func decodeProductList(ctx context.Context, cursor *mongo.Cursor, total int64) (*domain.ProductListResult, error) {
+	var models []productModel
+	if err := cursor.All(ctx, &models); err != nil {
+		return nil, fmt.Errorf("decoding products: %w", err)
+	}
+	products := make([]domain.Product, 0, len(models))
+	for _, m := range models {
+		if p := m.toDomain(); p != nil {
+			products = append(products, *p)
+		}
+	}
+	return &domain.ProductListResult{Products: products, TotalCount: total}, nil
 }
 
 func (r *ProductRepo) FindByVariantSKUs(ctx context.Context, skus []string) ([]domain.Product, error) {
-	filter := bson.M{
-		"variants.sku": bson.M{
-			"$in": skus,
-		},
+	if len(skus) == 0 {
+		return nil, nil
 	}
-	total, err := r.productColl.CountDocuments(ctx, filter)
+	cur, err := r.productColl.Find(ctx, bson.M{"variants.sku": bson.M{"$in": skus}})
 	if err != nil {
-		return []domain.Product{}, fmt.Errorf("counting products: %w", err)
+		return nil, fmt.Errorf("finding products by variant skus: %w", err)
 	}
-
-	if total == 0 {
-		return []domain.Product{}, nil
-	}
-
-	cursor, err := r.productColl.Find(ctx, filter)
-	if err != nil {
-		return []domain.Product{}, fmt.Errorf("finding products by variant skus: %w", err)
-	}
-	defer cursor.Close(ctx)
+	defer cur.Close(ctx)
 
 	var models []productModel
-	if err := cursor.All(ctx, &models); err != nil {
-		return []domain.Product{}, fmt.Errorf("decoding products: %w", err)
+	if err := cur.All(ctx, &models); err != nil {
+		return nil, fmt.Errorf("decoding products: %w", err)
 	}
-
-	results := make([]domain.Product, len(models))
-	for i, m := range models {
-		d := m.toDomain()
-		if d != nil {
-			results[i] = *d
+	out := make([]domain.Product, 0, len(models))
+	for _, m := range models {
+		if d := m.toDomain(); d != nil {
+			out = append(out, *d)
 		}
 	}
-
-	return results, nil
+	return out, nil
 }
 
-func buildQueryFilter(params domain.SearchProductParams) (bson.M, error) {
-	filter, err := buildFilter(params)
+type statusGroupResult struct {
+	Status string `bson:"_id"`
+	Count  int    `bson:"count"`
+}
+
+func (r *ProductRepo) CountPerStatus(ctx context.Context, filter domain.ProductListFilter) (*domain.ProductStatusCounts, error) {
+	q, err := buildProductListQuery(filter)
 	if err != nil {
 		return nil, err
 	}
 
-	if params.Query == "" {
-		return filter, nil
+	delete(q, "status")
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: q}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$status"},
+			{Key: "count", Value: bson.D{
+				{Key: "$sum", Value: 1},
+			}},
+		}}},
 	}
 
-	search := buildSearchFilter(params.Query)
-	if len(filter) == 0 {
-		return search, nil
+	cursor, err := r.productColl.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("aggregating products: %w", err)
 	}
-	return bson.M{
-		"$and": bson.A{filter, search},
-	}, nil
+	defer cursor.Close(ctx)
+
+	var results []statusGroupResult
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, fmt.Errorf("decoding products: %w", err)
+	}
+
+	counts := &domain.ProductStatusCounts{}
+	for _, result := range results {
+		counts.All += result.Count
+		switch domain.ProductStatus(result.Status) {
+		case domain.ProductStatusActive:
+			counts.Active += result.Count
+		case domain.ProductStatusDraft:
+			counts.Draft += result.Count
+		case domain.ProductStatusInactive:
+			counts.Inactive += result.Count
+		case domain.ProductStatusArchived:
+			counts.Archived += result.Count
+		}
+	}
+	return counts, nil
 }
 
-func buildSearchFilter(k string) bson.M {
-	escaped := regexp.QuoteMeta(k)
-	regexQuery := bson.M{
-		"$regex":   escaped,
-		"$options": "i",
+func buildProductListQuery(f domain.ProductListFilter) (bson.M, error) {
+	ands := make(bson.A, 0, 4)
+
+	if len(f.Statuses) > 0 {
+		statuses := make([]string, len(f.Statuses))
+		for i, s := range f.Statuses {
+			statuses[i] = string(s)
+		}
+		ands = append(ands, bson.M{"status": bson.M{"$in": statuses}})
 	}
 
+	if cid := strings.TrimSpace(f.CategoryID); cid != "" {
+		oid, err := bson.ObjectIDFromHex(cid)
+		if err != nil {
+			return nil, domain.ErrInvalidCategoryID
+		}
+		ands = append(ands, bson.M{"category_id": oid})
+	}
+
+	if sku := strings.TrimSpace(f.SKU); sku != "" {
+		ands = append(ands, bson.M{"variants.sku": sku})
+	}
+
+	if f.MinPrice != nil || f.MaxPrice != nil {
+		price := bson.M{}
+		if f.MinPrice != nil {
+			price["$gte"] = *f.MinPrice
+		}
+		if f.MaxPrice != nil {
+			price["$lte"] = *f.MaxPrice
+		}
+		ands = append(ands, bson.M{
+			"variants": bson.M{"$elemMatch": bson.M{"price.amount": price}},
+		})
+	}
+
+	if f.CreatedFrom != nil || f.CreatedTo != nil {
+		rangeQ := bson.M{}
+		if f.CreatedFrom != nil {
+			rangeQ["$gte"] = *f.CreatedFrom
+		}
+		if f.CreatedTo != nil {
+			rangeQ["$lte"] = *f.CreatedTo
+		}
+		ands = append(ands, bson.M{"created_at": rangeQ})
+	}
+
+	if q := strings.TrimSpace(f.Query); q != "" {
+		ands = append(ands, buildSearchFilter(q))
+	}
+
+	switch len(ands) {
+	case 0:
+		return bson.M{}, nil
+	case 1:
+		return ands[0].(bson.M), nil
+	default:
+		return bson.M{"$and": ands}, nil
+	}
+}
+
+func buildSearchFilter(keyword string) bson.M {
+	rx := bson.M{"$regex": regexp.QuoteMeta(keyword), "$options": "i"}
 	return bson.M{
 		"$or": bson.A{
-			bson.M{"name": regexQuery},
-			bson.M{"tags": regexQuery},
-			bson.M{"description": regexQuery},
-			bson.M{"variants.sku": regexQuery},
+			bson.M{"name": rx},
+			bson.M{"tags": rx},
+			bson.M{"description": rx},
+			bson.M{"variants.sku": rx},
 		},
 	}
 }
 
-func buildFilter(params domain.SearchProductParams) (bson.M, error) {
-	filter := bson.M{}
-
-	if params.CategoryID != "" {
-		oid, err := bson.ObjectIDFromHex(params.CategoryID)
-		if err != nil {
-			return bson.M{}, domain.ErrInvalidCategoryID
-		}
-		filter["category_id"] = oid
+func buildProductListSort(keys []domain.SortKey) bson.D {
+	defaultSort := bson.D{{Key: "created_at", Value: -1}}
+	if len(keys) == 0 {
+		return defaultSort
 	}
 
-	if params.Status != nil {
-		filter["status"] = string(*params.Status)
+	sort := make(bson.D, 0, len(keys)+1)
+	seen := make(map[domain.SortField]struct{}, len(keys))
+	for _, k := range keys {
+		if _, ok := seen[k.Field]; ok {
+			continue
+		}
+		seen[k.Field] = struct{}{}
+
+		field, ok := mongoField(k.Field)
+		if !ok {
+			continue
+		}
+
+		dir := 1
+		if k.Dir == domain.SortDesc {
+			dir = -1
+		}
+
+		sort = append(sort, bson.E{Key: field, Value: dir})
 	}
 
-	if params.MinPrice != nil || params.MaxPrice != nil {
-		price := bson.M{}
-		if params.MinPrice != nil {
-			price["$gte"] = *params.MinPrice
-		}
-		if params.MaxPrice != nil {
-			price["$lte"] = *params.MaxPrice
-		}
-		filter["variants.price.amount"] = price
+	if len(sort) == 0 {
+		return defaultSort
 	}
-	return filter, nil
+
+	if _, ok := seen[domain.SortByDate]; !ok {
+		sort = append(sort, bson.E{Key: "created_at", Value: -1})
+	}
+	return sort
+}
+
+func mongoField(f domain.SortField) (string, bool) {
+	switch f {
+	case domain.SortByName:
+		return "name", true
+	case domain.SortByPrice:
+		return "variants.0.price.amount", true
+	case domain.SortByDate:
+		return "created_at", true
+	default:
+		return "", false
+	}
+}
+
+func mapWriteError(err error) error {
+	if field, val, ok := extractDuplicateField(err); ok {
+		if strings.Contains(field, "sku") {
+			return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSKU, field, val)
+		}
+		if field == "slug" {
+			return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateSlug, field, val)
+		}
+		return fmt.Errorf("%w: %s = %v", domain.ErrDuplicateField, field, val)
+	}
+	return err
 }

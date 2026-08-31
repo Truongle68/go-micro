@@ -132,6 +132,23 @@ func (p *Product) ApplyUpdate(params UpdateProductParams) error {
 	return nil
 }
 
+type ProductListFilter struct {
+	Statuses    []ProductStatus
+	CategoryID  string
+	Query       string
+	MinPrice    *int
+	MaxPrice    *int
+	SKU         string
+	CreatedFrom *time.Time
+	CreatedTo   *time.Time
+	Sort        []SortKey
+}
+
+type ProductListResult struct {
+	Products   []Product
+	TotalCount int64
+}
+
 type SearchProductParams struct {
 	Query      string
 	CategoryID string
@@ -143,8 +160,8 @@ type SearchProductParams struct {
 type SearchProductsQuery struct {
 	Query      string         `form:"q"`
 	CategoryID string         `form:"category_id"`
-	MinPrice   *int         `form:"min_price"`
-	MaxPrice   *int         `form:"max_price"`
+	MinPrice   *int           `form:"min_price"`
+	MaxPrice   *int           `form:"max_price"`
 	Status     *ProductStatus `form:"status"`
 }
 
@@ -168,9 +185,12 @@ func (p SearchProductParams) Validate() error {
 	return nil
 }
 
-type ProductListResult struct {
-	Products   []Product
-	TotalCount int64
+type ProductStatusCounts struct {
+	All      int `json:"all"`
+	Draft    int `json:"draft"`
+	Active   int `json:"active"`
+	Inactive int `json:"inactive"`
+	Archived int `json:"archived"`
 }
 
 type ProductStatus string
@@ -189,4 +209,42 @@ func (s ProductStatus) IsValid() bool {
 	default:
 		return false
 	}
+}
+
+type SortDir string
+
+const (
+	SortAsc  SortDir = "asc"
+	SortDesc SortDir = "desc"
+)
+
+func (d SortDir) IsValid() bool {
+	switch d {
+	case SortAsc, SortDesc:
+		return true
+	default:
+		return false
+	}
+}
+
+type SortField string
+
+const (
+	SortByName  SortField = "name"
+	SortByPrice SortField = "price"
+	SortByDate  SortField = "date"
+)
+
+func (f SortField) IsValid() bool {
+	switch f {
+	case SortByName, SortByDate, SortByPrice:
+		return true
+	default:
+		return false
+	}
+}
+
+type SortKey struct {
+	Field SortField `json:"field"`
+	Dir   SortDir   `json:"dir"`
 }

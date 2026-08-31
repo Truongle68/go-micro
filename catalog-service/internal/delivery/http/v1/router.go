@@ -37,6 +37,16 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
 	authMid := ginmw.Auth(deps.Verifier, deps.Cache)
 	adminMid := ginmw.Role(string(domain.UserRoleAdmin))
 
+	admin := apiV1Group.Group("/admin", authMid, adminMid)
+	{
+		products := admin.Group("/products")
+		{
+			products.POST("", r.createProduct)
+			products.GET("", r.listAdminProducts)
+			products.GET("/statistics/counts", r.countProductsPerStatus)
+		}
+	}
+
 	products := apiV1Group.Group("/products")
 	{
 		products.POST("", authMid, adminMid, r.createProduct)
@@ -44,7 +54,7 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
 		products.GET("/:id", r.getProduct)
 		products.PUT("/:id", authMid, adminMid, r.updateProduct)
 		products.DELETE("/:id", authMid, adminMid, r.deleteProduct)
-		products.GET("", r.listProducts)
+		products.GET("", r.listPublicProducts)
 	}
 
 	categories := apiV1Group.Group("/categories")
