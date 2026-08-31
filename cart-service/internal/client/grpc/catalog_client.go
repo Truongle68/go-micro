@@ -2,12 +2,15 @@ package grpc
 
 import (
 	"cart-service/internal/client"
+	"cart-service/internal/domain"
 	"context"
 	"fmt"
 
 	catalogv1 "github.com/TruongLe68/go-micro/pkg/gen/proto/go/catalog/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type catalogGRPCClient struct {
@@ -29,7 +32,18 @@ func (c *catalogGRPCClient) GetVariantsBySKUs(ctx context.Context, skus []string
 		Sku: skus,
 	})
 	if err != nil {
-		return []client.VariantDTO{}, fmt.Errorf("gRPC get variants by skus failed: %w", err)
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.NotFound:
+				return nil, fmt.Errorf("%w: %s", domain.ErrSKUNotFound, st.Message())
+			case codes.FailedPrecondition:
+				return nil, fmt.Errorf("%w: %s", domain.ErrInactiveVariant, st.Message())
+			case codes.InvalidArgument:
+				return nil, fmt.Errorf("%w: %s", domain.ErrEmptySKU, st.Message())
+			}
+		}
+		return nil, fmt.Errorf("catalog GetVariantsBySKUs: %w", err)
 	}
 	if res.GetVariants() == nil {
 		return []client.VariantDTO{}, nil
@@ -38,8 +52,11 @@ func (c *catalogGRPCClient) GetVariantsBySKUs(ctx context.Context, skus []string
 	variants := make([]client.VariantDTO, len(res.GetVariants()))
 	for i, v := range res.GetVariants() {
 		variants[i] = client.VariantDTO{
-			SKU:        v.GetSku(),
-			Attributes: v.GetAttributes(),
+			ID:          v.GetId(),
+			ProductID:   v.GetProductId(),
+			ProductName: v.GetProductName(),
+			SKU:         v.GetSku(),
+			Attributes:  v.GetAttributes(),
 			Price: client.Price{
 				Amount:   int(v.GetPrice().GetAmount()),
 				Currency: v.GetPrice().GetCurrency(),

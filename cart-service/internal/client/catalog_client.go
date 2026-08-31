@@ -3,11 +3,14 @@ package client
 import "context"
 
 type VariantDTO struct {
-	SKU        string            `json:"sku"`
-	Attributes map[string]string `json:"attributes"`
-	Price      Price             `json:"price"`
-	Image      string            `json:"image"`
-	IsActive   bool              `json:"is_active"`
+	ID          string            `json:"id"`
+	ProductID   string            `json:"product_id"`
+	ProductName string            `json:"product_name"`
+	SKU         string            `json:"sku"`
+	Attributes  map[string]string `json:"attributes"`
+	Price       Price             `json:"price"`
+	Image       string            `json:"image"`
+	IsActive    bool              `json:"is_active"`
 }
 
 type Price struct {

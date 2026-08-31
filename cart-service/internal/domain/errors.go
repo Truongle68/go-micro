@@ -12,6 +12,9 @@ const (
 	CodeInvalidUserID   ErrorCode = "INVALID_USER_ID"
 	CodeInvalidSKU      ErrorCode = "INVALID_SKU"
 	CodeEmptyCart       ErrorCode = "EMPTY_CART"
+	CodeEmptySKU        ErrorCode = "SKU_EMPTY"
+	CodeSKUNotFound     ErrorCode = "SKU_NOT_FOUND"
+	CodeInactiveVariant ErrorCode = "INACTIVE_VARIANT"
 )
 
 type AppError struct {
@@ -45,6 +48,9 @@ var (
 	ErrFailedToUpdateItem   = errors.New("failed to update item quantity")
 	ErrFailedToRemoveItem   = errors.New("failed to remove item from cart")
 	ErrFailedToClearCart    = errors.New("failed to clear cart")
+	ErrEmptySKU             = errors.New("sku cannot be empty")
+	ErrSKUNotFound          = errors.New("sku not found")
+	ErrInactiveVariant      = errors.New("inactive variant")
 )
 
 var sentinelToCodeMap = map[error]ErrorCode{
@@ -56,6 +62,9 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrEmptyCart:            CodeEmptyCart,
 	ErrSKURequired:          CodeInvalidSKU,
 	ErrFailedToRetrieveCart: CodeCartNotFound,
+	ErrEmptySKU:             CodeEmptySKU,
+	ErrSKUNotFound:          CodeSKUNotFound,
+	ErrInactiveVariant:      CodeInactiveVariant,
 }
 
 func ToAppError(err error) *AppError {
