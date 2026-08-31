@@ -90,10 +90,32 @@ func (m *mockTransactor) WithTransaction(ctx context.Context, fn func(ctx contex
 	return fn(ctx)
 }
 
+type mockCartClient struct{}
+
+func (m *mockCartClient) GetCart(ctx context.Context, userID string, token string) (*client.CartDTO, error) {
+	return &client.CartDTO{
+		UserID: userID,
+		Items: []client.CartItemDTO{
+			{
+				SKU:      "SKU-001",
+				Quantity: 2,
+			},
+		},
+	}, nil
+}
+
+func (m *mockCartClient) RemoveItems(ctx context.Context, userID string, skus []string, token string) error {
+	return nil
+}
+
+func (m *mockCartClient) ClearCart(ctx context.Context, userID string, token string) error {
+	return nil
+}
+
 func TestCheckoutAndOrderLifecycle(t *testing.T) {
 	repo := newMockOrderRepo()
 	l := logger.New("error")
-	uc := usecase.NewOrderUC(repo, nil, &mockCatalogClient{}, &mockTransactor{}, l)
+	uc := usecase.NewOrderUC(repo, &mockCartClient{}, &mockCatalogClient{}, &mockTransactor{}, l)
 
 	ctx := context.Background()
 	userID := "usr_1001"

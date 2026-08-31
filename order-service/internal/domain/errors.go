@@ -18,8 +18,10 @@ const (
 	CodeCartEmpty                   ErrorCode = "CART_EMPTY"
 	CodeEmptySKU                    ErrorCode = "SKU_EMPTY"
 	CodeSKUNotFound                 ErrorCode = "SKU_NOT_FOUND"
-	CodeInvalidQuantity             ErrorCode = "INVALID_QUANTITY"
 	CodeInactiveVariant             ErrorCode = "INACTIVE_VARIANT"
+	CodeInvalidQuantity             ErrorCode = "INVALID_QUANTITY"
+	CodeCartItemNotFound            ErrorCode = "CART_ITEM_NOT_FOUND"
+	CodeCartItemQtyExceeded         ErrorCode = "CART_ITEM_QUANTITY_EXCEEDED"
 )
 
 type AppError struct {
@@ -53,8 +55,10 @@ var (
 	ErrCartEmpty                   = errors.New("cart cannot be empty")
 	ErrEmptySKU                    = errors.New("sku cannot be empty")
 	ErrSKUNotFound                 = errors.New("sku not found")
-	ErrInvalidQuantity             = errors.New("invalid quantity: must be positive")
 	ErrInactiveVariant             = errors.New("inactive variant")
+	ErrInvalidQuantity             = errors.New("invalid quantity: must be positive")
+	ErrCartItemNotFound            = errors.New("item not found in cart")
+	ErrCartItemQtyExceeded         = errors.New("exceed item quantity in cart")
 )
 
 var sentinelToCodeMap = map[error]ErrorCode{
@@ -71,8 +75,10 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrCartEmpty:                   CodeCartEmpty,
 	ErrEmptySKU:                    CodeEmptySKU,
 	ErrSKUNotFound:                 CodeSKUNotFound,
-	ErrInvalidQuantity:             CodeInvalidQuantity,
 	ErrInactiveVariant:             CodeInactiveVariant,
+	ErrInvalidQuantity:             CodeInvalidQuantity,
+	ErrCartItemNotFound:            CodeCartItemNotFound,
+	ErrCartItemQtyExceeded:         CodeCartItemQtyExceeded,
 }
 
 func ToAppError(err error) *AppError {

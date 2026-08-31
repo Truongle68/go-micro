@@ -36,35 +36,103 @@ type rawLine struct {
 }
 
 func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutInput, token string) (*domain.Order, error) {
-	items := input.Items
-	var (
-		raw []rawLine
-		err error
-	)
-
-	switch {
-	case len(items) > 0:
-		raw, err = parseRawLine(items, func(item CheckoutItemInput) string { return item.SKU }, func(item CheckoutItemInput) int { return item.Quantity })
-	case uc.cartClient != nil:
-		cart, err := uc.cartClient.GetCart(ctx, userID, token)
-		if err != nil {
-			return nil, fmt.Errorf("OrderUC.Checkout - cartClient.GetCart: %w", err)
-		}
-		items := cart.Items
-		if len(items) == 0 {
-			return nil, domain.ErrCartEmpty
-		}
-		raw, err = parseRawLine(items, func(item client.CartItemDTO) string { return item.SKU }, func(item client.CartItemDTO) int { return item.Quantity })
-	default:
-		return nil, domain.ErrEmptyOrderItems
-	}
+	raws, err := uc.resolveCheckoutLines(ctx, userID, input, token)
 	if err != nil {
 		return nil, err
 	}
 
-	qtyBySKU := make(map[string]int, len(raw))
-	skus := make([]string, 0, len(raw))
-	for _, r := range raw {
+	domainItems, err := uc.buildOrderItemsFromCatalog(ctx, raws)
+	if err != nil {
+		return nil, err
+	}
+
+	order, history, err := domain.NewOrder(userID, domainItems, input.ShippingAddress, input.ShippingFee, input.PaymentMethod)
+	if err != nil {
+		return nil, fmt.Errorf("OrderUC.Checkout - domain.NewOrder: %w", err)
+	}
+
+	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		err := uc.repo.Create(txCtx, order, history)
+		if err != nil {
+			return fmt.Errorf("OrderUC.Checkout - Create: %w", err)
+		}
+
+		// COD Payment path (stub): transition pending_payment -> confirmed
+		confirmHist, err := order.MarkConfirmed("COD-" + order.ID)
+		if err != nil {
+			return fmt.Errorf("OrderUC.Checkout - MarkConfirmed: %w", err)
+		}
+
+		if err := uc.repo.UpdateStatus(txCtx, order, confirmHist); err != nil {
+			return fmt.Errorf("OrderUC.Checkout - repo.UpdateStatus: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("OrderUC.Checkout - CreateWithTransaction: %w", err)
+	}
+	// Best-effort remove checked out items from cart
+	if uc.cartClient != nil && len(domainItems) > 0 {
+		skus := make([]string, len(domainItems))
+		for i, item := range domainItems {
+			skus[i] = item.SKU
+		}
+		if err := uc.cartClient.RemoveItems(ctx, userID, skus, token); err != nil {
+			uc.logger.Warn("checkout cart cleanup: %v", err)
+		}
+	}
+	return order, nil
+}
+
+func (uc *OrderUC) resolveCheckoutLines(
+	ctx context.Context,
+	userID string,
+	input CheckoutInput,
+	token string,
+) ([]rawLine, error) {
+	items := input.Items
+	if len(items) <= 0 {
+		return nil, domain.ErrEmptyOrderItems
+	}
+
+	if uc.cartClient != nil {
+		cart, err := uc.cartClient.GetCart(ctx, userID, token)
+		if err != nil {
+			return nil, fmt.Errorf("OrderUC.Checkout - cartClient.GetCart: %w", err)
+		}
+
+		cartItems := make(map[string]int, len(cart.Items))
+		for _, item := range cart.Items {
+			cartItems[item.SKU] = item.Quantity
+		}
+
+		for _, item := range items {
+			cartQty, ok := cartItems[item.SKU]
+			if !ok {
+				return nil, domain.ErrCartItemNotFound
+			}
+			if item.Quantity > cartQty {
+				return nil, domain.ErrCartItemQtyExceeded
+			}
+		}
+	}
+
+	return parseRawLine(
+		items,
+		func(item CheckoutItemInput) string { return item.SKU },
+		func(item CheckoutItemInput) int { return item.Quantity },
+	)
+}
+
+func (uc *OrderUC) buildOrderItemsFromCatalog(ctx context.Context, raws []rawLine) ([]domain.OrderItem, error) {
+	if len(raws) == 0 {
+		return nil, domain.ErrEmptyOrderItems
+	}
+
+	qtyBySKU := make(map[string]int, len(raws))
+	skus := make([]string, 0, len(raws))
+	for _, r := range raws {
 		if _, ok := qtyBySKU[r.SKU]; !ok {
 			skus = append(skus, r.SKU)
 		}
@@ -73,7 +141,7 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 
 	variants, err := uc.catalogClient.GetVariantsBySKUs(ctx, skus)
 	if err != nil {
-		return nil, fmt.Errorf("OrderUC.Checkout - GetVariantsBySKUs: %w", err)
+		return nil, fmt.Errorf("buildOrderItemsFromCatalog - GetVariantsBySKUs: %w", err)
 	}
 	bySKU := make(map[string]client.VariantDTO, len(variants))
 	for _, v := range variants {
@@ -101,45 +169,7 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 			Quantity:     qtyBySKU[sku],
 		})
 	}
-
-	order, history, err := domain.NewOrder(userID, domainItems, input.ShippingAddress, input.ShippingFee, input.PaymentMethod)
-	if err != nil {
-		return nil, fmt.Errorf("OrderUC.Checkout - domain.NewOrder: %w", err)
-	}
-
-	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
-		err := uc.repo.Create(txCtx, order, history)
-		if err != nil {
-			return fmt.Errorf("OrderUC.Checkout - Create: %w", err)
-		}
-
-		// COD Payment path (stub): transition pending_payment -> confirmed
-		confirmHist, err := order.MarkConfirmed("COD-" + order.ID)
-		if err != nil {
-			return fmt.Errorf("OrderUC.Checkout - MarkConfirmed: %w", err)
-		}
-
-		if err := uc.repo.UpdateStatus(txCtx, order, confirmHist); err != nil {
-			return fmt.Errorf("OrderUC.Checkout - repo.UpdateStatus: %w", err)
-		}
-
-		// Best-effort remove checked out items from cart
-		if uc.cartClient != nil && len(domainItems) > 0 {
-			skus := make([]string, len(domainItems))
-			for i, item := range domainItems {
-				skus[i] = item.SKU
-			}
-			go func() {
-				_ = uc.cartClient.RemoveItems(context.Background(), userID, skus, token)
-			}()
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("OrderUC.Checkout - CreateWithTransaction: %w", err)
-	}
-
-	return order, nil
+	return domainItems, nil
 }
 
 func parseRawLine[T any](items []T, getSKU func(T) string, getQuantity func(T) int) ([]rawLine, error) {
