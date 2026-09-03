@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type StockReservation struct {
 	ID          string            `json:"id"`
@@ -20,22 +23,31 @@ type NewStockReservationParams struct {
 	WarehouseID string
 	Quantity    int
 	OrderID     string
-	Ttl         time.Duration
+	TTL         time.Duration
 }
 
 func NewStockReservation(params NewStockReservationParams) (*StockReservation, error) {
+	sku := strings.TrimSpace(params.SKU)
+	wh := strings.TrimSpace(params.WarehouseID)
+
+	if sku == "" {
+		return nil, ErrEmptySKU
+	}
+	if wh == "" {
+		return nil, ErrEmptyWhID
+	}
 	if params.Quantity <= 0 {
-		return nil, ErrInvalidQuantity
+		return nil, ErrNonPositiveQuantity
 	}
 
 	now := time.Now().UTC()
 	return &StockReservation{
-		SKU:         params.SKU,
-		WarehouseID: params.WarehouseID,
+		SKU:         sku,
+		WarehouseID: wh,
 		Quantity:    params.Quantity,
 		OrderID:     params.OrderID,
 		Status:      ReservationPending,
-		ExpiresAt:   now.Add(params.Ttl),
+		ExpiresAt:   now.Add(params.TTL),
 		CreatedAt:   now,
 	}, nil
 }

@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type StockLevel struct {
 	ID               string    `json:"id"`
@@ -13,6 +16,39 @@ type StockLevel struct {
 	Version          int       `json:"version"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type NewStockLevelParams struct {
+	SKU              string
+	WarehouseID      string
+	ReorderThreshold int
+	ReorderQuantity  int
+}
+
+func NewStockLevel(params NewStockLevelParams) (*StockLevel, error) {
+	if strings.TrimSpace(params.SKU) == "" {
+		return nil, ErrEmptySKU
+	}
+	if strings.TrimSpace(params.WarehouseID) == "" {
+		return nil, ErrEmptyWhID
+	}
+
+	if params.ReorderThreshold < 0 || params.ReorderQuantity < 0 {
+		return nil, ErrNegativeQuantity
+	}
+
+	now := time.Now().UTC()
+	return &StockLevel{
+		SKU:              params.SKU,
+		WarehouseID:      params.WarehouseID,
+		OnHand:           0,
+		Reserved:         0,
+		ReorderThreshold: params.ReorderThreshold,
+		ReorderQuantity:  params.ReorderQuantity,
+		Version:          1,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}, nil
 }
 
 func (s *StockLevel) Available() int {
@@ -29,7 +65,7 @@ func (s *StockLevel) NeedsReorder() bool {
 
 func (s *StockLevel) Reserve(qty int) error {
 	if qty <= 0 {
-		return ErrInvalidQuantity
+		return ErrNonPositiveQuantity
 	}
 
 	if s.Available() < qty {
@@ -44,7 +80,7 @@ func (s *StockLevel) Reserve(qty int) error {
 
 func (s *StockLevel) ConfirmReservation(qty int) error {
 	if qty <= 0 {
-		return ErrInvalidQuantity
+		return ErrNonPositiveQuantity
 	}
 
 	if s.Reserved < qty {
@@ -60,7 +96,7 @@ func (s *StockLevel) ConfirmReservation(qty int) error {
 
 func (s *StockLevel) Release(qty int) error {
 	if qty <= 0 {
-		return ErrInvalidQuantity
+		return ErrNonPositiveQuantity
 	}
 
 	if s.Reserved < qty {
@@ -86,7 +122,7 @@ func (s *StockLevel) AdjustOnHand(delta int) error {
 
 func (s *StockLevel) ApplyTransferOut(qty int) error {
 	if qty <= 0 {
-		return ErrInvalidQuantity
+		return ErrNonPositiveQuantity
 	}
 	if s.Available() < qty {
 		return ErrInsufficientStock

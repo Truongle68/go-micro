@@ -21,3 +21,35 @@ type WarehouseAddress struct {
 	Lat      float64 `json:"lat"`
 	Lng      float64 `json:"lng"`
 }
+
+type NewWarehouseParams struct {
+	Code    string
+	Name    string
+	Region  string
+	Address WarehouseAddress
+}
+
+func NewWarehouse(params NewWarehouseParams) (*Warehouse, error) {
+	if params.Code == "" {
+		return nil, ErrEmptyWhCode
+	}
+
+	if params.Name == "" {
+		return nil, ErrEmptyWhName
+	}
+
+	if params.Address.City == "" {
+		return nil, ErrEmptyWhAddressCity
+	}
+
+	now := time.Now().UTC()
+	return &Warehouse{
+		Code:      params.Code,
+		Name:      params.Name,
+		Region:    params.Region,
+		Address:   params.Address,
+		IsActive:  true,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
