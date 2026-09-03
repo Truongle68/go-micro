@@ -75,12 +75,51 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  inventory-db:
+    container_name: inventory-db
+    image: postgres:18-alpine
+    volumes:
+      - inventory-data:/var/lib/postgresql
+      - ./inventory-service/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./inventory-service/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    environment:
+      - POSTGRES_USER=${INVENTORY_POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${INVENTORY_POSTGRES_PW:-postgres}
+      - POSTGRES_DB=${INVENTORY_POSTGRES_DB:-inventory-db}
+    ports:
+      - "5435:5432"
+    restart: always
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    restart: always
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   identity-data:
   catalog-data:
   redis-data:
   order-data:
+  inventory-data:
+  rabbitmq-data:
 
 networks:
   catalog-net:

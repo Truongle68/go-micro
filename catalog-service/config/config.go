@@ -21,12 +21,7 @@ type (
 	}
 
 	grpc struct {
-		Port     string `env:"GRPC_PORT" envDefault:"50050"`
-		Services services
-	}
-
-	services struct {
-		UserServiceAddr string `env:"USER_SERVICE_ADDR" envDefault:"50050"`
+		Port string `env:"GRPC_PORT" envDefault:"50050"`
 	}
 
 	mongodb struct {

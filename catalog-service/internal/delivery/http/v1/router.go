@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"catalog-service/internal/domain"
-
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	"github.com/TruongLe68/go-micro/pkg/ginmw"
@@ -35,7 +33,7 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps Dependencies) {
 	}
 
 	authMid := ginmw.Auth(deps.Verifier, deps.Cache)
-	adminMid := ginmw.Role(string(domain.UserRoleAdmin))
+	adminMid := ginmw.Role(ginmw.AdminRole)
 
 	admin := apiV1Group.Group("/admin", authMid, adminMid)
 	{

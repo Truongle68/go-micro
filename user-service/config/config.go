@@ -10,7 +10,6 @@ import (
 type (
 	Config struct {
 		HTTP    http
-		GRPC    grpc
 		PG      pg
 		JWT     jwt
 		Redis   redis
@@ -30,11 +29,6 @@ type (
 		SMTPUser     string `env:"SMTP_USER" envDefault:""`
 		SMTPPassword string `env:"SMTP_PASSWORD" envDefault:""`
 		SenderEmail  string `env:"SENDER_EMAIL" envDefault:"no-reply@example.com"`
-	}
-
-	grpc struct {
-		Port     string `env:"GRPC_PORT" envDefault:"50050"`
-		Services services
 	}
 
 	services struct {
