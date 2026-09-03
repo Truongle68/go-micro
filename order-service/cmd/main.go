@@ -65,10 +65,14 @@ func main() {
 	if err != nil {
 		l.Fatal("failed to initialize catalog gRPC client: %v", err)
 	}
+	inventoryClient, err := grpcclient.NewInventoryGRPCClient(cfg.Services.InventoryServiceGRPCAddr)
+	if err != nil {
+		l.Fatal("failed to initialize inventory gRPC client: %v", err)
+	}
 
 	// init repo & usecase
 	orderRepo := pgrepo.NewOrderRepo(pg.DB)
-	orderUC := usecase.NewOrderUC(orderRepo, cartClient, catalogClient, transactor, l)
+	orderUC := usecase.NewOrderUC(orderRepo, cartClient, catalogClient, inventoryClient, transactor, l)
 
 	// init http server & router
 	server := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))

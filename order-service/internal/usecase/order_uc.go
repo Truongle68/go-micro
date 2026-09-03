@@ -13,20 +13,29 @@ import (
 )
 
 type OrderUC struct {
-	repo          OrderRepository
-	cartClient    client.CartClient
-	catalogClient client.CatalogClient
-	transactor    Transactor
-	logger        logger.Interface
+	repo            OrderRepository
+	cartClient      client.CartClient
+	catalogClient   client.CatalogClient
+	inventoryClient InventoryClient
+	transactor      Transactor
+	logger          logger.Interface
 }
 
-func NewOrderUC(repo OrderRepository, cartClient client.CartClient, catalogClient client.CatalogClient, transactor Transactor, l logger.Interface) *OrderUC {
+func NewOrderUC(
+	repo OrderRepository,
+	cartClient client.CartClient,
+	catalogClient client.CatalogClient,
+	inventoryClient InventoryClient,
+	transactor Transactor,
+	l logger.Interface,
+) *OrderUC {
 	return &OrderUC{
-		repo:          repo,
-		cartClient:    cartClient,
-		catalogClient: catalogClient,
-		transactor:    transactor,
-		logger:        l,
+		repo:            repo,
+		cartClient:      cartClient,
+		catalogClient:   catalogClient,
+		inventoryClient: inventoryClient,
+		transactor:      transactor,
+		logger:          l,
 	}
 }
 
@@ -51,13 +60,41 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		return nil, fmt.Errorf("OrderUC.Checkout - domain.NewOrder: %w", err)
 	}
 
+	// Step 1: Create the order in pending_payment state
 	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		err := uc.repo.Create(txCtx, order, history)
 		if err != nil {
 			return fmt.Errorf("OrderUC.Checkout - Create: %w", err)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("OrderUC.Checkout - CreateTransaction: %w", err)
+	}
 
-		// COD Payment path (stub): transition pending_payment -> confirmed
+	// Step 2: Reserve stock via inventory service
+	if uc.inventoryClient != nil {
+		skuQtys := make([]client.SKUQty, len(domainItems))
+		for i, item := range domainItems {
+			skuQtys[i] = client.SKUQty{SKU: item.SKU, Quantity: item.Quantity}
+		}
+
+		if err := uc.inventoryClient.ReserveStock(ctx, order.ID, skuQtys); err != nil {
+			// Mark order as failed_stock
+			failHist, markErr := order.MarkFailed(domain.OrderStatusFailedStock, fmt.Sprintf("stock reservation failed: %v", err))
+			if markErr != nil {
+				uc.logger.Error("checkout stock-fail mark: %v (original: %v)", markErr, err)
+				return nil, fmt.Errorf("OrderUC.Checkout - ReserveStock: %w", err)
+			}
+			if updateErr := uc.repo.UpdateStatus(ctx, order, failHist); updateErr != nil {
+				uc.logger.Error("checkout stock-fail persist: %v", updateErr)
+			}
+			return nil, fmt.Errorf("OrderUC.Checkout - ReserveStock: %w", err)
+		}
+	}
+
+	// Step 3: COD Payment path (stub): transition pending_payment -> confirmed
+	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		confirmHist, err := order.MarkConfirmed("COD-" + order.ID)
 		if err != nil {
 			return fmt.Errorf("OrderUC.Checkout - MarkConfirmed: %w", err)
@@ -70,9 +107,17 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("OrderUC.Checkout - CreateWithTransaction: %w", err)
+		return nil, fmt.Errorf("OrderUC.Checkout - ConfirmTransaction: %w", err)
 	}
-	// Best-effort remove checked out items from cart
+
+	// Step 4: Confirm reservation (deduct on-hand stock) — best-effort
+	if uc.inventoryClient != nil {
+		if err := uc.inventoryClient.ConfirmReservation(ctx, order.ID); err != nil {
+			uc.logger.Warn("checkout confirm-reservation: %v", err)
+		}
+	}
+
+	// Step 5: Best-effort remove checked out items from cart
 	if uc.cartClient != nil && len(domainItems) > 0 {
 		skus := make([]string, len(domainItems))
 		for i, item := range domainItems {
@@ -279,6 +324,13 @@ func (uc *OrderUC) CancelOrder(ctx context.Context, orderID string, userID strin
 
 	if err := uc.repo.UpdateStatus(ctx, order, cancelHist); err != nil {
 		return nil, fmt.Errorf("OrderUC.CancelOrder - repo.UpdateStatus: %w", err)
+	}
+
+	// Release reserved inventory — best-effort
+	if uc.inventoryClient != nil {
+		if err := uc.inventoryClient.ReleaseReservation(ctx, orderID); err != nil {
+			uc.logger.Warn("cancel release-reservation: %v", err)
+		}
 	}
 
 	return order, nil

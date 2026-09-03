@@ -22,6 +22,7 @@ const (
 	CodeInvalidQuantity             ErrorCode = "INVALID_QUANTITY"
 	CodeCartItemNotFound            ErrorCode = "CART_ITEM_NOT_FOUND"
 	CodeCartItemQtyExceeded         ErrorCode = "CART_ITEM_QUANTITY_EXCEEDED"
+	CodeInsufficientStock           ErrorCode = "INSUFFICIENT_STOCK"
 )
 
 type AppError struct {
@@ -59,6 +60,7 @@ var (
 	ErrInvalidQuantity             = errors.New("invalid quantity: must be positive")
 	ErrCartItemNotFound            = errors.New("item not found in cart")
 	ErrCartItemQtyExceeded         = errors.New("exceed item quantity in cart")
+	ErrInsufficientStock           = errors.New("insufficient stock")
 )
 
 var sentinelToCodeMap = map[error]ErrorCode{
@@ -79,6 +81,7 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrInvalidQuantity:             CodeInvalidQuantity,
 	ErrCartItemNotFound:            CodeCartItemNotFound,
 	ErrCartItemQtyExceeded:         CodeCartItemQtyExceeded,
+	ErrInsufficientStock:           CodeInsufficientStock,
 }
 
 func ToAppError(err error) *AppError {

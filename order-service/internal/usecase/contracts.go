@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 
+	"order-service/internal/client"
 	"order-service/internal/domain"
 	"order-service/internal/repo/postgres"
 	pgtransactor "order-service/pkg/postgres"
@@ -35,3 +36,11 @@ type Transactor interface {
 }
 
 var _ Transactor = (*pgtransactor.PostgresTransactor)(nil)
+
+// InventoryClient defines the inventory service operations needed by the order usecase.
+type InventoryClient interface {
+	CheckStock(ctx context.Context, items []client.SKUQty) (map[string]int, error)
+	ReserveStock(ctx context.Context, orderID string, items []client.SKUQty) error
+	ConfirmReservation(ctx context.Context, orderID string) error
+	ReleaseReservation(ctx context.Context, orderID string) error
+}

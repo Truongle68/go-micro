@@ -24,9 +24,10 @@ type (
 	}
 
 	Services struct {
-		CartServiceURL         string `env:"CART_SERVICE_URL" envDefault:"http://localhost:4003"`
-		CartServiceGRPCAddr    string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
-		CatalogServiceGRPCAddr string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
+		CartServiceURL             string `env:"CART_SERVICE_URL" envDefault:"http://localhost:4003"`
+		CartServiceGRPCAddr        string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
+		CatalogServiceGRPCAddr     string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
+		InventoryServiceGRPCAddr   string `env:"INVENTORY_SERVICE_GRPC_ADDR" envDefault:"localhost:50052"`
 	}
 
 	JWT struct {
