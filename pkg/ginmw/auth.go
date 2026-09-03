@@ -19,6 +19,11 @@ const (
 	DefaultAccessCookie = "access_token"
 )
 
+const (
+	AdminRole = "admin"
+	UserRole  = "user"
+)
+
 type middlewareConfig struct {
 	cookieName string
 	useBearer  bool

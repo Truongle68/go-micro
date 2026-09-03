@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package inventory.v1;
+
+option go_package = "github.com/TruongLe68/go-micro/pkg/gen/proto/go/inventory/v1;inventoryv1";
+
+service InventoryService {
+  rpc CheckStock(CheckStockRequest) returns (CheckStockResponse);
+  rpc ReserveStock(ReserveStockRequest) returns (ReserveStockResponse);
+  rpc ConfirmReservation(ConfirmReservationRequest) returns (ConfirmReservationResponse);
+  rpc ReleaseReservation(ReleaseReservationRequest) returns (ReleaseReservationResponse);
+}
+
+message SKUQuantity {
+  string sku = 1;
+  int32 quantity = 2;
+}
+
+message StockAvailability {
+  string sku = 1;
+  int32 available = 2;
+}
+
+// CheckStock
+message CheckStockRequest {
+  repeated string skus = 1;
+}
+
+message CheckStockResponse {
+  repeated StockAvailability items = 1;
+}
+
+// ReserveStock
+message ReserveStockRequest {
+  string order_id = 1;
+  repeated SKUQuantity items = 2;
+}
+
+message ReserveStockResponse {
+  bool success = 1;
+}
+
+// ConfirmReservation
+message ConfirmReservationRequest {
+  string order_id = 1;
+}
+
+message ConfirmReservationResponse {
+  bool success = 1;
+}
+
+// ReleaseReservation
+message ReleaseReservationRequest {
+  string order_id = 1;
+}
+
+message ReleaseReservationResponse {
+  bool success = 1;
+}
