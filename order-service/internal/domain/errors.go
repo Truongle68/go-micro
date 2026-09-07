@@ -23,6 +23,8 @@ const (
 	CodeCartItemNotFound            ErrorCode = "CART_ITEM_NOT_FOUND"
 	CodeCartItemQtyExceeded         ErrorCode = "CART_ITEM_QUANTITY_EXCEEDED"
 	CodeInsufficientStock           ErrorCode = "INSUFFICIENT_STOCK"
+	CodeReservationNotFound         ErrorCode = "RESERVATION_NOT_FOUND"
+	CodeReservationExpired          ErrorCode = "RESERVATION_EXPIRED"
 )
 
 type AppError struct {
@@ -61,6 +63,8 @@ var (
 	ErrCartItemNotFound            = errors.New("item not found in cart")
 	ErrCartItemQtyExceeded         = errors.New("exceed item quantity in cart")
 	ErrInsufficientStock           = errors.New("insufficient stock")
+	ErrReservationNotFound         = errors.New("reservation not fount")
+	ErrReservationExpired          = errors.New("reservation expired")
 )
 
 var sentinelToCodeMap = map[error]ErrorCode{
@@ -82,6 +86,8 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrCartItemNotFound:            CodeCartItemNotFound,
 	ErrCartItemQtyExceeded:         CodeCartItemQtyExceeded,
 	ErrInsufficientStock:           CodeInsufficientStock,
+	ErrReservationNotFound:         CodeReservationNotFound,
+	ErrReservationExpired:          CodeReservationExpired,
 }
 
 func ToAppError(err error) *AppError {

@@ -27,6 +27,7 @@ type OrderRepository interface {
 	FindByUserID(ctx context.Context, userID string, limit int64, offset int64) ([]domain.Order, int64, error)
 	UpdateStatus(ctx context.Context, order *domain.Order, history *domain.OrderStatusHistory) error
 	GetTrackingHistory(ctx context.Context, orderID string) ([]domain.OrderStatusHistory, error)
+	AppendNote(ctx context.Context, orderID string, currentStatus domain.OrderStatus, note string) error
 }
 
 var _ OrderRepository = (*postgres.OrderRepo)(nil)

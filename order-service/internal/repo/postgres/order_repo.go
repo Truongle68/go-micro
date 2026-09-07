@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"order-service/internal/domain"
 	orderpg "order-service/pkg/postgres"
+
+	"github.com/google/uuid"
 )
 
 type OrderRepo struct {
@@ -268,4 +271,20 @@ func (r *OrderRepo) GetTrackingHistory(ctx context.Context, orderID string) ([]d
 	}
 
 	return histories, nil
+}
+
+func (r *OrderRepo) AppendNote(ctx context.Context, orderID string, currentStatus domain.OrderStatus, note string) error {
+	executor := orderpg.GetExecutor(ctx, r.db)
+	query := `
+		INSERT INTO order_status_history (
+			id, order_id, from_status, to_status, note, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6)`
+
+	_, err := executor.ExecContext(ctx, query,
+		uuid.New().String(), orderID, currentStatus, currentStatus, note, time.Now().UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("OrderRepo.AppendNote - insert: %w", err)
+	}
+	return nil
 }

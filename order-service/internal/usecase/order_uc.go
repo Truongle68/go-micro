@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"order-service/internal/client"
 	"order-service/internal/domain"
@@ -44,6 +46,11 @@ type rawLine struct {
 	Quantity int
 }
 
+const (
+	confirmReservationMaxAttempts = 3
+	confirmReservationBaseBackoff = 200 * time.Millisecond
+)
+
 func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutInput, token string) (*domain.Order, error) {
 	raws, err := uc.resolveCheckoutLines(ctx, userID, input, token)
 	if err != nil {
@@ -60,7 +67,7 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		return nil, fmt.Errorf("OrderUC.Checkout - domain.NewOrder: %w", err)
 	}
 
-	// Step 1: Create the order in pending_payment state
+	// create the order in pending_payment state
 	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		err := uc.repo.Create(txCtx, order, history)
 		if err != nil {
@@ -72,7 +79,7 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		return nil, fmt.Errorf("OrderUC.Checkout - CreateTransaction: %w", err)
 	}
 
-	// Step 2: Reserve stock via inventory service
+	// reserve stock via inventory service
 	if uc.inventoryClient != nil {
 		skuQtys := make([]client.SKUQty, len(domainItems))
 		for i, item := range domainItems {
@@ -81,19 +88,13 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 
 		if err := uc.inventoryClient.ReserveStock(ctx, order.ID, skuQtys); err != nil {
 			// Mark order as failed_stock
-			failHist, markErr := order.MarkFailed(domain.OrderStatusFailedStock, fmt.Sprintf("stock reservation failed: %v", err))
-			if markErr != nil {
-				uc.logger.Error("checkout stock-fail mark: %v (original: %v)", markErr, err)
-				return nil, fmt.Errorf("OrderUC.Checkout - ReserveStock: %w", err)
-			}
-			if updateErr := uc.repo.UpdateStatus(ctx, order, failHist); updateErr != nil {
-				uc.logger.Error("checkout stock-fail persist: %v", updateErr)
-			}
+			uc.failOrder(ctx, order, domain.OrderStatusFailedStock,
+				fmt.Sprintf("stock reservation failed: %v", err))
 			return nil, fmt.Errorf("OrderUC.Checkout - ReserveStock: %w", err)
 		}
 	}
 
-	// Step 3: COD Payment path (stub): transition pending_payment -> confirmed
+	// COD Payment path (stub): transition pending_payment -> confirmed
 	err = uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		confirmHist, err := order.MarkConfirmed("COD-" + order.ID)
 		if err != nil {
@@ -107,27 +108,76 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		return nil
 	})
 	if err != nil {
+		if uc.inventoryClient != nil {
+			if releaseErr := uc.inventoryClient.ReleaseReservation(ctx, order.ID); releaseErr != nil {
+				uc.logger.Error("checkout confirm-fail release: %v (original: %v)", releaseErr, err)
+			}
+		}
+		uc.failOrder(ctx, order, domain.OrderStatusFailedPayment, fmt.Sprintf("confirm failed: %v", err))
 		return nil, fmt.Errorf("OrderUC.Checkout - ConfirmTransaction: %w", err)
 	}
 
-	// Step 4: Confirm reservation (deduct on-hand stock) — best-effort
+	// confirm reservation (deduct on-hand stock)
 	if uc.inventoryClient != nil {
-		if err := uc.inventoryClient.ConfirmReservation(ctx, order.ID); err != nil {
-			uc.logger.Warn("checkout confirm-reservation: %v", err)
+		if err := uc.confirmReservationWithRetry(ctx, order.ID); err != nil {
+			uc.logger.Error(
+				"OrderUC.Checkout - ConfirmReservation FAILED after %d attempts for CONFIRMED order %s: %v — manual inventory reconciliation required",
+				confirmReservationMaxAttempts, order.ID, err,
+			)
+			if noteErr := uc.repo.AppendNote(ctx, order.ID, order.Status,
+				fmt.Sprintf("WARNING: stock confirm failed after checkout, needs reconciliation: %v", err),
+			); noteErr != nil {
+				uc.logger.Error("OrderUC.Checkout - failed to record reconciliation note: %v", noteErr)
+			}
 		}
 	}
 
-	// Step 5: Best-effort remove checked out items from cart
+	// remove checked out items from cart
 	if uc.cartClient != nil && len(domainItems) > 0 {
 		skus := make([]string, len(domainItems))
 		for i, item := range domainItems {
 			skus[i] = item.SKU
 		}
 		if err := uc.cartClient.RemoveItems(ctx, userID, skus, token); err != nil {
-			uc.logger.Warn("checkout cart cleanup: %v", err)
+			uc.logger.Warn("OrderUC.Checkout - cart cleanup: %v", err)
 		}
 	}
 	return order, nil
+}
+
+func (uc *OrderUC) confirmReservationWithRetry(ctx context.Context, orderID string) error {
+	var lastErr error
+	for attempt := 1; attempt <= confirmReservationMaxAttempts; attempt++ {
+		err := uc.inventoryClient.ConfirmReservation(ctx, orderID)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		if errors.Is(err, domain.ErrReservationNotFound) || errors.Is(err, domain.ErrReservationExpired) {
+			return err
+		}
+
+		if attempt < confirmReservationMaxAttempts {
+			select {
+			case <-time.After(confirmReservationBaseBackoff * time.Duration(attempt)):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+	return lastErr
+}
+
+func (uc *OrderUC) failOrder(ctx context.Context, order *domain.Order, status domain.OrderStatus, note string) {
+	failHist, err := order.MarkFailed(status, note)
+	if err != nil {
+		uc.logger.Error("OrderUC.Checkout - failOrder MarkFailed: %v (note: %s)", err, note)
+		return
+	}
+	if err := uc.repo.UpdateStatus(ctx, order, failHist); err != nil {
+		uc.logger.Error("OrderUC.Checkout - failOrder UpdateStatus: %v (note: %s)", err, note)
+	}
 }
 
 func (uc *OrderUC) resolveCheckoutLines(
@@ -326,7 +376,7 @@ func (uc *OrderUC) CancelOrder(ctx context.Context, orderID string, userID strin
 		return nil, fmt.Errorf("OrderUC.CancelOrder - repo.UpdateStatus: %w", err)
 	}
 
-	// Release reserved inventory — best-effort
+	// Release reserved inventory
 	if uc.inventoryClient != nil {
 		if err := uc.inventoryClient.ReleaseReservation(ctx, orderID); err != nil {
 			uc.logger.Warn("cancel release-reservation: %v", err)

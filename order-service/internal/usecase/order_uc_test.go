@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"order-service/internal/client"
 	"order-service/internal/domain"
@@ -67,6 +68,18 @@ func (m *mockOrderRepo) GetTrackingHistory(ctx context.Context, orderID string) 
 	return h, nil
 }
 
+func (m *mockOrderRepo) AppendNote(ctx context.Context, orderID string, currentStatus domain.OrderStatus, note string) error {
+	m.histories[orderID] = append(m.histories[orderID], domain.OrderStatusHistory{
+		ID:         "note_id",
+		OrderID:    orderID,
+		FromStatus: currentStatus,
+		ToStatus:   currentStatus,
+		Note:       note,
+		CreatedAt:  time.Now().UTC(),
+	})
+	return nil
+}
+
 type mockCatalogClient struct{}
 
 func (m *mockCatalogClient) GetVariantsBySKUs(ctx context.Context, skus []string) ([]client.VariantDTO, error) {
@@ -112,10 +125,32 @@ func (m *mockCartClient) ClearCart(ctx context.Context, userID string, token str
 	return nil
 }
 
+type mockInventoryClient struct{}
+
+func (m *mockInventoryClient) CheckStock(ctx context.Context, items []client.SKUQty) (map[string]int, error) {
+	res := make(map[string]int, len(items))
+	for _, item := range items {
+		res[item.SKU] = 100
+	}
+	return res, nil
+}
+
+func (m *mockInventoryClient) ReserveStock(ctx context.Context, orderID string, items []client.SKUQty) error {
+	return nil
+}
+
+func (m *mockInventoryClient) ConfirmReservation(ctx context.Context, orderID string) error {
+	return nil
+}
+
+func (m *mockInventoryClient) ReleaseReservation(ctx context.Context, orderID string) error {
+	return nil
+}
+
 func TestCheckoutAndOrderLifecycle(t *testing.T) {
 	repo := newMockOrderRepo()
 	l := logger.New("error")
-	uc := usecase.NewOrderUC(repo, &mockCartClient{}, &mockCatalogClient{}, &mockTransactor{}, l)
+	uc := usecase.NewOrderUC(repo, &mockCartClient{}, &mockCatalogClient{}, &mockInventoryClient{}, &mockTransactor{}, l)
 
 	ctx := context.Background()
 	userID := "usr_1001"
