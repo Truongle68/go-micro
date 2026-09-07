@@ -43,3 +43,32 @@ func (r *WarehouseRepo) FindByID(ctx context.Context, id string) (*domain.Wareho
 
 	return &w, nil
 }
+
+func (r *WarehouseRepo) Find(ctx context.Context) ([]domain.Warehouse, error) {
+	exec := invpg.GetExecutor(ctx, r.db)
+
+	rows, err := exec.QueryContext(ctx, `
+		SELECT id, code, name, region, address_line1, address_ward, address_district, address_city, lat, lng, is_active, created_at, updated_at
+		FROM warehouses
+		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("WarehouseRepo.Find - query: %w", err)
+	}
+	defer rows.Close()
+
+	var warehouses []domain.Warehouse
+	for rows.Next() {
+		var w domain.Warehouse
+		if err := rows.Scan(
+			&w.ID, &w.Code, &w.Name, &w.Region,
+			&w.Address.Line1, &w.Address.Ward, &w.Address.District, &w.Address.City,
+			&w.Address.Lat, &w.Address.Lng,
+			&w.IsActive, &w.CreatedAt, &w.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("WarehouseRepo.Find - scan: %w", err)
+		}
+		warehouses = append(warehouses, w)
+	}
+	return warehouses, rows.Err()
+}

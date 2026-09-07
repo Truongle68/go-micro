@@ -27,7 +27,7 @@ func (h *V1) createSupplier(c *gin.Context) {
 		City:     r.Address.City,
 	}
 
-	supplier, err := h.supplier.CreateSupplier(c.Request.Context(), r.Code, r.Name, r.Phone, address)
+	supplier, err := h.supplier.CreateSupplier(c.Request.Context(), r.Code, r.Name, r.Phone, r.Email, address)
 	if err != nil {
 		if errors.Is(err, domain.ErrDuplicateSuppCode) {
 			response.Error(c, http.StatusConflict, string(domain.CodeDuplicateSuppCode), "supplier with this code already exists")

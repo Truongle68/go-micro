@@ -20,19 +20,23 @@ CREATE INDEX IF NOT EXISTS idx_suppliers_code ON suppliers(code);
 CREATE INDEX IF NOT EXISTS idx_suppliers_is_active ON suppliers(is_active);
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    version       INT NOT NULL DEFAULT 1,
-    code          VARCHAR(50) NOT NULL UNIQUE,
-    supplier_id   UUID NOT NULL REFERENCES suppliers(id),
-    supplier_name VARCHAR(255) NOT NULL DEFAULT '',
-    warehouse_id  VARCHAR(255) NOT NULL,
-    lines         JSONB NOT NULL DEFAULT '[]'::jsonb,
-    status        VARCHAR(50) NOT NULL DEFAULT 'draft',
-    created_by    VARCHAR(255) NOT NULL DEFAULT '',
-    expected_at   TIMESTAMP WITH TIME ZONE,
-    received_at   TIMESTAMP WITH TIME ZONE,
-    created_at    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    version         INT NOT NULL DEFAULT 1,
+    code            VARCHAR(50) NOT NULL UNIQUE,
+    supplier_id     UUID NOT NULL REFERENCES suppliers(id),
+    supplier_code   VARCHAR(50) NOT NULL DEFAULT '',
+    supplier_name   VARCHAR(255) NOT NULL DEFAULT '',
+    warehouse_id    VARCHAR(255) NOT NULL,
+    warehouse_code  VARCHAR(50) NOT NULL DEFAULT '',
+    warehouse_name  VARCHAR(255) NOT NULL DEFAULT '',
+    lines           JSONB NOT NULL DEFAULT '[]'::jsonb,
+    status          VARCHAR(50) NOT NULL DEFAULT 'draft',
+    created_by      VARCHAR(255) NOT NULL DEFAULT '',
+    created_by_name VARCHAR(255) NOT NULL DEFAULT '',
+    expected_at     TIMESTAMP WITH TIME ZONE,
+    received_at     TIMESTAMP WITH TIME ZONE,
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_code ON purchase_orders(code);

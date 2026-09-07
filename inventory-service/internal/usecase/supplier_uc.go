@@ -23,8 +23,8 @@ func NewSupplierUC(repo SupplierRepository, l logger.Interface) *SupplierUC {
 	}
 }
 
-func (uc *SupplierUC) CreateSupplier(ctx context.Context, code, name, phone string, address domain.SupplierAddress) (*domain.Supplier, error) {
-	s, err := domain.NewSupplier(code, name, phone, address)
+func (uc *SupplierUC) CreateSupplier(ctx context.Context, code, name, phone, email string, address domain.SupplierAddress) (*domain.Supplier, error) {
+	s, err := domain.NewSupplier(code, name, phone, email, address)
 	if err != nil {
 		return nil, err
 	}

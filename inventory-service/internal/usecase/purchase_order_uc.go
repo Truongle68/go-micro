@@ -14,11 +14,12 @@ import (
 )
 
 type CreatePurchaseOrderInput struct {
-	Code        string
-	SupplierID  string
-	WarehouseID string
-	CreatedBy   string
-	Lines       []domain.NewPurchaseOrderLineInput
+	Code          string
+	SupplierID    string
+	WarehouseID   string
+	CreatedBy     string
+	CreatedByName string
+	Lines         []domain.NewPurchaseOrderLineInput
 }
 
 type PurchaseOrderUC struct {
@@ -66,6 +67,7 @@ func (uc *PurchaseOrderUC) CreatePurchaseOrder(ctx context.Context, input Create
 		return nil, fmt.Errorf("PurchaseOrderUC.CreatePurchaseOrder: %w", domain.ErrSuppAlreadyInactive)
 	}
 
+	var whCode, whName string
 	if uc.warehouseRepo != nil {
 		wh, err := uc.warehouseRepo.FindByID(ctx, input.WarehouseID)
 		if err != nil {
@@ -77,6 +79,8 @@ func (uc *PurchaseOrderUC) CreatePurchaseOrder(ctx context.Context, input Create
 		if !wh.IsActive {
 			return nil, fmt.Errorf("PurchaseOrderUC.CreatePurchaseOrder: %w", domain.ErrWhAlreadyInactive)
 		}
+		whCode = wh.Code
+		whName = wh.Name
 	}
 
 	// Validate SKUs against catalog-service and auto-populate ProductName
@@ -108,10 +112,18 @@ func (uc *PurchaseOrderUC) CreatePurchaseOrder(ctx context.Context, input Create
 		}
 	}
 
-	po, err := domain.NewPurchaseOrder(
-		input.Code, supplier.ID, supplier.Name, input.WarehouseID, input.CreatedBy,
-		input.Lines,
-	)
+	po, err := domain.NewPurchaseOrder(domain.NewPurchaseOrderParams{
+		Code:          input.Code,
+		SupplierID:    supplier.ID,
+		SupplierCode:  supplier.Code,
+		SupplierName:  supplier.Name,
+		WarehouseID:   input.WarehouseID,
+		WarehouseCode: whCode,
+		WarehouseName: whName,
+		CreatedBy:     input.CreatedBy,
+		CreatedByName: input.CreatedByName,
+		Lines:         input.Lines,
+	})
 	if err != nil {
 		return nil, err
 	}

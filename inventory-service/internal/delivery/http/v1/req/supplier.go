@@ -11,6 +11,7 @@ type CreateSupplierReq struct {
 	Code    string             `json:"code" binding:"required"`
 	Name    string             `json:"name" binding:"required"`
 	Phone   string             `json:"phone"`
+	Email   string             `json:"email"`
 	Address SupplierAddressReq `json:"address"`
 }
 

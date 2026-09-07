@@ -37,11 +37,12 @@ func (h *V1) createPurchaseOrder(c *gin.Context) {
 	}
 
 	input := usecase.CreatePurchaseOrderInput{
-		Code:        r.Code,
-		SupplierID:  r.SupplierID,
-		WarehouseID: r.WarehouseID,
-		CreatedBy:   userID,
-		Lines:       lines,
+		Code:          r.Code,
+		SupplierID:    r.SupplierID,
+		WarehouseID:   r.WarehouseID,
+		CreatedBy:     userID,
+		CreatedByName: r.CreatedByName,
+		Lines:         lines,
 	}
 
 	po, err := h.po.CreatePurchaseOrder(c.Request.Context(), input)

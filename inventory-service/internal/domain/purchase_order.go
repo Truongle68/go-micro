@@ -6,19 +6,23 @@ import (
 )
 
 type PurchaseOrder struct {
-	ID           string              `json:"id"`
-	Version      int                 `json:"version"`
-	Code         string              `json:"code"`
-	SupplierID   string              `json:"supplier_id"`
-	SupplierName string              `json:"supplier_name"`
-	WarehouseID  string              `json:"warehouse_id"`
-	Lines        []PurchaseOrderLine `json:"lines"`
-	Status       PurchaseOrderStatus `json:"status"`
-	CreatedBy    string              `json:"created_by"`
-	CreatedAt    time.Time           `json:"created_at"`
-	UpdatedAt    time.Time           `json:"updated_at"`
-	ExpectedAt   *time.Time          `json:"expected_at,omitempty"`
-	ReceivedAt   *time.Time          `json:"received_at,omitempty"`
+	ID            string              `json:"id"`
+	Version       int                 `json:"version"`
+	Code          string              `json:"code"`
+	SupplierID    string              `json:"supplier_id"`
+	SupplierCode  string              `json:"supplier_code"`
+	SupplierName  string              `json:"supplier_name"`
+	WarehouseID   string              `json:"warehouse_id"`
+	WarehouseCode string              `json:"warehouse_code"`
+	WarehouseName string              `json:"warehouse_name"`
+	Lines         []PurchaseOrderLine `json:"lines"`
+	Status        PurchaseOrderStatus `json:"status"`
+	CreatedBy     string              `json:"created_by"`
+	CreatedByName string              `json:"created_by_name"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
+	ExpectedAt    *time.Time          `json:"expected_at,omitempty"`
+	ReceivedAt    *time.Time          `json:"received_at,omitempty"`
 }
 
 type PurchaseOrderLine struct {
@@ -46,23 +50,33 @@ type NewPurchaseOrderLineInput struct {
 	UnitCost        int64
 }
 
-func NewPurchaseOrder(
-	code, supplierID, supplierName, warehouseID, createdBy string,
-	lineInputs []NewPurchaseOrderLineInput,
-) (*PurchaseOrder, error) {
-	if strings.TrimSpace(supplierID) == "" {
+type NewPurchaseOrderParams struct {
+	Code          string
+	SupplierID    string
+	SupplierCode  string
+	SupplierName  string
+	WarehouseID   string
+	WarehouseCode string
+	WarehouseName string
+	CreatedBy     string
+	CreatedByName string
+	Lines         []NewPurchaseOrderLineInput
+}
+
+func NewPurchaseOrder(params NewPurchaseOrderParams) (*PurchaseOrder, error) {
+	if strings.TrimSpace(params.SupplierID) == "" {
 		return nil, ErrEmptySuppID
 	}
-	if strings.TrimSpace(warehouseID) == "" {
+	if strings.TrimSpace(params.WarehouseID) == "" {
 		return nil, ErrEmptyWhID
 	}
-	if len(lineInputs) == 0 {
+	if len(params.Lines) == 0 {
 		return nil, ErrEmptyPurchaseOrderLines
 	}
 
-	lines := make([]PurchaseOrderLine, 0, len(lineInputs))
-	seenSKUs := make(map[string]bool, len(lineInputs))
-	for _, in := range lineInputs {
+	lines := make([]PurchaseOrderLine, 0, len(params.Lines))
+	seenSKUs := make(map[string]bool, len(params.Lines))
+	for _, in := range params.Lines {
 		if strings.TrimSpace(in.SKU) == "" {
 			return nil, ErrEmptySKU
 		}
@@ -88,10 +102,20 @@ func NewPurchaseOrder(
 
 	now := time.Now().UTC()
 	return &PurchaseOrder{
-		Code: code, Version: 1, SupplierID: supplierID, SupplierName: supplierName,
-		WarehouseID: warehouseID, Lines: lines,
-		Status: POStatusDraft, CreatedBy: createdBy,
-		CreatedAt: now, UpdatedAt: now,
+		Code:          params.Code,
+		Version:       1,
+		SupplierID:    params.SupplierID,
+		SupplierCode:  params.SupplierCode,
+		SupplierName:  params.SupplierName,
+		WarehouseID:   params.WarehouseID,
+		WarehouseCode: params.WarehouseCode,
+		WarehouseName: params.WarehouseName,
+		Lines:         lines,
+		Status:        POStatusDraft,
+		CreatedBy:     params.CreatedBy,
+		CreatedByName: params.CreatedByName,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}, nil
 }
 
@@ -113,11 +137,6 @@ func (po *PurchaseOrder) Confirm() error {
 	return nil
 }
 
-// ReceiveLine records that `qty` units of a specific SKU physically
-// arrived. This does NOT touch StockLevel/StockBatch directly — that's
-// the usecase layer's job (same separation as Order.Cancel not calling
-// inventory-service itself). This method only updates the PO's OWN
-// bookkeeping and decides whether the whole PO's status should flip.
 func (po *PurchaseOrder) ReceiveLine(sku string, qty int) error {
 	if po.Status != POStatusOrdered && po.Status != POStatusPartiallyReceived {
 		return ErrInvalidPOTransition

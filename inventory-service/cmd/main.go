@@ -84,6 +84,7 @@ func main() {
 	}
 
 	// init usecases
+	warehouseUC := usecase.NewWarehouseUC(warehouseRepo)
 	supplierUC := usecase.NewSupplierUC(supplierRepo, l)
 	purchaseOrderUC := usecase.NewPurchaseOrderUC(
 		purchaseOrderRepo,
@@ -95,12 +96,21 @@ func main() {
 		transactor,
 		l,
 	)
-	stockUC := usecase.NewStockUC(stockLevelRepo, stockReservationRepo, stockMovementRepo, transactor, eventPublisher, l)
+	stockUC := usecase.NewStockUC(
+		stockLevelRepo,
+		warehouseRepo,
+		stockReservationRepo,
+		stockMovementRepo,
+		catalogClient,
+		transactor,
+		eventPublisher,
+		l,
+	)
 
 	// init HTTP server, setup routers
 	server := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 
-	v1Deps := v1.NewDependencies(supplierUC, purchaseOrderUC, jwtVerifier, cache.TokenBlacklist, l)
+	v1Deps := v1.NewDependencies(supplierUC, purchaseOrderUC, warehouseUC, stockUC, jwtVerifier, cache.TokenBlacklist, l)
 	http.NewRouter(server.Engine, v1Deps)
 
 	// init gRPC server

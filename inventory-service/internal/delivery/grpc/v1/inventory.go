@@ -129,12 +129,12 @@ func mapDomainError(err error) error {
 
 	switch appErr.Code {
 	case domain.CodeInsufficientStock:
-		return status.Errorf(codes.FailedPrecondition, appErr.Message)
+		return status.Errorf(codes.FailedPrecondition, "%s", appErr.Message)
 	case domain.CodeNonPositiveQuantity:
-		return status.Errorf(codes.InvalidArgument, appErr.Message)
+		return status.Errorf(codes.InvalidArgument, "%s", appErr.Message)
 	case domain.CodeEmptySKU, domain.CodeEmptyWarehouseID:
-		return status.Errorf(codes.InvalidArgument, appErr.Message)
+		return status.Errorf(codes.InvalidArgument, "%s", appErr.Message)
 	default:
-		return status.Errorf(codes.Internal, appErr.Message)
+		return status.Errorf(codes.Internal, "%s", appErr.Message)
 	}
 }

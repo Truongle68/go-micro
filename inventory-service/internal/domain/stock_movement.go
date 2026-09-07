@@ -26,3 +26,9 @@ const (
 	MovementTransferIn  MovementType = "transfer_in"
 	MovementTransferOut MovementType = "transfer_out"
 )
+
+type StockMovementFilter struct {
+	SKU         string
+	WarehouseID string
+	Type        MovementType
+}

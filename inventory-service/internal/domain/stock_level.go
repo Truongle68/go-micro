@@ -138,3 +138,18 @@ func (s *StockLevel) ApplyTransferIn(qty int) {
 	s.Version++
 	s.UpdatedAt = time.Now().UTC()
 }
+
+type StockLevelFilter struct {
+	WarehouseID string
+	SKU         string
+	LowStock    bool
+}
+
+type StockSummary struct {
+	TotalOnHand     int `json:"total_on_hand"`
+	TotalReserved   int `json:"total_reserved"`
+	TotalAvailable  int `json:"total_available"`
+	TotalSKUs       int `json:"total_skus"`
+	LowStockCount   int `json:"low_stock_count"`
+	OutOfStockCount int `json:"out_of_stock_count"`
+}

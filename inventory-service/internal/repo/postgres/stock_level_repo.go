@@ -4,9 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"inventory-service/internal/domain"
 	invpg "inventory-service/pkg/postgres"
+
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 )
 
 // StockLevelRepo implements stock level persistence with optimistic locking.
@@ -197,6 +200,142 @@ func (r *StockLevelRepo) BulkCheckAvailability(ctx context.Context, skus []strin
 	}
 
 	return result, rows.Err()
+}
+
+// FindByID returns a single stock level by its UUID.
+func (r *StockLevelRepo) FindByID(ctx context.Context, id string) (*domain.StockLevel, error) {
+	exec := invpg.GetExecutor(ctx, r.db)
+
+	var sl domain.StockLevel
+	err := exec.QueryRowContext(ctx, `
+		SELECT id, sku, warehouse_id, on_hand, reserved,
+		       reorder_threshold, reorder_quantity, version,
+		       created_at, updated_at
+		FROM stock_levels
+		WHERE id = $1
+	`, id).Scan(
+		&sl.ID, &sl.SKU, &sl.WarehouseID,
+		&sl.OnHand, &sl.Reserved,
+		&sl.ReorderThreshold, &sl.ReorderQuantity,
+		&sl.Version, &sl.CreatedAt, &sl.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("StockLevelRepo.FindByID: %w", err)
+	}
+
+	return &sl, nil
+}
+
+// List returns a paginated list of stock levels matching the given filter.
+func (r *StockLevelRepo) List(ctx context.Context, filter domain.StockLevelFilter, p pagination.Params) ([]domain.StockLevel, int64, error) {
+	exec := invpg.GetExecutor(ctx, r.db)
+	normParams := p.Normalize()
+
+	var conditions []string
+	args := make([]interface{}, 0, 4)
+	argIdx := 1
+
+	if filter.WarehouseID != "" {
+		conditions = append(conditions, fmt.Sprintf("warehouse_id = $%d", argIdx))
+		args = append(args, filter.WarehouseID)
+		argIdx++
+	}
+	if filter.SKU != "" {
+		conditions = append(conditions, fmt.Sprintf("sku = $%d", argIdx))
+		args = append(args, filter.SKU)
+		argIdx++
+	}
+	if filter.LowStock {
+		conditions = append(conditions, "(on_hand - reserved) <= reorder_threshold")
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Count total
+	countQuery := "SELECT COUNT(*) FROM stock_levels" + whereClause
+	var total int64
+	if err := exec.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("StockLevelRepo.List - count: %w", err)
+	}
+
+	// Query paginated items
+	query := fmt.Sprintf(`
+		SELECT id, sku, warehouse_id, on_hand, reserved,
+		       reorder_threshold, reorder_quantity, version,
+		       created_at, updated_at
+		FROM stock_levels
+		%s
+		ORDER BY updated_at DESC
+		LIMIT $%d OFFSET $%d
+	`, whereClause, argIdx, argIdx+1)
+
+	queryArgs := append(args, normParams.Limit, normParams.Skip())
+
+	rows, err := exec.QueryContext(ctx, query, queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("StockLevelRepo.List - query: %w", err)
+	}
+	defer rows.Close()
+
+	levels := make([]domain.StockLevel, 0)
+	for rows.Next() {
+		var sl domain.StockLevel
+		if err := rows.Scan(
+			&sl.ID, &sl.SKU, &sl.WarehouseID,
+			&sl.OnHand, &sl.Reserved,
+			&sl.ReorderThreshold, &sl.ReorderQuantity,
+			&sl.Version, &sl.CreatedAt, &sl.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("StockLevelRepo.List - scan: %w", err)
+		}
+		levels = append(levels, sl)
+	}
+
+	return levels, total, rows.Err()
+}
+
+// GetSummary returns aggregated stock KPIs across all or a specific warehouse.
+func (r *StockLevelRepo) GetSummary(ctx context.Context, warehouseID string) (*domain.StockSummary, error) {
+	exec := invpg.GetExecutor(ctx, r.db)
+
+	whereClause := ""
+	args := make([]interface{}, 0, 1)
+	if warehouseID != "" {
+		whereClause = " WHERE warehouse_id = $1"
+		args = append(args, warehouseID)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			COALESCE(SUM(on_hand), 0) AS total_on_hand,
+			COALESCE(SUM(reserved), 0) AS total_reserved,
+			COALESCE(SUM(GREATEST(on_hand - reserved, 0)), 0) AS total_available,
+			COUNT(DISTINCT sku) AS total_skus,
+			COUNT(*) FILTER (WHERE (on_hand - reserved) <= reorder_threshold) AS low_stock_count,
+			COUNT(*) FILTER (WHERE (on_hand - reserved) <= 0) AS out_of_stock_count
+		FROM stock_levels
+		%s
+	`, whereClause)
+
+	var s domain.StockSummary
+	if err := exec.QueryRowContext(ctx, query, args...).Scan(
+		&s.TotalOnHand,
+		&s.TotalReserved,
+		&s.TotalAvailable,
+		&s.TotalSKUs,
+		&s.LowStockCount,
+		&s.OutOfStockCount,
+	); err != nil {
+		return nil, fmt.Errorf("StockLevelRepo.GetSummary: %w", err)
+	}
+
+	return &s, nil
 }
 
 // pqStringArray converts a []string to a driver.Valuer for PostgreSQL's text[].

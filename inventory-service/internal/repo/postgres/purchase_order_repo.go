@@ -38,14 +38,22 @@ func (r *PurchaseOrderRepo) Create(ctx context.Context, po *domain.PurchaseOrder
 
 	query := `
 		INSERT INTO purchase_orders (
-			id, version, code, supplier_id, supplier_name, warehouse_id,
-			lines, status, created_by, expected_at, received_at,
+			id, version, code,
+			supplier_id, supplier_code, supplier_name,
+			warehouse_id, warehouse_code, warehouse_name,
+			lines, status,
+			created_by, created_by_name,
+			expected_at, received_at,
 			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
 
 	_, err = executor.ExecContext(ctx, query,
-		po.ID, po.Version, po.Code, po.SupplierID, po.SupplierName, po.WarehouseID,
-		linesJSON, string(po.Status), po.CreatedBy, po.ExpectedAt, po.ReceivedAt,
+		po.ID, po.Version, po.Code,
+		po.SupplierID, po.SupplierCode, po.SupplierName,
+		po.WarehouseID, po.WarehouseCode, po.WarehouseName,
+		linesJSON, string(po.Status),
+		po.CreatedBy, po.CreatedByName,
+		po.ExpectedAt, po.ReceivedAt,
 		po.CreatedAt, po.UpdatedAt,
 	)
 	if err != nil {
@@ -66,8 +74,12 @@ func (r *PurchaseOrderRepo) FindByID(ctx context.Context, id string) (*domain.Pu
 
 	query := `
 		SELECT
-			id, version, code, supplier_id, supplier_name, warehouse_id,
-			lines, status, created_by, expected_at, received_at,
+			id, version, code,
+			supplier_id, supplier_code, supplier_name,
+			warehouse_id, warehouse_code, warehouse_name,
+			lines, status,
+			created_by, created_by_name,
+			expected_at, received_at,
 			created_at, updated_at
 		FROM purchase_orders
 		WHERE id = $1`
@@ -77,8 +89,12 @@ func (r *PurchaseOrderRepo) FindByID(ctx context.Context, id string) (*domain.Pu
 	var statusStr string
 
 	err := executor.QueryRowContext(ctx, query, id).Scan(
-		&po.ID, &po.Version, &po.Code, &po.SupplierID, &po.SupplierName, &po.WarehouseID,
-		&linesJSON, &statusStr, &po.CreatedBy, &po.ExpectedAt, &po.ReceivedAt,
+		&po.ID, &po.Version, &po.Code,
+		&po.SupplierID, &po.SupplierCode, &po.SupplierName,
+		&po.WarehouseID, &po.WarehouseCode, &po.WarehouseName,
+		&linesJSON, &statusStr,
+		&po.CreatedBy, &po.CreatedByName,
+		&po.ExpectedAt, &po.ReceivedAt,
 		&po.CreatedAt, &po.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -162,8 +178,12 @@ func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrde
 
 	query := fmt.Sprintf(`
 		SELECT
-			id, version, code, supplier_id, supplier_name, warehouse_id,
-			lines, status, created_by, expected_at, received_at,
+			id, version, code,
+			supplier_id, supplier_code, supplier_name,
+			warehouse_id, warehouse_code, warehouse_name,
+			lines, status,
+			created_by, created_by_name,
+			expected_at, received_at,
 			created_at, updated_at
 		FROM purchase_orders
 		%s
@@ -185,8 +205,12 @@ func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrde
 		var statusStr string
 
 		if err := rows.Scan(
-			&po.ID, &po.Version, &po.Code, &po.SupplierID, &po.SupplierName, &po.WarehouseID,
-			&linesJSON, &statusStr, &po.CreatedBy, &po.ExpectedAt, &po.ReceivedAt,
+			&po.ID, &po.Version, &po.Code,
+			&po.SupplierID, &po.SupplierCode, &po.SupplierName,
+			&po.WarehouseID, &po.WarehouseCode, &po.WarehouseName,
+			&linesJSON, &statusStr,
+			&po.CreatedBy, &po.CreatedByName,
+			&po.ExpectedAt, &po.ReceivedAt,
 			&po.CreatedAt, &po.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("PurchaseOrderRepo.List - scan: %w", err)

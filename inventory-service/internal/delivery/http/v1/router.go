@@ -10,24 +10,30 @@ import (
 )
 
 type V1 struct {
-	supplier SupplierUC
-	po       PurchaseOrderUC
-	l        logger.Interface
-	v        *validator.Validate
+	supplier  SupplierUC
+	po        PurchaseOrderUC
+	warehouse WarehouseUC
+	stock     StockUC
+	l         logger.Interface
+	v         *validator.Validate
 }
 
 type Dependencies struct {
 	Supplier      SupplierUC
 	PurchaseOrder PurchaseOrderUC
+	Warehouse     WarehouseUC
+	Stock         StockUC
 	Verifier      jwtmanager.JWTManager
 	Cache         redismanager.BlacklistCacher
 	Logger        logger.Interface
 }
 
-func NewDependencies(supplier SupplierUC, po PurchaseOrderUC, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
+func NewDependencies(supplier SupplierUC, po PurchaseOrderUC, w WarehouseUC, stock StockUC, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
 	return &Dependencies{
 		Supplier:      supplier,
 		PurchaseOrder: po,
+		Warehouse:     w,
+		Stock:         stock,
 		Verifier:      verifier,
 		Cache:         cache,
 		Logger:        l,
@@ -36,14 +42,35 @@ func NewDependencies(supplier SupplierUC, po PurchaseOrderUC, verifier jwtmanage
 
 func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	r := &V1{
-		supplier: deps.Supplier,
-		po:       deps.PurchaseOrder,
-		l:        deps.Logger,
-		v:        validator.New(),
+		supplier:  deps.Supplier,
+		po:        deps.PurchaseOrder,
+		warehouse: deps.Warehouse,
+		stock:     deps.Stock,
+		l:         deps.Logger,
+		v:         validator.New(),
 	}
 
 	authMW := ginmw.Auth(deps.Verifier, deps.Cache)
 	adminMW := ginmw.Role(ginmw.AdminRole)
+
+	// Public stock routes (Front Store)
+	apiV1Group.GET("/stock/availability", r.checkAvailability)
+	apiV1Group.GET("/stock/availability/:sku", r.getSKUAvailability)
+
+	// Stock management routes (Dashboard)
+	stockGroup := apiV1Group.Group("/stock")
+	stockGroup.Use(authMW, adminMW)
+	stockGroup.GET("/levels", r.listStockLevels)
+	stockGroup.GET("/levels/:id", r.getStockLevel)
+	stockGroup.POST("/adjust", r.adjustStock)
+	stockGroup.PUT("/levels/:id/thresholds", r.updateThresholds)
+	stockGroup.GET("/summary", r.getStockSummary)
+	stockGroup.GET("/movements", r.listStockMovements)
+
+	// Warehouse routes
+	whGroup := apiV1Group.Group("/warehouses")
+	whGroup.Use(authMW, adminMW)
+	whGroup.GET("", r.listWarehouses)
 
 	// Supplier routes
 	suppGroup := apiV1Group.Group("/suppliers")

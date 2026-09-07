@@ -36,9 +36,12 @@ var _ PurchaseOrderRepository = (*postgres.PurchaseOrderRepo)(nil)
 // StockLevelRepository defines persistence operations for stock levels.
 type StockLevelRepository interface {
 	Create(ctx context.Context, sl *domain.StockLevel) error
+	FindByID(ctx context.Context, id string) (*domain.StockLevel, error)
 	FindBySKU(ctx context.Context, sku string) ([]domain.StockLevel, error)
 	FindBySKUAndWarehouse(ctx context.Context, sku, warehouseID string) (*domain.StockLevel, error)
 	FindFirstAvailable(ctx context.Context, sku string, qty int) (*domain.StockLevel, error)
+	List(ctx context.Context, filter domain.StockLevelFilter, page pagination.Params) ([]domain.StockLevel, int64, error)
+	GetSummary(ctx context.Context, warehouseID string) (*domain.StockSummary, error)
 	Update(ctx context.Context, sl *domain.StockLevel) error
 	BulkCheckAvailability(ctx context.Context, skus []string) (map[string]int, error)
 }
@@ -48,6 +51,7 @@ var _ StockLevelRepository = (*postgres.StockLevelRepo)(nil)
 // WarehouseRepository defines persistence operations for warehouses.
 type WarehouseRepository interface {
 	FindByID(ctx context.Context, id string) (*domain.Warehouse, error)
+	Find(ctx context.Context) ([]domain.Warehouse, error)
 }
 
 var _ WarehouseRepository = (*postgres.WarehouseRepo)(nil)
@@ -66,6 +70,7 @@ var _ StockReservationRepository = (*postgres.StockReservationRepo)(nil)
 // StockMovementRepository defines persistence operations for stock movements.
 type StockMovementRepository interface {
 	Create(ctx context.Context, m *domain.StockMovement) error
+	List(ctx context.Context, filter domain.StockMovementFilter, page pagination.Params) ([]domain.StockMovement, int64, error)
 }
 
 var _ StockMovementRepository = (*postgres.StockMovementRepo)(nil)

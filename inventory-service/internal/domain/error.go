@@ -26,19 +26,22 @@ const (
 	CodeInvalidPOTransition     ErrorCode = "INVALID_PO_TRANSITION"
 	CodeReceivedExceedsOrdered  ErrorCode = "RECEIVED_EXCEEDS_ORDERED"
 	// Supplier error code
-	CodeEmptySuppName       ErrorCode = "EMPTY_SUPPLIER_NAME"
-	CodeEmptySuppCode       ErrorCode = "EMPTY_SUPPLIER_CODE"
-	CodeSuppAlreadyActive   ErrorCode = "SUPPLIER_ALREADY_ACTIVE"
-	CodeSuppAlreadyInactive ErrorCode = "SUPPLIER_ALREADY_INACTIVE"
-	CodeSuppNotFound        ErrorCode = "SUPPLIER_NOT_FOUND"
-	CodePONotFound          ErrorCode = "PURCHASE_ORDER_NOT_FOUND"
+	CodeEmptySuppName          ErrorCode = "EMPTY_SUPPLIER_NAME"
+	CodeEmptySuppCode          ErrorCode = "EMPTY_SUPPLIER_CODE"
+	CodeEmptySuppPhone         ErrorCode = "EMPTY_SUPPLIER_PHONE"
+	CodeEmptySuppEmail         ErrorCode = "EMPTY_SUPPLIER_EMAIL"
+	CodeSuppAlreadyActive      ErrorCode = "SUPPLIER_ALREADY_ACTIVE"
+	CodeSuppAlreadyInactive    ErrorCode = "SUPPLIER_ALREADY_INACTIVE"
+	CodeSuppNotFound           ErrorCode = "SUPPLIER_NOT_FOUND"
+	CodePONotFound             ErrorCode = "PURCHASE_ORDER_NOT_FOUND"
 	CodeConcurrentModification ErrorCode = "CONCURRENT_MODIFICATION"
-	CodeWhNotFound          ErrorCode = "WAREHOUSE_NOT_FOUND"
-	CodeWhInactive          ErrorCode = "WAREHOUSE_INACTIVE"
-	CodeSKUNotFound         ErrorCode = "SKU_NOT_FOUND"
-	CodeInactiveVariant     ErrorCode = "INACTIVE_VARIANT"
-	CodeDuplicatePOCode     ErrorCode = "DUPLICATE_PURCHASE_ORDER_CODE"
-	CodeDuplicateSuppCode   ErrorCode = "DUPLICATE_SUPPLIER_CODE"
+	CodeWhNotFound             ErrorCode = "WAREHOUSE_NOT_FOUND"
+	CodeWhInactive             ErrorCode = "WAREHOUSE_INACTIVE"
+	CodeSKUNotFound            ErrorCode = "SKU_NOT_FOUND"
+	CodeInactiveVariant        ErrorCode = "INACTIVE_VARIANT"
+	CodeDuplicatePOCode        ErrorCode = "DUPLICATE_PURCHASE_ORDER_CODE"
+	CodeDuplicateSuppCode      ErrorCode = "DUPLICATE_SUPPLIER_CODE"
+	CodeStockLevelNotFound     ErrorCode = "STOCK_LEVEL_NOT_FOUND"
 )
 
 type AppError struct {
@@ -76,19 +79,22 @@ var (
 	ErrInvalidPOTransition     = errors.New("invalid purchase order status transition")
 	ErrReceivedExceedsOrdered  = errors.New("received quantity exceeds ordered quantity")
 	// Supplier error msg
-	ErrEmptySuppName       = errors.New("supplier name cannot be empty")
-	ErrEmptySuppCode       = errors.New("supplier code cannot be empty")
-	ErrSuppAlreadyActive   = errors.New("supplier already active")
-	ErrSuppAlreadyInactive = errors.New("supplier already inactive")
-	ErrSuppNotFound        = errors.New("supplier not found")
-	ErrPONotFound          = errors.New("purchase order not found")
+	ErrEmptySuppName          = errors.New("supplier name cannot be empty")
+	ErrEmptySuppCode          = errors.New("supplier code cannot be empty")
+	ErrEmptySuppPhone         = errors.New("supplier phone cannot be empty")
+	ErrEmptySuppEmail         = errors.New("supplier email cannot be empty")
+	ErrSuppAlreadyActive      = errors.New("supplier already active")
+	ErrSuppAlreadyInactive    = errors.New("supplier already inactive")
+	ErrSuppNotFound           = errors.New("supplier not found")
+	ErrPONotFound             = errors.New("purchase order not found")
 	ErrConcurrentModification = errors.New("concurrent modification detected")
-	ErrWhNotFound          = errors.New("warehouse not found")
-	ErrWhAlreadyInactive   = errors.New("warehouse already inactive")
-	ErrSKUNotFound         = errors.New("sku not found in catalog")
-	ErrInactiveVariant     = errors.New("product variant is inactive")
-	ErrDuplicatePOCode     = errors.New("purchase order with this code already exists")
-	ErrDuplicateSuppCode   = errors.New("supplier with this code already exists")
+	ErrWhNotFound             = errors.New("warehouse not found")
+	ErrWhAlreadyInactive      = errors.New("warehouse already inactive")
+	ErrSKUNotFound            = errors.New("sku not found in catalog")
+	ErrInactiveVariant        = errors.New("product variant is inactive")
+	ErrDuplicatePOCode        = errors.New("purchase order with this code already exists")
+	ErrDuplicateSuppCode      = errors.New("supplier with this code already exists")
+	ErrStockLevelNotFound     = errors.New("stock level not found")
 
 	// Business Rule / Invariant Errors
 	ErrNegativeQuantity = errors.New("reorder threshold and quantity cannot be negative")
@@ -110,6 +116,8 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrNegativeQuantity:        CodeNegativeQuantity,
 	ErrEmptySuppName:           CodeEmptySuppName,
 	ErrEmptySuppCode:           CodeEmptySuppCode,
+	ErrEmptySuppEmail:          CodeEmptySuppEmail,
+	ErrEmptySuppPhone:          CodeEmptySuppPhone,
 	ErrSuppAlreadyActive:       CodeSuppAlreadyActive,
 	ErrSuppAlreadyInactive:     CodeSuppAlreadyInactive,
 	ErrEmptySuppID:             CodeEmptySuppID,
@@ -121,11 +129,12 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrPONotFound:              CodePONotFound,
 	ErrConcurrentModification:  CodeConcurrentModification,
 	ErrWhNotFound:              CodeWhNotFound,
-	ErrWhAlreadyInactive:      CodeWhInactive,
+	ErrWhAlreadyInactive:       CodeWhInactive,
 	ErrSKUNotFound:             CodeSKUNotFound,
 	ErrInactiveVariant:         CodeInactiveVariant,
-	ErrDuplicatePOCode:          CodeDuplicatePOCode,
-	ErrDuplicateSuppCode:        CodeDuplicateSuppCode,
+	ErrDuplicatePOCode:         CodeDuplicatePOCode,
+	ErrDuplicateSuppCode:       CodeDuplicateSuppCode,
+	ErrStockLevelNotFound:      CodeStockLevelNotFound,
 }
 
 func ToAppError(err error) *AppError {
