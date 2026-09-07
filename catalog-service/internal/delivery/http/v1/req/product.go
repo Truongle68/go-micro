@@ -7,6 +7,7 @@ type CreateProduct struct {
 	DescriptionHTML string               `json:"description_html,omitempty"`
 	Highlights      []string             `json:"highlights,omitempty"`
 	Tags            []string             `json:"tags,omitempty"`
+	Images          []string             `json:"images,omitempty"`
 	OptionTypes     []OptionTypeInput    `json:"option_types,omitempty"`
 	Variants        []CreateVariantInput `json:"variants" validate:"required,min=1,dive"`
 	Specifications  []SpecGroupInput     `json:"specifications,omitempty"`
@@ -50,6 +51,7 @@ type UpdateProduct struct {
 	DescriptionHTML *string              `json:"description_html,omitempty"`
 	Highlights      []string             `json:"highlights,omitempty"`
 	Tags            []string             `json:"tags,omitempty"`
+	Images          []string             `json:"images,omitempty"`
 	OptionTypes     []OptionTypeInput    `json:"option_types,omitempty"`
 	Variants        []CreateVariantInput `json:"variants,omitempty" validate:"omitempty,dive"`
 	Specifications  []SpecGroupInput     `json:"specifications,omitempty"`

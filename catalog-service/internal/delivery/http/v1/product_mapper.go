@@ -5,7 +5,6 @@ import (
 	"catalog-service/internal/delivery/http/v1/res"
 	"catalog-service/internal/domain"
 	"catalog-service/internal/usecase"
-	"catalog-service/pkg/sliceutil"
 )
 
 func toCreateProductInput(req req.CreateProduct) usecase.CreateProductInput {
@@ -22,10 +21,6 @@ func toCreateProductInput(req req.CreateProduct) usecase.CreateProductInput {
 			Image: vr.Image,
 		}
 	}
-
-	images := sliceutil.DedupeString(variants, func(v usecase.CreateVariantInput) string {
-		return v.Image
-	})
 
 	optionTypes := make([]usecase.OptionTypeInput, len(req.OptionTypes))
 	for i, ot := range req.OptionTypes {
@@ -48,7 +43,7 @@ func toCreateProductInput(req req.CreateProduct) usecase.CreateProductInput {
 		DescriptionHTML: req.DescriptionHTML,
 		Highlights:      req.Highlights,
 		Tags:            req.Tags,
-		Images:          images,
+		Images:          req.Images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,
@@ -75,7 +70,6 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 	}
 
 	var variants []usecase.CreateVariantInput
-	var images []string
 	if req.Variants != nil {
 		variants = make([]usecase.CreateVariantInput, len(req.Variants))
 		for i, v := range req.Variants {
@@ -89,10 +83,6 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 				},
 				Image: v.Image,
 			}
-			if v.Image == "" {
-				continue
-			}
-			images = append(images, v.Image)
 		}
 	}
 
@@ -124,7 +114,7 @@ func toUpdateProductInput(req req.UpdateProduct, id string) usecase.UpdateProduc
 		DescriptionHTML: req.DescriptionHTML,
 		Highlights:      req.Highlights,
 		Tags:            req.Tags,
-		Images:          images,
+		Images:          req.Images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,

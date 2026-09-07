@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"catalog-service/internal/domain"
-	"catalog-service/pkg/sliceutil"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -55,12 +54,7 @@ func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain
 		return nil, domain.ErrInvalidProductStatus
 	}
 
-	images := in.Images
-	if len(images) == 0 && len(in.Variants) > 0 {
-		images = sliceutil.DedupeString(in.Variants, func(v CreateVariantInput) string {
-			return v.Image
-		})
-	}
+	images := mergeProductImages(in.Images, in.Variants)
 
 	now := time.Now()
 	product := &domain.Product{
@@ -106,6 +100,29 @@ func (uc *ProductUC) Create(ctx context.Context, in CreateProductInput) (*domain
 	}
 
 	return product, nil
+}
+
+func mergeProductImages(imgs []string, variants []CreateVariantInput) []string {
+	seen := make(map[string]bool, len(imgs)+len(variants))
+	results := make([]string, 0, len(imgs)+len(variants))
+
+	add := func(url string) {
+		if url == "" || seen[url] {
+			return
+		}
+		seen[url] = true
+		results = append(results, url)
+	}
+
+	for _, img := range imgs {
+		add(img)
+	}
+
+	for _, v := range variants {
+		add(v.Image)
+	}
+
+	return results
 }
 
 func validateVariantOptions(variants []CreateVariantInput, optionTypes []OptionTypeInput) error {
@@ -409,6 +426,7 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 	if in.Variants != nil {
 		variants = toDomainVariants(in.Variants, now)
 	}
+	images := mergeProductImages(in.Images, in.Variants)
 	var specs []domain.SpecGroup
 	if in.Specifications != nil {
 		specs = toDomainSpecifications(in.Specifications)
@@ -423,6 +441,7 @@ func (uc *ProductUC) Update(ctx context.Context, in UpdateProductInput) (*domain
 		DescriptionHTML: descHTML,
 		Highlights:      in.Highlights,
 		Tags:            in.Tags,
+		Images:          images,
 		OptionTypes:     optionTypes,
 		Variants:        variants,
 		Specifications:  specs,

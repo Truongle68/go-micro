@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"catalog-service/pkg/sliceutil"
 	"time"
 )
 
@@ -70,6 +69,7 @@ type UpdateProductParams struct {
 	DescriptionHTML *string
 	Highlights      []string
 	Tags            []string
+	Images          []string
 	OptionTypes     []OptionType
 	Variants        []Variant
 	Specifications  []SpecGroup
@@ -115,10 +115,8 @@ func (p *Product) ApplyUpdate(params UpdateProductParams) error {
 			return ErrProductRequiresVariant
 		}
 		p.Variants = params.Variants
-		p.Images = sliceutil.DedupeString(params.Variants, func(v Variant) string {
-			return v.Image
-		})
 	}
+	p.Images = params.Images
 	if params.Specifications != nil {
 		p.Specifications = params.Specifications
 	}
