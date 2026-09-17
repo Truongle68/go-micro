@@ -23,7 +23,7 @@ import (
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/postgres"
-	"github.com/TruongLe68/go-micro/pkg/rabbitmq/publisher"
+	"github.com/TruongLe68/go-micro/pkg/rabbitmq"
 	"github.com/TruongLe68/go-micro/pkg/redis"
 )
 
@@ -61,7 +61,7 @@ func main() {
 
 	// init RabbitMQ event publisher
 	var eventPublisher usecase.EventPublisher
-	rmqPublisher, err := publisher.New(cfg.RMQ.URL)
+	rmqPublisher, err := rabbitmq.NewPublisher(cfg.RMQ.URL, cfg.RMQ.Exchange)
 	if err != nil {
 		l.Warn("failed to initialize RabbitMQ publisher (events disabled): %v", err)
 	} else {
@@ -76,6 +76,7 @@ func main() {
 	stockLevelRepo := pgrepo.NewStockLevelRepo(pg.DB)
 	stockReservationRepo := pgrepo.NewStockReservationRepo(pg.DB)
 	stockMovementRepo := pgrepo.NewStockMovementRepo(pg.DB)
+	outboxRepo := pgrepo.NewOutboxRepo(pg.DB)
 
 	// init clients
 	catalogClient, err := grpcclient.NewCatalogGRPCClient(cfg.Services.CatalogServiceAddr)
@@ -94,6 +95,7 @@ func main() {
 		stockMovementRepo,
 		catalogClient,
 		transactor,
+		outboxRepo,
 		l,
 	)
 	stockUC := usecase.NewStockUC(

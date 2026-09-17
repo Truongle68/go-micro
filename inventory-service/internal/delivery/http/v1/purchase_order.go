@@ -121,20 +121,20 @@ func (h *V1) confirmPurchaseOrder(c *gin.Context) {
 	response.Success(c, http.StatusOK, "purchase order confirmed successfully", po)
 }
 
-func (h *V1) receiveLine(c *gin.Context) {
+func (h *V1) receiveGoods(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		response.Error(c, http.StatusBadRequest, response.CodeValidationError, "purchase order id is required")
 		return
 	}
 
-	var r req.ReceiveLineReq
+	var r req.ReceiveGoodsReq
 	if err := c.ShouldBindJSON(&r); err != nil {
 		response.InvalidRequestBody(c, err.Error())
 		return
 	}
 
-	po, err := h.po.ReceiveLine(c.Request.Context(), id, r.SKU, r.Quantity)
+	po, err := h.po.ReceiveGoods(c.Request.Context(), id, r.ToReceiptLines())
 	if err != nil {
 		if errors.Is(err, domain.ErrPONotFound) {
 			response.Error(c, http.StatusNotFound, string(domain.CodePONotFound), err.Error())
@@ -144,12 +144,12 @@ func (h *V1) receiveLine(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, string(appErr.Code), appErr.Message)
 			return
 		}
-		h.l.Error("h.receiveLine: %v", err)
-		response.InternalServerError(c, "failed to receive line")
+		h.l.Error("h.receiveGoods: %v", err)
+		response.InternalServerError(c, "failed to receive goods")
 		return
 	}
 
-	response.Success(c, http.StatusOK, "line received successfully", po)
+	response.Success(c, http.StatusOK, "goods received successfully", po)
 }
 
 func (h *V1) cancelPurchaseOrder(c *gin.Context) {

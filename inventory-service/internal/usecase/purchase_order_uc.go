@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -30,6 +29,7 @@ type PurchaseOrderUC struct {
 	movRepo        StockMovementRepository
 	catalogClient  CatalogClient
 	transactor     Transactor
+	outboxRepo     OutboxRepository
 	logger         logger.Interface
 }
 
@@ -41,6 +41,7 @@ func NewPurchaseOrderUC(
 	movRepo StockMovementRepository,
 	catalogClient CatalogClient,
 	transactor Transactor,
+	outboxRepo OutboxRepository,
 	l logger.Interface,
 ) *PurchaseOrderUC {
 	return &PurchaseOrderUC{
@@ -51,6 +52,7 @@ func NewPurchaseOrderUC(
 		movRepo:        movRepo,
 		catalogClient:  catalogClient,
 		transactor:     transactor,
+		outboxRepo:     outboxRepo,
 		logger:         l,
 	}
 }
@@ -158,7 +160,12 @@ func (uc *PurchaseOrderUC) ConfirmPurchaseOrder(ctx context.Context, id string) 
 	return po, nil
 }
 
-func (uc *PurchaseOrderUC) ReceiveLine(ctx context.Context, poID, sku string, qty int) (*domain.PurchaseOrder, error) {
+type ReceiptLine struct {
+	SKU      string
+	Quantity int
+}
+
+func (uc *PurchaseOrderUC) ReceiveGoods(ctx context.Context, poID string, lines []domain.ReceiveLine) (*domain.PurchaseOrder, error) {
 	var po *domain.PurchaseOrder
 
 	err := uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
@@ -168,7 +175,7 @@ func (uc *PurchaseOrderUC) ReceiveLine(ctx context.Context, poID, sku string, qt
 			return err
 		}
 
-		if err := po.ReceiveLine(sku, qty); err != nil {
+		if err := po.ReceiveLines(lines); err != nil {
 			return err
 		}
 
@@ -176,83 +183,64 @@ func (uc *PurchaseOrderUC) ReceiveLine(ctx context.Context, poID, sku string, qt
 			return fmt.Errorf("updating purchase order: %w", err)
 		}
 
-		// Adjust stock atomically alongside the PO update
-		if err := uc.applyStockReceipt(txCtx, po.WarehouseID, sku, qty, poID); err != nil {
-			return fmt.Errorf("adjusting stock for %s: %w", sku, err)
+		// Atomically record domain event in outbox within the same transaction
+		if uc.outboxRepo != nil {
+			poLinesBySKU := make(map[string]domain.PurchaseOrderLine, len(po.Lines))
+			for _, pl := range po.Lines {
+				poLinesBySKU[pl.SKU] = pl
+			}
+
+			eventLines := make([]domain.GoodsReceivedLine, len(lines))
+			for i, l := range lines {
+				pl := poLinesBySKU[l.SKU]
+				eventLines[i] = domain.GoodsReceivedLine{
+					SKU:              l.SKU,
+					ProductName:      pl.ProductName,
+					QuantityOrdered:  pl.QuantityOrdered,
+					QuantityReceived: l.Quantity,
+					UnitCost:         pl.UnitCost,
+				}
+			}
+
+			receivedAt := time.Now().UTC()
+			if po.ReceivedAt != nil {
+				receivedAt = *po.ReceivedAt
+			}
+
+			goodsReceivedEvent := domain.GoodsReceivedEvent{
+				EventType:       domain.EventGoodsReceived,
+				PurchaseOrderID: po.ID,
+				POCode:          po.Code,
+				SupplierID:      po.SupplierID,
+				SupplierCode:    po.SupplierCode,
+				WarehouseID:     po.WarehouseID,
+				WarehouseCode:   po.WarehouseCode,
+				ReceivedAt:      receivedAt,
+				Lines:           eventLines,
+			}
+
+			outboxEvt, err := domain.NewOutboxEvent(
+				domain.AggregatePurchaseOrder,
+				po.ID,
+				domain.EventGoodsReceived,
+				goodsReceivedEvent,
+			)
+			if err != nil {
+				return fmt.Errorf("creating outbox event: %w", err)
+			}
+
+			if err := uc.outboxRepo.Create(txCtx, outboxEvt); err != nil {
+				return fmt.Errorf("saving outbox event: %w", err)
+			}
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("PurchaseOrderUC.ReceiveLine: %w", err)
+		return nil, fmt.Errorf("PurchaseOrderUC.ReceiveGoods: %w", err)
 	}
 	return po, nil
-}
-
-func (uc *PurchaseOrderUC) applyStockReceipt(ctx context.Context, warehouseID, sku string, qty int, poID string) error {
-	const maxRetries = 3
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		level, err := uc.stockLevelRepo.FindBySKUAndWarehouse(ctx, sku, warehouseID)
-		if err != nil {
-			return err
-		}
-		if level == nil {
-			// First-ever receipt for this SKU at this warehouse — create the row.
-			newLevel, err := domain.NewStockLevel(domain.NewStockLevelParams{
-				SKU:              sku,
-				WarehouseID:      warehouseID,
-				ReorderThreshold: 0,
-				ReorderQuantity:  0,
-			})
-			if err != nil {
-				return err
-			}
-			if err := newLevel.AdjustOnHand(qty); err != nil {
-				return err
-			}
-			if err := uc.stockLevelRepo.Create(ctx, newLevel); err != nil {
-				return err
-			}
-			if uc.movRepo != nil {
-				_ = uc.movRepo.Create(ctx, &domain.StockMovement{
-					SKU:           sku,
-					WarehouseID:   warehouseID,
-					Type:          domain.MovementInbound,
-					Quantity:      qty,
-					ReferenceType: "purchase_order",
-					ReferenceID:   poID,
-					Note:          fmt.Sprintf("Received %d units from PO %s", qty, poID),
-					CreatedAt:     time.Now().UTC(),
-				})
-			}
-			return nil
-		}
-
-		if err := level.AdjustOnHand(qty); err != nil {
-			return err
-		}
-		err = uc.stockLevelRepo.Update(ctx, level)
-		if err == nil {
-			if uc.movRepo != nil {
-				_ = uc.movRepo.Create(ctx, &domain.StockMovement{
-					SKU:           sku,
-					WarehouseID:   warehouseID,
-					Type:          domain.MovementInbound,
-					Quantity:      qty,
-					ReferenceType: "purchase_order",
-					ReferenceID:   poID,
-					Note:          fmt.Sprintf("Received %d units from PO %s", qty, poID),
-					CreatedAt:     time.Now().UTC(),
-				})
-			}
-			return nil
-		}
-		if !errors.Is(err, domain.ErrConcurrentModification) {
-			return err
-		}
-	}
-	return domain.ErrConcurrentModification
 }
 
 func (uc *PurchaseOrderUC) CancelPurchaseOrder(ctx context.Context, id string) (*domain.PurchaseOrder, error) {

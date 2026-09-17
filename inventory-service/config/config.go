@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	env "github.com/TruongLe68/go-micro/pkg/config"
 )
@@ -17,6 +18,7 @@ type (
 		Redis    redis
 		Log      log
 		Email    email
+		Outbox   outbox
 	}
 
 	http struct {
@@ -37,9 +39,19 @@ type (
 	}
 
 	rmq struct {
-		ServerExchange string `env:"RMQ_RPC_SERVER,required"`
-		ClientExchange string `env:"RMQ_RPC_CLIENT,required"`
+		ServerExchange string `env:"RMQ_RPC_SERVER" envDefault:"inventory_rpc_server"`
+		ClientExchange string `env:"RMQ_RPC_CLIENT" envDefault:"inventory_rpc_client"`
 		URL            string `env:"RMQ_URL,required"`
+		Exchange       string `env:"RMQ_EXCHANGE" envDefault:"inventory.events"`
+		ExchangeType   string `env:"RMQ_EXCHANGE_TYPE" envDefault:"topic"`
+		QueueName      string `env:"RMQ_QUEUE_NAME" envDefault:""`
+		RoutingKey     string `env:"RMQ_ROUTING_KEY" envDefault:""`
+	}
+
+	outbox struct {
+		PollInterval time.Duration `env:"OUTBOX_POLL_INTERVAL" envDefault:"5s"`
+		BatchSize    int           `env:"OUTBOX_BATCH_SIZE" envDefault:"50"`
+		MaxRetries   int           `env:"OUTBOX_MAX_RETRIES" envDefault:"5"`
 	}
 
 	services struct {
@@ -64,6 +76,14 @@ type (
 		Level string `env:"LOG_LEVEL" envDefault:"debug"`
 	}
 )
+
+// RabbitMQConfig exposes the RabbitMQ settings per OUTBOX.md specifications.
+type RabbitMQConfig struct {
+	URL        string
+	Exchange   string
+	QueueName  string
+	RoutingKey string
+}
 
 func New() (*Config, error) {
 	cfg := &Config{}

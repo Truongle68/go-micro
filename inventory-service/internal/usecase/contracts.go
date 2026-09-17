@@ -8,7 +8,7 @@ import (
 	invpg "inventory-service/pkg/postgres"
 
 	"github.com/TruongLe68/go-micro/pkg/pagination"
-	"github.com/TruongLe68/go-micro/pkg/rabbitmq/publisher"
+	"github.com/TruongLe68/go-micro/pkg/rabbitmq"
 )
 
 type CatalogClient interface {
@@ -77,7 +77,7 @@ var _ StockMovementRepository = (*postgres.StockMovementRepo)(nil)
 
 // EventPublisher abstracts the event publishing mechanism.
 type EventPublisher interface {
-	Publish(ctx context.Context, event publisher.Event) error
+	Publish(ctx context.Context, event rabbitmq.Event) error
 }
 
 type Transactor interface {
@@ -85,3 +85,10 @@ type Transactor interface {
 }
 
 var _ Transactor = (*invpg.PostgresTransactor)(nil)
+
+// OutboxRepository defines persistence operations for transactional outbox events.
+type OutboxRepository interface {
+	Create(ctx context.Context, event *domain.OutboxEvent) error
+}
+
+var _ OutboxRepository = (*postgres.OutboxRepo)(nil)

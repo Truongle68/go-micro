@@ -113,6 +113,23 @@ func (r *PurchaseOrderRepo) FindByID(ctx context.Context, id string) (*domain.Pu
 	return &po, nil
 }
 
+func (r *PurchaseOrderRepo) exists(ctx context.Context, id string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM purchase_orders
+			WHERE id = $1
+		) AS is_exists`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("PurchaseOrderRepo.exists: %w", err)
+	}
+
+	return true, nil
+}
+
 func (r *PurchaseOrderRepo) Update(ctx context.Context, po *domain.PurchaseOrder) error {
 	executor := invpg.GetExecutor(ctx, r.db)
 
@@ -141,7 +158,14 @@ func (r *PurchaseOrderRepo) Update(ctx context.Context, po *domain.PurchaseOrder
 		return fmt.Errorf("PurchaseOrderRepo.Update - RowsAffected: %w", err)
 	}
 	if rows == 0 {
-		return fmt.Errorf("PurchaseOrderRepo.Update: optimistic lock conflict or not found")
+		exists, checkErr := r.exists(ctx, po.ID)
+		if checkErr != nil {
+			return fmt.Errorf("PurchaseOrderRepo.Update - checking existence: %w", checkErr)
+		}
+		if !exists {
+			return domain.ErrPONotFound
+		}
+		return domain.ErrConcurrentModification
 	}
 	return nil
 }

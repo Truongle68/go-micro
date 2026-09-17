@@ -26,7 +26,7 @@ type PurchaseOrderUC interface {
 	CreatePurchaseOrder(ctx context.Context, input usecase.CreatePurchaseOrderInput) (*domain.PurchaseOrder, error)
 	GetPurchaseOrder(ctx context.Context, id string) (*domain.PurchaseOrder, error)
 	ConfirmPurchaseOrder(ctx context.Context, id string) (*domain.PurchaseOrder, error)
-	ReceiveLine(ctx context.Context, poID, sku string, qty int) (*domain.PurchaseOrder, error)
+	ReceiveGoods(ctx context.Context, poID string, lines []domain.ReceiveLine) (*domain.PurchaseOrder, error)
 	CancelPurchaseOrder(ctx context.Context, id string) (*domain.PurchaseOrder, error)
 	ListPurchaseOrders(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, error)
 }

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/pagination"
-	"github.com/TruongLe68/go-micro/pkg/rabbitmq/publisher"
+	"github.com/TruongLe68/go-micro/pkg/rabbitmq"
 )
 
 const _defaultReservationTTL = 15 * time.Minute
@@ -104,10 +105,10 @@ func (uc *StockUC) ReserveStock(ctx context.Context, orderID string, items []SKU
 		return nil
 	}
 
-	var eventItems []publisher.SKUQtyItem
+	var eventItems []rabbitmq.SKUQtyItem
 
 	err := uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
-		eventItems = make([]publisher.SKUQtyItem, 0, len(items))
+		eventItems = make([]rabbitmq.SKUQtyItem, 0, len(items))
 
 		for _, item := range items {
 			// Find the first warehouse with enough available stock
@@ -156,7 +157,7 @@ func (uc *StockUC) ReserveStock(ctx context.Context, orderID string, items []SKU
 				return fmt.Errorf("ReserveStock - Create movement sku=%s: %w", item.SKU, err)
 			}
 
-			eventItems = append(eventItems, publisher.SKUQtyItem{
+			eventItems = append(eventItems, rabbitmq.SKUQtyItem{
 				SKU:         item.SKU,
 				WarehouseID: sl.WarehouseID,
 				Quantity:    item.Quantity,
@@ -169,7 +170,7 @@ func (uc *StockUC) ReserveStock(ctx context.Context, orderID string, items []SKU
 		return err
 	}
 
-	uc.publishEvent(ctx, publisher.EventStockReserved, publisher.StockReservedPayload{
+	uc.publishEvent(ctx, rabbitmq.EventStockReserved, rabbitmq.StockReservedPayload{
 		OrderID: orderID,
 		Items:   eventItems,
 	})
@@ -180,7 +181,7 @@ func (uc *StockUC) ReserveStock(ctx context.Context, orderID string, items []SKU
 // ConfirmReservation confirms all pending reservations for an order,
 // deducting on-hand stock and marking reservations as confirmed.
 func (uc *StockUC) ConfirmReservation(ctx context.Context, orderID string) error {
-	var eventItems []publisher.SKUQtyItem
+	var eventItems []rabbitmq.SKUQtyItem
 
 	err := uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		reservations, err := uc.resRepo.FindPendingByOrderID(txCtx, orderID)
@@ -188,7 +189,7 @@ func (uc *StockUC) ConfirmReservation(ctx context.Context, orderID string) error
 			return fmt.Errorf("ConfirmReservation - FindPendingByOrderID: %w", err)
 		}
 
-		eventItems = make([]publisher.SKUQtyItem, 0, len(reservations))
+		eventItems = make([]rabbitmq.SKUQtyItem, 0, len(reservations))
 
 		for i := range reservations {
 			res := &reservations[i]
@@ -230,7 +231,7 @@ func (uc *StockUC) ConfirmReservation(ctx context.Context, orderID string) error
 				return fmt.Errorf("ConfirmReservation - Create movement sku=%s: %w", res.SKU, err)
 			}
 
-			eventItems = append(eventItems, publisher.SKUQtyItem{
+			eventItems = append(eventItems, rabbitmq.SKUQtyItem{
 				SKU:         res.SKU,
 				WarehouseID: res.WarehouseID,
 				Quantity:    res.Quantity,
@@ -243,7 +244,7 @@ func (uc *StockUC) ConfirmReservation(ctx context.Context, orderID string) error
 		return err
 	}
 
-	uc.publishEvent(ctx, publisher.EventStockConfirmed, publisher.StockConfirmedPayload{
+	uc.publishEvent(ctx, rabbitmq.EventStockConfirmed, rabbitmq.StockConfirmedPayload{
 		OrderID: orderID,
 		Items:   eventItems,
 	})
@@ -254,7 +255,7 @@ func (uc *StockUC) ConfirmReservation(ctx context.Context, orderID string) error
 // ReleaseReservation releases all pending reservations for an order,
 // returning reserved stock to available.
 func (uc *StockUC) ReleaseReservation(ctx context.Context, orderID string) error {
-	var eventItems []publisher.SKUQtyItem
+	var eventItems []rabbitmq.SKUQtyItem
 
 	err := uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
 		reservations, err := uc.resRepo.FindPendingByOrderID(txCtx, orderID)
@@ -262,7 +263,7 @@ func (uc *StockUC) ReleaseReservation(ctx context.Context, orderID string) error
 			return fmt.Errorf("ReleaseReservation - FindPendingByOrderID: %w", err)
 		}
 
-		eventItems = make([]publisher.SKUQtyItem, 0, len(reservations))
+		eventItems = make([]rabbitmq.SKUQtyItem, 0, len(reservations))
 
 		for i := range reservations {
 			res := &reservations[i]
@@ -304,7 +305,7 @@ func (uc *StockUC) ReleaseReservation(ctx context.Context, orderID string) error
 				return fmt.Errorf("ReleaseReservation - Create movement sku=%s: %w", res.SKU, err)
 			}
 
-			eventItems = append(eventItems, publisher.SKUQtyItem{
+			eventItems = append(eventItems, rabbitmq.SKUQtyItem{
 				SKU:         res.SKU,
 				WarehouseID: res.WarehouseID,
 				Quantity:    res.Quantity,
@@ -317,12 +318,92 @@ func (uc *StockUC) ReleaseReservation(ctx context.Context, orderID string) error
 		return err
 	}
 
-	uc.publishEvent(ctx, publisher.EventStockReleased, publisher.StockReleasedPayload{
+	uc.publishEvent(ctx, rabbitmq.EventStockReleased, rabbitmq.StockReleasedPayload{
 		OrderID: orderID,
 		Items:   eventItems,
 	})
 
 	return nil
+}
+
+func (uc *StockUC) ApplyGoodsReceived(ctx context.Context, goods domain.GoodsReceivedEvent) error {
+	err := uc.transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		for _, l := range goods.Lines {
+			if err := uc.applyStockReceipt(txCtx, goods.WarehouseID, l.SKU, l.QuantityReceived); err != nil {
+				return fmt.Errorf("adjusting stock for %s: %w", l.SKU, err)
+			}
+
+			if err := uc.recordMovement(
+				txCtx,
+				goods.WarehouseID,
+				l.SKU, l.QuantityReceived,
+				domain.AggregatePurchaseOrder,
+				goods.PurchaseOrderID,
+				fmt.Sprintf("Received %d units from PO %s", l.QuantityReceived, goods.POCode),
+			); err != nil {
+				return fmt.Errorf("recording stock movement for %s: %v", l.SKU, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("StockUC.ApplyGoodsReceived: %w", err)
+	}
+	return nil
+}
+
+func (uc *StockUC) applyStockReceipt(ctx context.Context, warehouseID, sku string, qty int) error {
+	const maxRetries = 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		level, err := uc.stockRepo.FindBySKUAndWarehouse(ctx, sku, warehouseID)
+		if err != nil {
+			return err
+		}
+		if level == nil {
+			// First-ever receipt for this SKU at this warehouse — create the row.
+			newLevel, err := domain.NewStockLevel(domain.NewStockLevelParams{
+				SKU:              sku,
+				WarehouseID:      warehouseID,
+				ReorderThreshold: 0,
+				ReorderQuantity:  0,
+			})
+			if err != nil {
+				return err
+			}
+			if err := newLevel.AdjustOnHand(qty); err != nil {
+				return err
+			}
+			if err := uc.stockRepo.Create(ctx, newLevel); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		if err := level.AdjustOnHand(qty); err != nil {
+			return err
+		}
+		if err := uc.stockRepo.Update(ctx, level); err != nil {
+			if errors.Is(err, domain.ErrConcurrentModification) {
+				continue
+			}
+			return err
+		}
+		return nil
+	}
+	return domain.ErrConcurrentModification
+}
+
+func (uc *StockUC) recordMovement(ctx context.Context, warehouseID, sku string, qty int, refType, refID, note string) error {
+	return uc.movRepo.Create(ctx, &domain.StockMovement{
+		SKU:           sku,
+		WarehouseID:   warehouseID,
+		Type:          domain.MovementInbound,
+		Quantity:      qty,
+		ReferenceType: refType,
+		ReferenceID:   refID,
+		Note:          note,
+		CreatedAt:     time.Now().UTC(),
+	})
 }
 
 // GetStockLevel returns stock levels for a SKU across all warehouses.
@@ -625,7 +706,7 @@ func (uc *StockUC) publishEvent(ctx context.Context, eventType string, payload a
 		return
 	}
 
-	event := publisher.Event{
+	event := rabbitmq.Event{
 		Type:      eventType,
 		Payload:   data,
 		Timestamp: time.Now().UTC(),

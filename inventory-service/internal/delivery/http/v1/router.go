@@ -89,6 +89,6 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	poGroup.GET("", r.listPurchaseOrders)
 	poGroup.GET("/:id", r.getPurchaseOrder)
 	poGroup.POST("/:id/confirm", r.confirmPurchaseOrder)
-	poGroup.POST("/:id/receive", r.receiveLine)
+	poGroup.POST("/:id/receive", r.receiveGoods)
 	poGroup.POST("/:id/cancel", r.cancelPurchaseOrder)
 }

@@ -137,38 +137,57 @@ func (po *PurchaseOrder) Confirm() error {
 	return nil
 }
 
-func (po *PurchaseOrder) ReceiveLine(sku string, qty int) error {
-	if po.Status != POStatusOrdered && po.Status != POStatusPartiallyReceived {
-		return ErrInvalidPOTransition
-	}
+// receiveLine updates the line quantity
+func (po *PurchaseOrder) receiveLine(sku string, qty int) error {
 	if qty <= 0 {
 		return ErrNonPositiveQuantity
 	}
 
-	found := false
 	for i := range po.Lines {
 		if po.Lines[i].SKU != sku {
 			continue
 		}
-		found = true
+
 		newReceived := po.Lines[i].QuantityReceived + qty
 		if newReceived > po.Lines[i].QuantityOrdered {
 			return ErrReceivedExceedsOrdered
 		}
+
 		po.Lines[i].QuantityReceived = newReceived
-		break
-	}
-	if !found {
-		return ErrEmptySKU
+		return nil
 	}
 
-	po.Status = po.computeReceivingStatus()
+	return ErrEmptySKU
+}
+
+type ReceiveLine struct {
+	SKU      string
+	Quantity int
+}
+
+func (po *PurchaseOrder) ReceiveLines(lines []ReceiveLine) error {
+	if po.Status != POStatusOrdered && po.Status != POStatusPartiallyReceived {
+		return ErrInvalidPOTransition
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+
+	for _, l := range lines {
+		if err := po.receiveLine(l.SKU, l.Quantity); err != nil {
+			return err
+		}
+	}
+
 	po.Version++
+	po.Status = po.computeReceivingStatus()
 	po.UpdatedAt = time.Now().UTC()
+
 	if po.Status == POStatusReceived {
 		now := time.Now().UTC()
 		po.ReceivedAt = &now
 	}
+
 	return nil
 }
 
