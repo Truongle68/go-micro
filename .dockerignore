@@ -1,0 +1,17 @@
+.git
+.gitignore
+.dockerignore
+.env
+*/.env
+bin/
+*/bin/
+*.exe
+*.log
+*.tmp
+*.md
+.idea/
+.vscode/
+node_modules/
+proto/
+supermarket/
+tmp/
