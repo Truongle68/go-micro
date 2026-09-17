@@ -1,4 +1,4 @@
-package publisher
+package rabbitmq
 
 // Event type constants for inventory domain events.
 const (
