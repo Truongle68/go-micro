@@ -15,5 +15,7 @@ require (
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	go.mongodb.org/mongo-driver v1.17.9 // indirect
-	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 )
+
+replace golang.org/x/net => golang.org/x/net v0.53.0
