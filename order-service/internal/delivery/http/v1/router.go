@@ -38,8 +38,19 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 		v: validator.New(),
 	}
 
+	authMW := ginmw.Auth(deps.Verifier, deps.Cache)
+	adminMW := ginmw.Role(ginmw.AdminRole)
+
+	admin := apiV1Group.Group("/admin", authMW, adminMW)
+	{
+		orders := admin.Group("/orders")
+		{
+			orders.GET("", r.listAdminOrders)
+		}
+	}
+
 	ordersGroup := apiV1Group.Group("/orders")
-	ordersGroup.Use(ginmw.Auth(deps.Verifier, deps.Cache))
+	ordersGroup.Use(authMW)
 
 	ordersGroup.POST("/checkout", r.checkout)
 	ordersGroup.GET("", r.listOrders)

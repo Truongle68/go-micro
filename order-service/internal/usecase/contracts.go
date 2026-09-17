@@ -7,6 +7,8 @@ import (
 	"order-service/internal/domain"
 	"order-service/internal/repo/postgres"
 	pgtransactor "order-service/pkg/postgres"
+
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 )
 
 type CheckoutItemInput struct {
@@ -25,6 +27,7 @@ type OrderRepository interface {
 	Create(ctx context.Context, order *domain.Order, history *domain.OrderStatusHistory) error
 	FindByID(ctx context.Context, id string) (*domain.Order, error)
 	FindByUserID(ctx context.Context, userID string, limit int64, offset int64) ([]domain.Order, int64, error)
+	List(ctx context.Context, filter domain.OrderFilter, p pagination.Params) ([]domain.Order, int64, error)
 	UpdateStatus(ctx context.Context, order *domain.Order, history *domain.OrderStatusHistory) error
 	GetTrackingHistory(ctx context.Context, orderID string) ([]domain.OrderStatusHistory, error)
 	AppendNote(ctx context.Context, orderID string, currentStatus domain.OrderStatus, note string) error

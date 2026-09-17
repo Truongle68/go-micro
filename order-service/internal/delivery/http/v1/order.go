@@ -89,6 +89,25 @@ func (h *V1) listOrders(c *gin.Context) {
 	response.SuccessPaginated(c, http.StatusOK, "orders retrieved successfully", *result)
 }
 
+func (h *V1) listAdminOrders(c *gin.Context) {
+	filter := domain.OrderFilter{
+		UserID: strings.TrimSpace(c.Query("user_id")),
+		Status: domain.OrderStatus(strings.TrimSpace(c.Query("status"))),
+		SKU:    strings.TrimSpace(c.Query("sku")),
+	}
+
+	params := pagination.FromQuery(c)
+
+	result, err := h.o.ListOrders(c.Request.Context(), filter, params)
+	if err != nil {
+		h.l.Error("h.listAdminOrders - h.o.ListOrders: %v", err)
+		response.InternalServerError(c, "failed to list orders")
+		return
+	}
+
+	response.SuccessPaginated(c, http.StatusOK, "orders retrieved successfully", *result)
+}
+
 func (h *V1) getOrder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok || userID == "" {

@@ -8,33 +8,40 @@ import (
 
 type (
 	Config struct {
-		HTTP     HTTP
-		PG       PG
-		Services Services
-		JWT      JWT
-		Log      Log
+		HTTP     http
+		PG       pg
+		Services services
+		JWT      jwt
+		Redis    redis
+		Log      log
 	}
 
-	HTTP struct {
+	http struct {
 		Port string `env:"HTTP_PORT" envDefault:"4004"`
 	}
 
-	PG struct {
+	pg struct {
 		Url string `env:"DB_URL,required"`
 	}
 
-	Services struct {
-		CartServiceURL             string `env:"CART_SERVICE_URL" envDefault:"http://localhost:4003"`
-		CartServiceGRPCAddr        string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
-		CatalogServiceGRPCAddr     string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
-		InventoryServiceGRPCAddr   string `env:"INVENTORY_SERVICE_GRPC_ADDR" envDefault:"localhost:50052"`
+	services struct {
+		CartServiceURL           string `env:"CART_SERVICE_URL" envDefault:"http://localhost:4003"`
+		CartServiceGRPCAddr      string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
+		CatalogServiceGRPCAddr   string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
+		InventoryServiceGRPCAddr string `env:"INVENTORY_SERVICE_GRPC_ADDR" envDefault:"localhost:50052"`
 	}
 
-	JWT struct {
+	jwt struct {
 		PublicKey string `env:"PUBLIC_KEY,required"`
 	}
 
-	Log struct {
+	redis struct {
+		Addr     string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
+		Password string `env:"REDIS_PASSWORD" envDefault:""`
+		DB       int    `env:"REDIS_DB" envDefault:"0"`
+	}
+
+	log struct {
 		Level string `env:"LOG_LEVEL" envDefault:"debug"`
 	}
 )

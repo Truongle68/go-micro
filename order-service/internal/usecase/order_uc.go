@@ -308,6 +308,18 @@ func (uc *OrderUC) ListOrdersByUser(ctx context.Context, userID string, page pag
 	return &result, nil
 }
 
+func (uc *OrderUC) ListOrders(ctx context.Context, filter domain.OrderFilter, page pagination.Params) (*pagination.Result[domain.Order], error) {
+	normParams := page.Normalize()
+
+	orders, total, err := uc.repo.List(ctx, filter, normParams)
+	if err != nil {
+		return nil, fmt.Errorf("OrderUC.ListOrders: %w", err)
+	}
+
+	result := pagination.NewResult(orders, normParams, total)
+	return &result, nil
+}
+
 func (uc *OrderUC) GetTrackingTimeline(ctx context.Context, orderID string, userID string) ([]domain.OrderStatusHistory, error) {
 	order, err := uc.repo.FindByID(ctx, orderID)
 	if err != nil {

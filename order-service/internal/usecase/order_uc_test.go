@@ -52,6 +52,32 @@ func (m *mockOrderRepo) FindByUserID(ctx context.Context, userID string, limit i
 	return userOrders, int64(len(userOrders)), nil
 }
 
+func (m *mockOrderRepo) List(ctx context.Context, filter domain.OrderFilter, p pagination.Params) ([]domain.Order, int64, error) {
+	var list []domain.Order
+	for _, o := range m.orders {
+		if filter.Status != "" && o.Status != filter.Status {
+			continue
+		}
+		if filter.UserID != "" && o.UserID != filter.UserID {
+			continue
+		}
+		if filter.SKU != "" {
+			hasSKU := false
+			for _, item := range o.Items {
+				if item.SKU == filter.SKU {
+					hasSKU = true
+					break
+				}
+			}
+			if !hasSKU {
+				continue
+			}
+		}
+		list = append(list, *o)
+	}
+	return list, int64(len(list)), nil
+}
+
 func (m *mockOrderRepo) UpdateStatus(ctx context.Context, order *domain.Order, history *domain.OrderStatusHistory) error {
 	m.orders[order.ID] = order
 	if history != nil {
@@ -234,5 +260,61 @@ func TestCheckoutAndOrderLifecycle(t *testing.T) {
 	_, err = uc.CancelOrder(ctx, order.ID, userID, "Changed mind")
 	if !errors.Is(err, domain.ErrCannotCancelDeliveriedOrder) {
 		t.Fatalf("expected ErrCannotCancelDeliveriedOrder, got %v", err)
+	}
+}
+
+func TestOrderUC_ListOrders(t *testing.T) {
+	repo := newMockOrderRepo()
+	uc := usecase.NewOrderUC(repo, nil, nil, nil, nil, logger.New("error"))
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	o1 := &domain.Order{
+		ID:     "order_1",
+		UserID: "user_1",
+		Status: domain.OrderStatusConfirmed,
+		Items: []domain.OrderItem{
+			{ID: "item_1", SKU: "SKU-RED-M", Quantity: 1},
+		},
+		CreatedAt: now,
+	}
+	o2 := &domain.Order{
+		ID:     "order_2",
+		UserID: "user_2",
+		Status: domain.OrderStatusDelivered,
+		Items: []domain.OrderItem{
+			{ID: "item_2", SKU: "SKU-BLUE-L", Quantity: 2},
+		},
+		CreatedAt: now,
+	}
+	_ = repo.Create(ctx, o1, nil)
+	_ = repo.Create(ctx, o2, nil)
+
+	// Filter by status
+	res, err := uc.ListOrders(ctx, domain.OrderFilter{Status: domain.OrderStatusConfirmed}, pagination.Params{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Items) != 1 || res.Items[0].ID != "order_1" {
+		t.Fatalf("expected 1 order with ID order_1, got %v", res.Items)
+	}
+
+	// Filter by user ID
+	res, err = uc.ListOrders(ctx, domain.OrderFilter{UserID: "user_2"}, pagination.Params{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Items) != 1 || res.Items[0].ID != "order_2" {
+		t.Fatalf("expected 1 order with ID order_2, got %v", res.Items)
+	}
+
+	// Filter by SKU
+	res, err = uc.ListOrders(ctx, domain.OrderFilter{SKU: "SKU-RED-M"}, pagination.Params{Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Items) != 1 || res.Items[0].ID != "order_1" {
+		t.Fatalf("expected 1 order with ID order_1, got %v", res.Items)
 	}
 }

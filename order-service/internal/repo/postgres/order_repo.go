@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"order-service/internal/domain"
 	orderpg "order-service/pkg/postgres"
 
+	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"github.com/google/uuid"
 )
 
@@ -176,6 +178,101 @@ func (r *OrderRepo) FindByUserID(ctx context.Context, userID string, limit int64
 		o.Items = items
 
 		orders = append(orders, o)
+	}
+
+	return orders, total, nil
+}
+
+func (r *OrderRepo) List(ctx context.Context, filter domain.OrderFilter, p pagination.Params) ([]domain.Order, int64, error) {
+	executor := orderpg.GetExecutor(ctx, r.db)
+	normParams := p.Normalize()
+
+	var conditions []string
+	args := make([]interface{}, 0, 4)
+	argIdx := 1
+
+	if filter.Status != "" {
+		conditions = append(conditions, fmt.Sprintf("status=$%d", argIdx))
+		args = append(args, filter.Status)
+		argIdx++
+	}
+
+	if filter.UserID != "" {
+		conditions = append(conditions, fmt.Sprintf("user_id=$%d", argIdx))
+		args = append(args, filter.UserID)
+		argIdx++
+	}
+
+	if filter.SKU != "" {
+		conditions = append(conditions, fmt.Sprintf(
+			`EXISTS(
+			SELECT 1 FROM order_items oi
+			WHERE oi.order_id = orders.id AND oi.sku = $%d
+		)`, argIdx))
+		args = append(args, filter.SKU)
+		argIdx++
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	var total int64
+	countQuery := "SELECT COUNT(*) FROM orders" + whereClause
+	if err := executor.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("OrderRepo.List - count: %w", err)
+	}
+	if total == 0 {
+		return []domain.Order{}, 0, nil
+	}
+
+	queryOrders := fmt.Sprintf(`
+		SELECT
+			id, user_id, status, subtotal, shipping_fee, total,
+			payment_method, payment_id, tracking_code,
+			full_name, phone, street, ward, district, city, country,
+			created_at, updated_at
+		FROM orders
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d`, whereClause, argIdx, argIdx+1)
+
+	queryArgs := make([]interface{}, len(args), len(args)+2)
+	copy(queryArgs, args)
+	queryArgs = append(queryArgs, normParams.Limit, normParams.Skip())
+
+	rows, err := executor.QueryContext(ctx, queryOrders, queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("OrderRepo.List - query orders: %w", err)
+	}
+	defer rows.Close()
+
+	orders := make([]domain.Order, 0)
+	for rows.Next() {
+		var o domain.Order
+		var statusStr string
+		if err := rows.Scan(
+			&o.ID, &o.UserID, &statusStr, &o.Subtotal, &o.ShippingFee, &o.Total,
+			&o.PaymentMethod, &o.PaymentID, &o.TrackingCode,
+			&o.ShippingAddress.FullName, &o.ShippingAddress.Phone, &o.ShippingAddress.Street,
+			&o.ShippingAddress.Ward, &o.ShippingAddress.District, &o.ShippingAddress.City, &o.ShippingAddress.Country,
+			&o.CreatedAt, &o.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("OrderRepo.List - scan: %w", err)
+		}
+		o.Status = domain.OrderStatus(statusStr)
+
+		items, err := r.findItemsByOrderID(ctx, executor, o.ID)
+		if err != nil {
+			return nil, 0, err
+		}
+		o.Items = items
+
+		orders = append(orders, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("OrderRepo.List - rows: %w", err)
 	}
 
 	return orders, total, nil

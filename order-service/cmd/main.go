@@ -40,7 +40,8 @@ func main() {
 	transactor := pgtransactor.NewPostgresTransactor(pg.DB)
 
 	// optional redis connection for token blacklist checking
-	redisClient, err := redis.New("localhost:6379", "secretredispass", 0)
+	redisClient, err := redis.New(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
+
 	if err != nil {
 		l.Warn("redis connection optional warning: %v", err)
 	}

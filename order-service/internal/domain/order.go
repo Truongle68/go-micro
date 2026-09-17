@@ -271,3 +271,9 @@ func (o *Order) Cancel(reason string) (*OrderStatusHistory, error) {
 		CreatedAt:  o.UpdatedAt,
 	}, nil
 }
+
+type OrderFilter struct {
+	UserID string
+	Status OrderStatus
+	SKU    string
+}

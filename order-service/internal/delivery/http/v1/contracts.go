@@ -12,6 +12,7 @@ type OrderUC interface {
 	Checkout(ctx context.Context, userID string, input usecase.CheckoutInput, token string) (*domain.Order, error)
 	GetOrder(ctx context.Context, orderID string, userID string) (*domain.Order, error)
 	ListOrdersByUser(ctx context.Context, userID string, page pagination.Params) (*pagination.Result[domain.Order], error)
+	ListOrders(ctx context.Context, filter domain.OrderFilter, page pagination.Params) (*pagination.Result[domain.Order], error)
 	GetTrackingTimeline(ctx context.Context, orderID string, userID string) ([]domain.OrderStatusHistory, error)
 	ShipOrder(ctx context.Context, orderID string, trackingCode string) (*domain.Order, error)
 	DeliverOrder(ctx context.Context, orderID string) (*domain.Order, error)
