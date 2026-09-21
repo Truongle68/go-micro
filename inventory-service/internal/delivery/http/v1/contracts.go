@@ -16,7 +16,7 @@ type SupplierUC interface {
 	UpdateSupplier(ctx context.Context, id, name, email, phone string, address domain.SupplierAddress) (*domain.Supplier, error)
 	DeactivateSupplier(ctx context.Context, id string) (*domain.Supplier, error)
 	ReactivateSupplier(ctx context.Context, id string) (*domain.Supplier, error)
-	ListSuppliers(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, error)
+	ListSuppliers(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, int64, error)
 }
 
 var _ SupplierUC = (*usecase.SupplierUC)(nil)
@@ -28,7 +28,7 @@ type PurchaseOrderUC interface {
 	ConfirmPurchaseOrder(ctx context.Context, id string) (*domain.PurchaseOrder, error)
 	ReceiveGoods(ctx context.Context, poID string, lines []domain.ReceiveLine) (*domain.PurchaseOrder, error)
 	CancelPurchaseOrder(ctx context.Context, id string) (*domain.PurchaseOrder, error)
-	ListPurchaseOrders(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, error)
+	ListPurchaseOrders(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, int64, error)
 }
 
 var _ PurchaseOrderUC = (*usecase.PurchaseOrderUC)(nil)

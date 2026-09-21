@@ -259,10 +259,10 @@ func (uc *PurchaseOrderUC) CancelPurchaseOrder(ctx context.Context, id string) (
 	return po, nil
 }
 
-func (uc *PurchaseOrderUC) ListPurchaseOrders(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, error) {
-	orders, err := uc.poRepo.List(ctx, filter, page)
+func (uc *PurchaseOrderUC) ListPurchaseOrders(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, int64, error) {
+	orders, total, err := uc.poRepo.List(ctx, filter, page)
 	if err != nil {
-		return nil, fmt.Errorf("PurchaseOrderUC.ListPurchaseOrders - repo.List: %w", err)
+		return nil, 0, fmt.Errorf("PurchaseOrderUC.ListPurchaseOrders - repo.List: %w", err)
 	}
-	return orders, nil
+	return orders, total, nil
 }

@@ -9,10 +9,11 @@ import (
 	"inventory-service/internal/domain"
 	invpg "inventory-service/pkg/postgres"
 
+	"strings"
+
 	"github.com/TruongLe68/go-micro/pkg/pagination"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	"strings"
 )
 
 type SupplierRepo struct {
@@ -111,7 +112,7 @@ func (r *SupplierRepo) Update(ctx context.Context, s *domain.Supplier) error {
 	return nil
 }
 
-func (r *SupplierRepo) List(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, error) {
+func (r *SupplierRepo) List(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, int64, error) {
 	executor := invpg.GetExecutor(ctx, r.db)
 
 	normParams := page.Normalize()
@@ -124,6 +125,12 @@ func (r *SupplierRepo) List(ctx context.Context, activeOnly bool, page paginatio
 		baseWhere = fmt.Sprintf(" WHERE is_active = $%d", argIdx)
 		args = append(args, true)
 		argIdx++
+	}
+
+	countQuery := "SELECT COUNT(*) FROM suppliers" + baseWhere
+	var total int64
+	if err := executor.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("SupplierRepo.List: %w", err)
 	}
 
 	query := fmt.Sprintf(`
@@ -140,7 +147,7 @@ func (r *SupplierRepo) List(ctx context.Context, activeOnly bool, page paginatio
 
 	rows, err := executor.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("SupplierRepo.List: %w", err)
+		return nil, 0, fmt.Errorf("SupplierRepo.List: %w", err)
 	}
 	defer rows.Close()
 
@@ -152,9 +159,14 @@ func (r *SupplierRepo) List(ctx context.Context, activeOnly bool, page paginatio
 			&s.Address.Line1, &s.Address.Ward, &s.Address.District, &s.Address.City,
 			&s.IsActive, &s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("SupplierRepo.List - scan: %w", err)
+			return nil, 0, fmt.Errorf("SupplierRepo.List - scan: %w", err)
 		}
 		suppliers = append(suppliers, s)
 	}
-	return suppliers, nil
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("SupplierRepo.List - rows: %w", err)
+	}
+
+	return suppliers, total, nil
 }

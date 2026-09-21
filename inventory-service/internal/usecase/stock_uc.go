@@ -339,7 +339,7 @@ func (uc *StockUC) ApplyGoodsReceived(ctx context.Context, goods domain.GoodsRec
 				l.SKU, l.QuantityReceived,
 				domain.AggregatePurchaseOrder,
 				goods.PurchaseOrderID,
-				fmt.Sprintf("Received %d units from PO %s", l.QuantityReceived, goods.POCode),
+				fmt.Sprintf("Received %d units from %s", l.QuantityReceived, goods.POCode),
 			); err != nil {
 				return fmt.Errorf("recording stock movement for %s: %v", l.SKU, err)
 			}

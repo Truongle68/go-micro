@@ -186,12 +186,12 @@ func (h *V1) listPurchaseOrders(c *gin.Context) {
 
 	params := pagination.FromQuery(c)
 
-	orders, err := h.po.ListPurchaseOrders(c.Request.Context(), filter, params)
+	orders, total, err := h.po.ListPurchaseOrders(c.Request.Context(), filter, params)
 	if err != nil {
 		h.l.Error("h.listPurchaseOrders: %v", err)
 		response.InternalServerError(c, "failed to list purchase orders")
 		return
 	}
 
-	response.Success(c, http.StatusOK, "purchase orders retrieved successfully", orders)
+	response.SuccessPaginated(c, http.StatusOK, "purchase orders retrieved successfully", pagination.NewResult(orders, params, total))
 }

@@ -170,7 +170,7 @@ func (r *PurchaseOrderRepo) Update(ctx context.Context, po *domain.PurchaseOrder
 	return nil
 }
 
-func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, error) {
+func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, int64, error) {
 	executor := invpg.GetExecutor(ctx, r.db)
 
 	normParams := page.Normalize()
@@ -200,6 +200,12 @@ func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrde
 		whereClause = " WHERE " + strings.Join(conditions, " AND ")
 	}
 
+	countQuery := "SELECT COUNT(*) FROM purchase_orders" + whereClause
+	var total int64
+	if err := executor.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("PurchaseOrderRepo.List - count: %w", err)
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
 			id, version, code,
@@ -218,7 +224,7 @@ func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrde
 
 	rows, err := executor.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("PurchaseOrderRepo.List: %w", err)
+		return nil, 0, fmt.Errorf("PurchaseOrderRepo.List: %w", err)
 	}
 	defer rows.Close()
 
@@ -237,7 +243,7 @@ func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrde
 			&po.ExpectedAt, &po.ReceivedAt,
 			&po.CreatedAt, &po.UpdatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("PurchaseOrderRepo.List - scan: %w", err)
+			return nil, 0, fmt.Errorf("PurchaseOrderRepo.List - scan: %w", err)
 		}
 
 		po.Status = domain.PurchaseOrderStatus(statusStr)
@@ -246,5 +252,5 @@ func (r *PurchaseOrderRepo) List(ctx context.Context, filter domain.PurchaseOrde
 		}
 		orders = append(orders, po)
 	}
-	return orders, nil
+	return orders, total, nil
 }

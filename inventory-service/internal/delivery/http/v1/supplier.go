@@ -160,12 +160,12 @@ func (h *V1) listSuppliers(c *gin.Context) {
 
 	params := pagination.FromQuery(c)
 
-	suppliers, err := h.supplier.ListSuppliers(c.Request.Context(), activeOnly, params)
+	suppliers, total, err := h.supplier.ListSuppliers(c.Request.Context(), activeOnly, params)
 	if err != nil {
 		h.l.Error("h.listSuppliers: %v", err)
 		response.InternalServerError(c, "failed to list suppliers")
 		return
 	}
 
-	response.Success(c, http.StatusOK, "suppliers retrieved successfully", suppliers)
+	response.SuccessPaginated(c, http.StatusOK, "suppliers retrieved successfully", pagination.NewResult(suppliers, params, total))
 }

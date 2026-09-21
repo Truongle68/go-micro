@@ -26,8 +26,8 @@ func (m *mockPORepo) Update(ctx context.Context, po *domain.PurchaseOrder) error
 	m.po = po
 	return nil
 }
-func (m *mockPORepo) List(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, error) {
-	return nil, nil
+func (m *mockPORepo) List(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, int64, error) {
+	return nil, 0, nil
 }
 
 type mockStockLevelRepo struct {

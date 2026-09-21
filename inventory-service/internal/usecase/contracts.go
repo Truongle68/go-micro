@@ -19,7 +19,7 @@ type SupplierRepository interface {
 	Create(ctx context.Context, s *domain.Supplier) error
 	FindByID(ctx context.Context, id string) (*domain.Supplier, error)
 	Update(ctx context.Context, s *domain.Supplier) error
-	List(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, error)
+	List(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, int64, error)
 }
 
 var _ SupplierRepository = (*postgres.SupplierRepo)(nil)
@@ -28,7 +28,7 @@ type PurchaseOrderRepository interface {
 	Create(ctx context.Context, po *domain.PurchaseOrder) error
 	FindByID(ctx context.Context, id string) (*domain.PurchaseOrder, error)
 	Update(ctx context.Context, po *domain.PurchaseOrder) error
-	List(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, error)
+	List(ctx context.Context, filter domain.PurchaseOrderFilter, page pagination.Params) ([]domain.PurchaseOrder, int64, error)
 }
 
 var _ PurchaseOrderRepository = (*postgres.PurchaseOrderRepo)(nil)

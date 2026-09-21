@@ -94,10 +94,10 @@ func (uc *SupplierUC) ReactivateSupplier(ctx context.Context, id string) (*domai
 	return s, nil
 }
 
-func (uc *SupplierUC) ListSuppliers(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, error) {
-	suppliers, err := uc.repo.List(ctx, activeOnly, page)
+func (uc *SupplierUC) ListSuppliers(ctx context.Context, activeOnly bool, page pagination.Params) ([]domain.Supplier, int64, error) {
+	suppliers, total, err := uc.repo.List(ctx, activeOnly, page)
 	if err != nil {
-		return nil, fmt.Errorf("SupplierUC.ListSuppliers - repo.List: %w", err)
+		return nil, 0, fmt.Errorf("SupplierUC.ListSuppliers - repo.List: %w", err)
 	}
-	return suppliers, nil
+	return suppliers, total, nil
 }
