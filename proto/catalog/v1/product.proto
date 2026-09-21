@@ -6,6 +6,7 @@ option go_package = "github.com/TruongLe68/go-micro/pkg/gen/proto/go/catalog/v1;
 
 service ProductService {
     rpc GetVariantsBySKUs(GetVariantsBySKURequest) returns (GetVariantsBySKUResponse);
+    rpc FindExistingSKUs(FindExistingSKUsRequest) returns (FindExistingSKUsResponse);
 }
 
 message Variant {
@@ -30,4 +31,12 @@ message GetVariantsBySKUResponse {
 
 message GetVariantsBySKURequest {
     repeated string sku = 1;
+}
+
+message FindExistingSKUsRequest {
+    repeated string skus = 1;
+}
+
+message FindExistingSKUsResponse {
+    repeated string existing_skus = 1;
 }

@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ProductService_GetVariantsBySKUs_FullMethodName = "/catalog.v1.ProductService/GetVariantsBySKUs"
+	ProductService_FindExistingSKUs_FullMethodName  = "/catalog.v1.ProductService/FindExistingSKUs"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProductServiceClient interface {
 	GetVariantsBySKUs(ctx context.Context, in *GetVariantsBySKURequest, opts ...grpc.CallOption) (*GetVariantsBySKUResponse, error)
+	FindExistingSKUs(ctx context.Context, in *FindExistingSKUsRequest, opts ...grpc.CallOption) (*FindExistingSKUsResponse, error)
 }
 
 type productServiceClient struct {
@@ -47,11 +49,22 @@ func (c *productServiceClient) GetVariantsBySKUs(ctx context.Context, in *GetVar
 	return out, nil
 }
 
+func (c *productServiceClient) FindExistingSKUs(ctx context.Context, in *FindExistingSKUsRequest, opts ...grpc.CallOption) (*FindExistingSKUsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FindExistingSKUsResponse)
+	err := c.cc.Invoke(ctx, ProductService_FindExistingSKUs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility.
 type ProductServiceServer interface {
 	GetVariantsBySKUs(context.Context, *GetVariantsBySKURequest) (*GetVariantsBySKUResponse, error)
+	FindExistingSKUs(context.Context, *FindExistingSKUsRequest) (*FindExistingSKUsResponse, error)
 	mustEmbedUnimplementedProductServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedProductServiceServer struct{}
 
 func (UnimplementedProductServiceServer) GetVariantsBySKUs(context.Context, *GetVariantsBySKURequest) (*GetVariantsBySKUResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetVariantsBySKUs not implemented")
+}
+func (UnimplementedProductServiceServer) FindExistingSKUs(context.Context, *FindExistingSKUsRequest) (*FindExistingSKUsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FindExistingSKUs not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 func (UnimplementedProductServiceServer) testEmbeddedByValue()                        {}
@@ -104,6 +120,24 @@ func _ProductService_GetVariantsBySKUs_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductService_FindExistingSKUs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FindExistingSKUsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).FindExistingSKUs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_FindExistingSKUs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).FindExistingSKUs(ctx, req.(*FindExistingSKUsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductService_ServiceDesc is the grpc.ServiceDesc for ProductService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetVariantsBySKUs",
 			Handler:    _ProductService_GetVariantsBySKUs_Handler,
+		},
+		{
+			MethodName: "FindExistingSKUs",
+			Handler:    _ProductService_FindExistingSKUs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

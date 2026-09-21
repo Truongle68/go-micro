@@ -293,6 +293,48 @@ func (r *ProductRepo) ExistSlug(ctx context.Context, name string) (bool, error) 
 	return count > 0, nil
 }
 
+func (r *ProductRepo) ExistSKU(ctx context.Context, sku string) (bool, error) {
+	filter := bson.M{"variants.sku": sku}
+	count, err := r.productColl.CountDocuments(ctx, filter, options.Count().SetLimit(1))
+	if err != nil {
+		return false, fmt.Errorf("checking sku existence: %w", err)
+	}
+	return count > 0, nil
+}
+
+func (r *ProductRepo) FindExistingSKUs(ctx context.Context, skus []string) (map[string]struct{}, error) {
+	filter := bson.M{"variants.sku": bson.M{
+		"$in": skus,
+	}}
+	opts := options.Find().SetProjection(bson.M{
+		"variants.sku": 1,
+		"_id":          1,
+	})
+	cursor, err := r.productColl.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("finding existing skus: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var docs []struct {
+		Variants []struct {
+			SKU string `bson:"sku"`
+		} `bson:"variants"`
+	}
+
+	if err := cursor.All(ctx, &docs); err != nil {
+		return nil, fmt.Errorf("decoding: %w", err)
+	}
+
+	existings := make(map[string]struct{}, len(docs))
+	for _, d := range docs {
+		for _, v := range d.Variants {
+			existings[v.SKU] = struct{}{}
+		}
+	}
+	return existings, nil
+}
+
 func (r *ProductRepo) EnsureIndexes(ctx context.Context) error {
 	models := []mongo.IndexModel{
 		{

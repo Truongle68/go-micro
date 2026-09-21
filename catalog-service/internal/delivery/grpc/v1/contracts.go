@@ -7,6 +7,7 @@ import (
 
 type ProductGRPCUsecase interface {
 	GetVariantsBySKUs(ctx context.Context, skus []string) ([]usecase.VariantView, error)
+	FindExistingSKUs(ctx context.Context, skus []string) (map[string]struct{}, error)
 }
 
 var _ ProductGRPCUsecase = (*usecase.ProductUC)(nil)

@@ -82,3 +82,23 @@ func mapVariantsToProto(variants []usecase.VariantView) []*catalogv1.Variant {
 	}
 	return protoVariants
 }
+
+func (s *ProductServer) FindExistingSKUs(ctx context.Context, req *catalogv1.FindExistingSKUsRequest) (*catalogv1.FindExistingSKUsResponse, error) {
+	if len(req.GetSkus()) == 0 {
+		return &catalogv1.FindExistingSKUsResponse{}, nil
+	}
+
+	existingSet, err := s.uc.FindExistingSKUs(ctx, req.GetSkus())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to find skus: %v", err)
+	}
+
+	existingSlice := make([]string, 0, len(existingSet))
+	for sku := range existingSet {
+		existingSlice = append(existingSlice, sku)
+	}
+
+	return &catalogv1.FindExistingSKUsResponse{
+		ExistingSkus: existingSlice,
+	}, nil
+}

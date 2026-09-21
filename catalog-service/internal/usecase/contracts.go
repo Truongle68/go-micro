@@ -12,6 +12,8 @@ type ProductRepository interface {
 	EnsureIndexes(ctx context.Context) error
 	Create(ctx context.Context, p *domain.Product) error
 	ExistSlug(ctx context.Context, name string) (bool, error)
+	ExistSKU(ctx context.Context, sku string) (bool, error)
+	FindExistingSKUs(ctx context.Context, skus []string) (map[string]struct{}, error)
 	FindByID(ctx context.Context, id string) (*domain.Product, error)
 	FindByCategory(ctx context.Context, categoryID string, p pagination.Params) (*domain.ProductListResult, error)
 	Update(ctx context.Context, p *domain.Product, expectedVersion int) (*domain.Product, error)

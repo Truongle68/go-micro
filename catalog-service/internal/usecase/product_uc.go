@@ -584,3 +584,11 @@ func (uc *ProductUC) CountPerStatus(ctx context.Context, in AdminListInput) (*do
 	filter := applyAdminListPolicy(in)
 	return uc.repo.CountPerStatus(ctx, filter)
 }
+
+func (uc *ProductUC) FindExistingSKUs(ctx context.Context, skus []string) (map[string]struct{}, error) {
+	existings, err := uc.repo.FindExistingSKUs(ctx, skus)
+	if err != nil {
+		return nil, err
+	}
+	return existings, nil
+}
