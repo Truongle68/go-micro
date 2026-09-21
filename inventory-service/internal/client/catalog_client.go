@@ -23,4 +23,5 @@ type Price struct {
 // CatalogClient defines interactions with the catalog-service.
 type CatalogClient interface {
 	GetVariantsBySKUs(ctx context.Context, skus []string) ([]VariantDTO, error)
+	FindExistingSKUs(ctx context.Context, skus []string) (map[string]struct{}, error)
 }

@@ -11,6 +11,7 @@ import (
 
 type V1 struct {
 	supplier  SupplierUC
+	supply    SupplyUC
 	po        PurchaseOrderUC
 	warehouse WarehouseUC
 	stock     StockUC
@@ -20,6 +21,7 @@ type V1 struct {
 
 type Dependencies struct {
 	Supplier      SupplierUC
+	Supply        SupplyUC
 	PurchaseOrder PurchaseOrderUC
 	Warehouse     WarehouseUC
 	Stock         StockUC
@@ -28,9 +30,10 @@ type Dependencies struct {
 	Logger        logger.Interface
 }
 
-func NewDependencies(supplier SupplierUC, po PurchaseOrderUC, w WarehouseUC, stock StockUC, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
+func NewDependencies(supplier SupplierUC, supply SupplyUC, po PurchaseOrderUC, w WarehouseUC, stock StockUC, verifier jwtmanager.JWTManager, cache redismanager.BlacklistCacher, l logger.Interface) *Dependencies {
 	return &Dependencies{
 		Supplier:      supplier,
+		Supply:        supply,
 		PurchaseOrder: po,
 		Warehouse:     w,
 		Stock:         stock,
@@ -43,6 +46,7 @@ func NewDependencies(supplier SupplierUC, po PurchaseOrderUC, w WarehouseUC, sto
 func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	r := &V1{
 		supplier:  deps.Supplier,
+		supply:    deps.Supply,
 		po:        deps.PurchaseOrder,
 		warehouse: deps.Warehouse,
 		stock:     deps.Stock,
@@ -81,6 +85,13 @@ func NewRoutes(apiV1Group *gin.RouterGroup, deps *Dependencies) {
 	suppGroup.PUT("/:id", r.updateSupplier)
 	suppGroup.POST("/:id/deactivate", r.deactivateSupplier)
 	suppGroup.POST("/:id/reactivate", r.reactivateSupplier)
+
+	// Supply routes
+	supplyGroup := apiV1Group.Group("/supplies")
+	supplyGroup.Use(authMW, adminMW)
+	supplyGroup.POST("", r.assignProducts)
+	supplyGroup.GET("/supplier/:supplierId", r.listSupplierSupplies)
+	supplyGroup.GET("/:id", r.getSupply)
 
 	// Purchase order routes
 	poGroup := apiV1Group.Group("/purchase-orders")

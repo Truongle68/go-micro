@@ -71,6 +71,7 @@ func main() {
 
 	// init repos
 	supplierRepo := pgrepo.NewSupplierRepo(pg.DB)
+	supplyRepo := pgrepo.NewSupplyRepo(pg.DB)
 	warehouseRepo := pgrepo.NewWarehouseRepo(pg.DB)
 	purchaseOrderRepo := pgrepo.NewPurchaseOrderRepo(pg.DB)
 	stockLevelRepo := pgrepo.NewStockLevelRepo(pg.DB)
@@ -87,6 +88,7 @@ func main() {
 	// init usecases
 	warehouseUC := usecase.NewWarehouseUC(warehouseRepo)
 	supplierUC := usecase.NewSupplierUC(supplierRepo, l)
+	supplyUC := usecase.NewSupplyUC(supplierRepo, supplyRepo, catalogClient)
 	purchaseOrderUC := usecase.NewPurchaseOrderUC(
 		purchaseOrderRepo,
 		supplierRepo,
@@ -112,7 +114,7 @@ func main() {
 	// init HTTP server, setup routers
 	server := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 
-	v1Deps := v1.NewDependencies(supplierUC, purchaseOrderUC, warehouseUC, stockUC, jwtVerifier, cache.TokenBlacklist, l)
+	v1Deps := v1.NewDependencies(supplierUC, supplyUC, purchaseOrderUC, warehouseUC, stockUC, jwtVerifier, cache.TokenBlacklist, l)
 	http.NewRouter(server.Engine, v1Deps)
 
 	// init gRPC server

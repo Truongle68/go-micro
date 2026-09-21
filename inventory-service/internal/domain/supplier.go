@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 )
@@ -64,4 +65,94 @@ func (s *Supplier) Reactivate() error {
 	s.Version++
 	s.UpdatedAt = time.Now().UTC()
 	return nil
+}
+
+type Supply struct {
+	ID          string    `json:"id"`
+	SupplierID  string    `json:"supplier_id"`
+	SKU         string    `json:"sku"`
+	Price       int64     `json:"price"`
+	LeadTime    LeadTime  `json:"lead_time"`
+	MinOrderQty int       `json:"min_order_qty"`
+	IsPreferred bool      `json:"is_preferred"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type LeadTime struct {
+	Days int `json:"days"`
+}
+
+func NewLeadTime(days int) (LeadTime, error) {
+	if days < 0 {
+		return LeadTime{}, ErrNegativeLeadDays
+	}
+	return LeadTime{Days: days}, nil
+}
+
+func (r SupplyAssignmentResult) MarshalJSON() ([]byte, error) {
+	type Alias SupplyAssignmentResult
+	var errStr *string
+	if r.Err != nil {
+		s := r.Err.Error()
+		errStr = &s
+	}
+
+	return json.Marshal(&struct {
+		Alias
+		Err *string `json:"err"`
+	}{
+		Alias: (Alias)(r),
+		Err:   errStr,
+	})
+}
+
+func (l LeadTime) IsFast() bool {
+	return l.Days <= 3
+}
+
+func (l LeadTime) AsDuration() time.Duration {
+	return time.Duration(l.Days) * 24 * time.Hour
+}
+
+func NewSupply(supplierID, sku string, price int64, leadTime LeadTime, moq int) (*Supply, error) {
+	if strings.TrimSpace(sku) == "" {
+		return nil, ErrEmptySKU
+	}
+
+	return &Supply{
+		SupplierID:  supplierID,
+		SKU:         sku,
+		Price:       price,
+		LeadTime:    leadTime,
+		MinOrderQty: moq,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}, nil
+}
+
+func (s *Supply) MarkPreferred() {
+	s.IsPreferred = true
+}
+
+func (s *Supply) UpdatePrice(price int64) error {
+	if price < 0 {
+		return ErrInvalidPrice
+	}
+	s.Price = price
+	return nil
+}
+
+type SupplyInput struct {
+	SKU         string
+	Price       int64
+	LeadTime    LeadTime
+	MinOrderQty int
+}
+
+type SupplyAssignmentResult struct {
+	SKU     string  `json:"sku"`
+	Success bool    `json:"success"`
+	Supply  *Supply `json:"supply"`
+	Err     error   `json:"err"`
 }

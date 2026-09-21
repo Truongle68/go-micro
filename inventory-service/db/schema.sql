@@ -19,6 +19,22 @@ CREATE TABLE IF NOT EXISTS suppliers (
 CREATE INDEX IF NOT EXISTS idx_suppliers_code ON suppliers(code);
 CREATE INDEX IF NOT EXISTS idx_suppliers_is_active ON suppliers(is_active);
 
+CREATE TABLE IF NOT EXISTS supplies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+    sku TEXT NOT NULL,
+    price NUMERIC(10,2),
+    lead_time JSONB NOT NULL DEFAULT '{}'::jsonb,
+    min_order_qty INT DEFAULT 1,
+    is_preferred BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE(supplier_id, sku)
+);
+
+CREATE INDEX IF NOT EXISTS idx_supplies_sku ON supplies(sku);
+CREATE INDEX IF NOT EXISTS idx_supplies_supplier ON supplies(supplier_id);
+
 CREATE TABLE IF NOT EXISTS purchase_orders (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     version         INT NOT NULL DEFAULT 1,

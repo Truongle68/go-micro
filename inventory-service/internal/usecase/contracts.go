@@ -13,6 +13,7 @@ import (
 
 type CatalogClient interface {
 	GetVariantsBySKUs(ctx context.Context, skus []string) ([]client.VariantDTO, error)
+	FindExistingSKUs(ctx context.Context, skus []string) (map[string]struct{}, error)
 }
 
 type SupplierRepository interface {
@@ -23,6 +24,14 @@ type SupplierRepository interface {
 }
 
 var _ SupplierRepository = (*postgres.SupplierRepo)(nil)
+
+type SupplyRepository interface {
+	CreateBatch(ctx context.Context, supplies []*domain.Supply) error
+	FindByID(ctx context.Context, id string) (*domain.Supply, error)
+	FindBySupplierID(ctx context.Context, supplierID string, p pagination.Params) ([]domain.Supply, int64, error)
+}
+
+var _ SupplyRepository = (*postgres.SupplyRepo)(nil)
 
 type PurchaseOrderRepository interface {
 	Create(ctx context.Context, po *domain.PurchaseOrder) error

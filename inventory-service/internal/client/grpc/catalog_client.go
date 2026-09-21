@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"inventory-service/internal/client"
 	"inventory-service/internal/domain"
@@ -21,13 +20,6 @@ type catalogGRPCClient struct {
 
 // NewCatalogGRPCClient connects to catalog-service gRPC server.
 func NewCatalogGRPCClient(target string) (client.CatalogClient, error) {
-	// Normalize address if only a port number or :port was provided
-	if !strings.Contains(target, ":") {
-		target = "localhost:" + target
-	} else if strings.HasPrefix(target, ":") {
-		target = "localhost" + target
-	}
-
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to product gRPC service at %s: %w", target, err)
@@ -58,7 +50,7 @@ func (c *catalogGRPCClient) GetVariantsBySKUs(ctx context.Context, skus []string
 				return nil, fmt.Errorf("%w: %s", domain.ErrEmptySKU, st.Message())
 			}
 		}
-		return nil, fmt.Errorf("catalog GetVariantsBySKUs: %w", err)
+		return nil, fmt.Errorf("rpc GetVariantsBySKUs failed: %w", err)
 	}
 
 	if res.GetVariants() == nil {
@@ -83,4 +75,22 @@ func (c *catalogGRPCClient) GetVariantsBySKUs(ctx context.Context, skus []string
 	}
 
 	return variants, nil
+}
+
+func (c *catalogGRPCClient) FindExistingSKUs(ctx context.Context, skus []string) (map[string]struct{}, error) {
+	if len(skus) == 0 {
+		return make(map[string]struct{}), nil
+	}
+
+	res, err := c.client.FindExistingSKUs(ctx, &catalogv1.FindExistingSKUsRequest{Skus: skus})
+	if err != nil {
+		return nil, fmt.Errorf("rpc FindExistingSKUs failed: %w", err)
+	}
+
+	existingMap := make(map[string]struct{}, len(res.GetExistingSkus()))
+	for _, sku := range res.GetExistingSkus() {
+		existingMap[sku] = struct{}{}
+	}
+
+	return existingMap, nil
 }

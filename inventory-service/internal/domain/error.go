@@ -42,6 +42,12 @@ const (
 	CodeDuplicatePOCode        ErrorCode = "DUPLICATE_PURCHASE_ORDER_CODE"
 	CodeDuplicateSuppCode      ErrorCode = "DUPLICATE_SUPPLIER_CODE"
 	CodeStockLevelNotFound     ErrorCode = "STOCK_LEVEL_NOT_FOUND"
+	CodeInactiveSupp           ErrorCode = "INACTIVE_SUPPLIER"
+	// Supply error code
+	CodeNegativeLeadDays ErrorCode = "NEGATIVE_LEAD_DAYS"
+	CodeDuplicateSKU     ErrorCode = "DUPLICATE_SKU"
+	CodeSupplyNotFound   ErrorCode = "SUPPLY_NOT_FOUND"
+	CodeEmptySupplyID    ErrorCode = "EMPTY_SUPPLY_ID"
 )
 
 type AppError struct {
@@ -95,6 +101,12 @@ var (
 	ErrDuplicatePOCode        = errors.New("purchase order with this code already exists")
 	ErrDuplicateSuppCode      = errors.New("supplier with this code already exists")
 	ErrStockLevelNotFound     = errors.New("stock level not found")
+	ErrInactiveSupp           = errors.New("inactive supplier")
+	// Supply error msg
+	ErrNegativeLeadDays = errors.New("lead days cannot be negative")
+	ErrDuplicateSKU     = errors.New("product with this SKU already existed in supplier's supply")
+	ErrSupplyNotFound   = errors.New("supply not found")
+	ErrEmptySupplyID    = errors.New("supply id cannot be empty")
 
 	// Business Rule / Invariant Errors
 	ErrNegativeQuantity = errors.New("reorder threshold and quantity cannot be negative")
@@ -135,6 +147,11 @@ var sentinelToCodeMap = map[error]ErrorCode{
 	ErrDuplicatePOCode:         CodeDuplicatePOCode,
 	ErrDuplicateSuppCode:       CodeDuplicateSuppCode,
 	ErrStockLevelNotFound:      CodeStockLevelNotFound,
+	ErrNegativeLeadDays:        CodeNegativeLeadDays,
+	ErrInactiveSupp:            CodeInactiveSupp,
+	ErrDuplicateSKU:            CodeDuplicateSKU,
+	ErrSupplyNotFound:          CodeSupplyNotFound,
+	ErrEmptySupplyID:           CodeEmptySupplyID,
 }
 
 func ToAppError(err error) *AppError {

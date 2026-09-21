@@ -21,6 +21,14 @@ type SupplierUC interface {
 
 var _ SupplierUC = (*usecase.SupplierUC)(nil)
 
+type SupplyUC interface {
+	AssignProducts(ctx context.Context, supplierID string, inputs []domain.SupplyInput) ([]domain.SupplyAssignmentResult, error)
+	GetSupply(ctx context.Context, id string) (*domain.Supply, error)
+	ListSupplierSupplies(ctx context.Context, supplierID string, page pagination.Params) ([]domain.Supply, int64, error)
+}
+
+var _ SupplyUC = (*usecase.SupplyUC)(nil)
+
 // PurchaseOrderUC defines the methods the delivery layer needs from the purchase order usecase.
 type PurchaseOrderUC interface {
 	CreatePurchaseOrder(ctx context.Context, input usecase.CreatePurchaseOrderInput) (*domain.PurchaseOrder, error)
