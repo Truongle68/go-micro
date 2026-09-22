@@ -17,8 +17,8 @@ COPY inventory-service/ ./inventory-service/
 # Compile static binaries for both the API service and outbox publisher
 WORKDIR /app/inventory-service
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/inventory-service ./cmd/main.go
-# RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/event-consumer ./cmd/event-consumer/main.go
-# RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/outbox-publisher ./cmd/outbox-publisher/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/event-consumer ./cmd/event-consumer/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/outbox-publisher ./cmd/outbox-publisher/main.go
 
 # Minimal production image
 FROM alpine:3.21
@@ -27,8 +27,8 @@ RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 COPY --from=builder /app/bin/inventory-service /app/inventory-service
-# COPY --from=builder /app/bin/event-consumer /app/event-consumer
-# COPY --from=builder /app/bin/outbox-publisher /app/outbox-publisher
+COPY --from=builder /app/bin/event-consumer /app/event-consumer
+COPY --from=builder /app/bin/outbox-publisher /app/outbox-publisher
 
 EXPOSE 4002 50052
 
