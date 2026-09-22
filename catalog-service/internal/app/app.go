@@ -18,12 +18,14 @@ import (
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	catalogv1 "github.com/TruongLe68/go-micro/pkg/gen/proto/go/catalog/v1"
+	"github.com/TruongLe68/go-micro/pkg/grpcmw"
 	"github.com/TruongLe68/go-micro/pkg/grpcserver"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/mongo"
 	"github.com/TruongLe68/go-micro/pkg/redis"
 	mongodrv "go.mongodb.org/mongo-driver/v2/mongo"
+	"google.golang.org/grpc"
 )
 
 type servers struct {
@@ -64,7 +66,7 @@ func initServers(l logger.Interface, uc useCases, cfg *config.Config, v jwtmanag
 	}
 	httpr.NewRouter(http.Engine, deps)
 
-	grpcServer := grpcserver.New(l, grpcserver.Port(cfg.GRPC.Port))
+	grpcServer := grpcserver.New(l, grpcserver.Port(cfg.GRPC.Port), grpcserver.ServerOptions(grpc.UnaryInterceptor(grpcmw.LoggingInterceptor)))
 	productServer := grpcv1.NewProductServer(uc.grpcProduct, l)
 	catalogv1.RegisterProductServiceServer(grpcServer.App, productServer)
 

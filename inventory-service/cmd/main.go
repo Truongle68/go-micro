@@ -19,12 +19,14 @@ import (
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
 	inventoryv1 "github.com/TruongLe68/go-micro/pkg/gen/proto/go/inventory/v1"
+	"github.com/TruongLe68/go-micro/pkg/grpcmw"
 	"github.com/TruongLe68/go-micro/pkg/grpcserver"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/postgres"
 	"github.com/TruongLe68/go-micro/pkg/rabbitmq"
 	"github.com/TruongLe68/go-micro/pkg/redis"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -118,7 +120,7 @@ func main() {
 	http.NewRouter(server.Engine, v1Deps)
 
 	// init gRPC server
-	grpcSrv := grpcserver.New(l, grpcserver.Port(cfg.GRPC.Port))
+	grpcSrv := grpcserver.New(l, grpcserver.Port(cfg.GRPC.Port), grpcserver.ServerOptions(grpc.UnaryInterceptor(grpcmw.LoggingInterceptor)))
 	inventoryServer := grpcv1.NewInventoryServer(stockUC, l)
 	inventoryv1.RegisterInventoryServiceServer(grpcSrv.App, inventoryServer)
 
