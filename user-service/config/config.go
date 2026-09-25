@@ -10,6 +10,7 @@ import (
 type (
 	Config struct {
 		HTTP    http
+		GRPC    grpc
 		PG      pg
 		JWT     jwt
 		Redis   redis
@@ -23,6 +24,10 @@ type (
 		BaseURL string `env:"BASE_URL" envDefault:"http://localhost:3000"`
 	}
 
+	grpc struct {
+		Port string `env:"GRPC_PORT" envDefault:"50050"`
+	}
+
 	email struct {
 		SMTPHost     string `env:"SMTP_HOST" envDefault:""`
 		SMTPPort     int    `env:"SMTP_PORT" envDefault:"587"`
@@ -32,7 +37,7 @@ type (
 	}
 
 	services struct {
-		RewardServiceAddr string `env:"REWARD_SERVICE_ADDR" envDefault:"50051"`
+		RewardServiceAddr string `env:"REWARD_SERVICE_ADDR" envDefault:"50050"`
 	}
 
 	pg struct {

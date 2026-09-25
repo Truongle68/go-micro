@@ -26,6 +26,6 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/bin/user-service /app/user-service
 
-EXPOSE 4000
+EXPOSE 4000 50050
 
 ENTRYPOINT ["/app/user-service"]

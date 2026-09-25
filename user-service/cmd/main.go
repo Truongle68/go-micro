@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"user-service/config"
+	grpcv1 "user-service/internal/delivery/grpc/v1"
 	"user-service/internal/delivery/http"
 	v1 "user-service/internal/delivery/http/v1"
 	repo "user-service/internal/repo/postgres"
@@ -20,10 +21,14 @@ import (
 
 	"github.com/GoProOrg/core-go-pkg/jwtmanager"
 	redismanager "github.com/GoProOrg/core-go-pkg/redismanager/identity"
+	userv1 "github.com/TruongLe68/go-micro/pkg/gen/proto/go/user/v1"
+	"github.com/TruongLe68/go-micro/pkg/grpcmw"
+	"github.com/TruongLe68/go-micro/pkg/grpcserver"
 	"github.com/TruongLe68/go-micro/pkg/httpserver"
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/postgres"
 	"github.com/TruongLe68/go-micro/pkg/redis"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -77,11 +82,16 @@ func main() {
 	authUC := usecase.NewAuthUC(userRepo, jwtManager, cache, transactor, emailWorker, otpDispatcher, l, cfg.HTTP.BaseURL)
 	userUC := usecase.NewUserUC(userRepo, jwtManager, cache, transactor, emailWorker, l, cfg.HTTP.BaseURL)
 
-	// init server, setup routers
+	// init http server, setup routers
 	httpserver := httpserver.New(l, httpserver.Port(cfg.HTTP.Port))
 
 	v1Deps := v1.NewDependencies(authUC, userUC, jwtVerifier, cache.TokenBlacklist, l)
 	http.NewRouter(httpserver.Engine, v1Deps)
+
+	// init grpc server, register services
+	grpcserver := grpcserver.New(l, grpcserver.Port(cfg.GRPC.Port), grpcserver.ServerOptions(grpc.UnaryInterceptor(grpcmw.LoggingInterceptor)))
+	userServer := grpcv1.NewUserServer(userUC, l)
+	userv1.RegisterUserServiceServer(grpcserver.App, userServer)
 
 	// start server
 	httpserver.Start()
