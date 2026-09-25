@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	env "github.com/TruongLe68/go-micro/pkg/config"
 )
@@ -13,6 +14,8 @@ type (
 		Services services
 		JWT      jwt
 		Redis    redis
+		RMQ      rmq
+		Outbox   outbox
 		Log      log
 	}
 
@@ -26,9 +29,10 @@ type (
 
 	services struct {
 		CartServiceURL           string `env:"CART_SERVICE_URL" envDefault:"http://localhost:4003"`
-		CartServiceGRPCAddr      string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
-		CatalogServiceGRPCAddr   string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
+		CatalogServiceGRPCAddr   string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50051"`
+		UserServiceGRPCAddr      string `env:"USER_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
 		InventoryServiceGRPCAddr string `env:"INVENTORY_SERVICE_GRPC_ADDR" envDefault:"localhost:50052"`
+		CartServiceGRPCAddr      string `env:"CART_SERVICE_GRPC_ADDR" envDefault:"localhost:50053"`
 	}
 
 	jwt struct {
@@ -39,6 +43,18 @@ type (
 		Addr     string `env:"REDIS_ADDR" envDefault:"localhost:6379"`
 		Password string `env:"REDIS_PASSWORD" envDefault:""`
 		DB       int    `env:"REDIS_DB" envDefault:"0"`
+	}
+
+	rmq struct {
+		URL          string `env:"RMQ_URL,required"`
+		Exchange     string `env:"RMQ_EXCHANGE" envDefault:"inventory.events"`
+		ExchangeType string `env:"RMQ_EXCHANGE_TYPE" envDefault:"topic"`
+	}
+
+	outbox struct {
+		PollInterval time.Duration `env:"OUTBOX_POLL_INTERVAL" envDefault:"5s"`
+		BatchSize    int           `env:"OUTBOX_BATCH_SIZE" envDefault:"50"`
+		MaxRetries   int           `env:"OUTBOX_MAX_RETRIES" envDefault:"5"`
 	}
 
 	log struct {

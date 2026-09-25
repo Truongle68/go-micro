@@ -37,8 +37,8 @@ type EventPublisher interface {
 // Option configures OutboxPublisherWorker.
 type Option func(*OutboxPublisherWorker)
 
-// PollInterval sets how often the worker polls for unpublished event.
-func PollInterval(d time.Duration) Option {
+// WithPollInterval sets how often the worker polls for unpublished events.
+func WithPollInterval(d time.Duration) Option {
 	return func(w *OutboxPublisherWorker) {
 		if d > 0 {
 			w.pollInterval = d
@@ -46,17 +46,17 @@ func PollInterval(d time.Duration) Option {
 	}
 }
 
-// BatchSize sets maximum number of events processed per cycle.
-func BatchSize(s int) Option {
+// WithBatchSize sets maximum number of events processed per cycle.
+func WithBatchSize(size int) Option {
 	return func(w *OutboxPublisherWorker) {
-		if s > 0 {
-			w.batchSize = s
+		if size > 0 {
+			w.batchSize = size
 		}
 	}
 }
 
-// MaxRetries sets maximum retries before an event is skipped or flagged.
-func MaxRetries(retries int) Option {
+// WithMaxRetries sets maximum retries before an event is skipped or flagged.
+func WithMaxRetries(retries int) Option {
 	return func(w *OutboxPublisherWorker) {
 		if retries > 0 {
 			w.maxRetries = retries

@@ -6,6 +6,7 @@ type ErrorCode string
 
 const (
 	CodeOrderNotFound               ErrorCode = "ORDER_NOT_FOUND"
+	CodeUserNotFound                ErrorCode = "USER_NOT_FOUND"
 	CodeInvalidOrderTransition      ErrorCode = "INVALID_ORDER_TRANSITION"
 	CodeEmptyOrderItems             ErrorCode = "EMPTY_ORDER_ITEMS"
 	CodeInvalidUserID               ErrorCode = "INVALID_USER_ID"
@@ -46,6 +47,7 @@ func NewAppError(code ErrorCode, err error) *AppError {
 
 var (
 	ErrOrderNotFound               = errors.New("order not found")
+	ErrUserNotFound                = errors.New("user not found")
 	ErrInvalidOrderTransition      = errors.New("invalid order status transition")
 	ErrEmptyOrderItems             = errors.New("order items cannot be empty")
 	ErrInvalidUserID               = errors.New("user ID cannot be empty")
@@ -69,6 +71,7 @@ var (
 
 var sentinelToCodeMap = map[error]ErrorCode{
 	ErrOrderNotFound:               CodeOrderNotFound,
+	ErrUserNotFound:                CodeUserNotFound,
 	ErrInvalidOrderTransition:      CodeInvalidOrderTransition,
 	ErrEmptyOrderItems:             CodeEmptyOrderItems,
 	ErrInvalidUserID:               CodeInvalidUserID,

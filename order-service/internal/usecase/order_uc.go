@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,6 +17,8 @@ import (
 
 type OrderUC struct {
 	repo            OrderRepository
+	outboxRepo      OutboxRepository
+	userClient      client.UserClient
 	cartClient      client.CartClient
 	catalogClient   client.CatalogClient
 	inventoryClient InventoryClient
@@ -25,6 +28,8 @@ type OrderUC struct {
 
 func NewOrderUC(
 	repo OrderRepository,
+	outboxRepo OutboxRepository,
+	userClient client.UserClient,
 	cartClient client.CartClient,
 	catalogClient client.CatalogClient,
 	inventoryClient InventoryClient,
@@ -33,6 +38,8 @@ func NewOrderUC(
 ) *OrderUC {
 	return &OrderUC{
 		repo:            repo,
+		outboxRepo:      outboxRepo,
+		userClient:      userClient,
 		cartClient:      cartClient,
 		catalogClient:   catalogClient,
 		inventoryClient: inventoryClient,
@@ -51,8 +58,19 @@ const (
 	confirmReservationBaseBackoff = 200 * time.Millisecond
 )
 
+// 1. create order
+// 2. reserve stock
+// 3. payment
 func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutInput, token string) (*domain.Order, error) {
-	raws, err := uc.resolveCheckoutLines(ctx, userID, input, token)
+	if uc.userClient == nil {
+		return nil, fmt.Errorf("OrderUC.Checkout - user client not configured")
+	}
+	userDto, err := uc.userClient.GetProfile(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	raws, err := uc.resolveCheckoutLines(ctx, userDto.UserID, input, token)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +91,44 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		if err != nil {
 			return fmt.Errorf("OrderUC.Checkout - Create: %w", err)
 		}
+
+		// generate event payload
+		items := make([]domain.OrderPlacedItem, 0, len(order.Items))
+		for _, item := range order.Items {
+			items = append(items, domain.OrderPlacedItem{
+				SKU:            item.SKU,
+				Quantity:       item.Quantity,
+				UnitPriceCents: item.UnitPrice,
+			})
+		}
+
+		payload := domain.OrderPlacedEvent{
+			OrderID:       order.ID,
+			UserID:        userID,
+			CustomerEmail: userID,
+			Items:         items,
+			TotalAmount:   order.Total,
+			PlacedAt:      order.CreatedAt,
+		}
+
+		bytePayload, _ := json.Marshal(payload)
+
+		// generate outbox event domain
+		outboxEvent, err := domain.NewOutboxEvent(
+			domain.AggregateOrder,
+			order.ID,
+			domain.EventOrderPlaced,
+			bytePayload,
+		)
+
+		if err != nil {
+			return fmt.Errorf("OrderUC.Checkout - NewOutboxEvent: %w", err)
+		}
+
+		// create outbox event
+		if err := uc.outboxRepo.Create(ctx, outboxEvent); err != nil {
+			return fmt.Errorf("OrderUC.Checkout - outboxRepo.Create: %w", err)
+		}
 		return nil
 	})
 	if err != nil {
@@ -80,18 +136,21 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 	}
 
 	// reserve stock via inventory service
-	if uc.inventoryClient != nil {
-		skuQtys := make([]client.SKUQty, len(domainItems))
-		for i, item := range domainItems {
-			skuQtys[i] = client.SKUQty{SKU: item.SKU, Quantity: item.Quantity}
-		}
+	if uc.inventoryClient == nil {
+		uc.failOrder(ctx, order, domain.OrderStatusFailedStock, "OrderUC.Checkout - inventory client not configured")
+		return nil, errors.New("OrderUC.Checkout - inventory client not configured")
+	}
 
-		if err := uc.inventoryClient.ReserveStock(ctx, order.ID, skuQtys); err != nil {
-			// Mark order as failed_stock
-			uc.failOrder(ctx, order, domain.OrderStatusFailedStock,
-				fmt.Sprintf("stock reservation failed: %v", err))
-			return nil, fmt.Errorf("OrderUC.Checkout - ReserveStock: %w", err)
-		}
+	skuQtys := make([]client.SKUQty, len(domainItems))
+	for i, item := range domainItems {
+		skuQtys[i] = client.SKUQty{SKU: item.SKU, Quantity: item.Quantity}
+	}
+
+	if err := uc.inventoryClient.ReserveStock(ctx, order.ID, skuQtys); err != nil {
+		// Mark order as failed_stock
+		uc.failOrder(ctx, order, domain.OrderStatusFailedStock,
+			fmt.Sprintf("stock reservation failed: %v", err))
+		return nil, fmt.Errorf("OrderUC.Checkout - ReserveStock: %w", err)
 	}
 
 	// COD Payment path (stub): transition pending_payment -> confirmed
@@ -117,7 +176,8 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		return nil, fmt.Errorf("OrderUC.Checkout - ConfirmTransaction: %w", err)
 	}
 
-	// confirm reservation (deduct on-hand stock)
+	// TODO: publish order placed event
+	// confirm reservation (deduct on-hand stock): handle by inventory consumer
 	if uc.inventoryClient != nil {
 		if err := uc.confirmReservationWithRetry(ctx, order.ID); err != nil {
 			uc.logger.Error(
@@ -132,7 +192,7 @@ func (uc *OrderUC) Checkout(ctx context.Context, userID string, input CheckoutIn
 		}
 	}
 
-	// remove checked out items from cart
+	// remove checked out items from cart: handle by cart consumer
 	if uc.cartClient != nil && len(domainItems) > 0 {
 		skus := make([]string, len(domainItems))
 		for i, item := range domainItems {

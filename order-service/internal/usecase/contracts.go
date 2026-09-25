@@ -9,6 +9,7 @@ import (
 	pgtransactor "order-service/pkg/postgres"
 
 	"github.com/TruongLe68/go-micro/pkg/pagination"
+	"github.com/TruongLe68/go-micro/pkg/rabbitmq"
 )
 
 type CheckoutItemInput struct {
@@ -35,6 +36,12 @@ type OrderRepository interface {
 
 var _ OrderRepository = (*postgres.OrderRepo)(nil)
 
+type OutboxRepository interface {
+	Create(ctx context.Context, event *domain.OutboxEvent) error
+}
+
+var _ OutboxRepository = (*postgres.OutboxRepo)(nil)
+
 type Transactor interface {
 	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
@@ -47,4 +54,9 @@ type InventoryClient interface {
 	ReserveStock(ctx context.Context, orderID string, items []client.SKUQty) error
 	ConfirmReservation(ctx context.Context, orderID string) error
 	ReleaseReservation(ctx context.Context, orderID string) error
+}
+
+// EventPublisher abstracts the event publishing mechanism.
+type EventPublisher interface {
+	Publish(ctx context.Context, event rabbitmq.Event) error
 }

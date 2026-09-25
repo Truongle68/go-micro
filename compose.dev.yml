@@ -282,6 +282,10 @@ services:
       - CART_SERVICE_GRPC_ADDR=cart-service:50053
       - CATALOG_SERVICE_GRPC_ADDR=catalog-service:50051
       - INVENTORY_SERVICE_GRPC_ADDR=inventory-service:50052
+      - RMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      - OUTBOX_POLL_INTERVAL=5s
+      - OUTBOX_BATCH_SIZE=50
+      - OUTBOX_MAX_RETRIES=5
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=${REDIS_PW}
       - REDIS_DB=4
@@ -297,6 +301,28 @@ services:
         condition: service_started
       inventory-service:
         condition: service_started
+
+  order-publisher:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    container_name: order-publisher
+    command: [ "/app/outbox-publisher" ]
+    environment:
+      - DB_URL=postgresql://${ORDER_POSTGRES_USER}:${ORDER_POSTGRES_PW}@order-db:5432/${ORDER_POSTGRES_DB}?sslmode=disable
+      - RMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      - OUTBOX_POLL_INTERVAL=5s
+      - OUTBOX_BATCH_SIZE=50
+      - OUTBOX_MAX_RETRIES=5
+      - LOG_LEVEL=info
+    env_file:
+      - ./order-service/.env
+    restart: unless-stopped
+    depends_on:
+      order-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   identity-data:

@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	AggregateOrder = "order"
+	AggregateOrder   = "order"
+	EventOrderPlaced = "order.placed"
 )
 
 var (
@@ -18,6 +19,22 @@ var (
 	ErrEmptyEventType     = errors.New("event type cannot be empty")
 	ErrNilEventPayload    = errors.New("event payload cannot be nil")
 )
+
+// OrderPlacedEvent represents a domain event emitted when an order is placed
+type OrderPlacedEvent struct {
+	OrderID       string            `json:"order_id"`
+	UserID        string            `json:"user_id"`
+	CustomerEmail string            `json:"customer_email"`
+	Items         []OrderPlacedItem `json:"items"`
+	TotalAmount   int64             `json:"total_amount_cents"`
+	PlacedAt      time.Time         `json:"placed_at"`
+}
+
+type OrderPlacedItem struct {
+	SKU            string `json:"sku"`
+	Quantity       int    `json:"quantity"`
+	UnitPriceCents int64  `json:"unit_price_cents"`
+}
 
 // OutboxEvent represents a transactional outbox table row.
 type OutboxEvent struct {

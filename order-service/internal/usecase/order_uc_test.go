@@ -129,6 +129,25 @@ func (m *mockTransactor) WithTransaction(ctx context.Context, fn func(ctx contex
 	return fn(ctx)
 }
 
+type mockOutboxRepo struct{}
+
+func (m *mockOutboxRepo) Create(ctx context.Context, event *domain.OutboxEvent) error {
+	return nil
+}
+
+type mockUserClient struct{}
+
+func (m *mockUserClient) GetProfile(ctx context.Context, userID string) (*client.UserProfileDTO, error) {
+	return &client.UserProfileDTO{
+		UserID:          userID,
+		Email:           "example@gmail.com",
+		Phone:           "099999999",
+		FullName:        "Nguyen Van A",
+		Status:          "verified",
+		IsEmailVerified: true,
+	}, nil
+}
+
 type mockCartClient struct{}
 
 func (m *mockCartClient) GetCart(ctx context.Context, userID string, token string) (*client.CartDTO, error) {
@@ -176,7 +195,7 @@ func (m *mockInventoryClient) ReleaseReservation(ctx context.Context, orderID st
 func TestCheckoutAndOrderLifecycle(t *testing.T) {
 	repo := newMockOrderRepo()
 	l := logger.New("error")
-	uc := usecase.NewOrderUC(repo, &mockCartClient{}, &mockCatalogClient{}, &mockInventoryClient{}, &mockTransactor{}, l)
+	uc := usecase.NewOrderUC(repo, &mockOutboxRepo{}, &mockUserClient{}, &mockCartClient{}, &mockCatalogClient{}, &mockInventoryClient{}, &mockTransactor{}, l)
 
 	ctx := context.Background()
 	userID := "usr_1001"
@@ -265,7 +284,7 @@ func TestCheckoutAndOrderLifecycle(t *testing.T) {
 
 func TestOrderUC_ListOrders(t *testing.T) {
 	repo := newMockOrderRepo()
-	uc := usecase.NewOrderUC(repo, nil, nil, nil, nil, logger.New("error"))
+	uc := usecase.NewOrderUC(repo, nil, nil, nil, nil, nil, nil, logger.New("error"))
 
 	ctx := context.Background()
 	now := time.Now().UTC()
