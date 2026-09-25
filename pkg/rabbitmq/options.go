@@ -1,9 +1,21 @@
 package rabbitmq
 
+import "time"
+
 type Option func(*Connection)
 
-func ExchangeType(exchangeType string) Option {
+func Attempts(n int) Option {
 	return func(c *Connection) {
-		c.ExchangeType = exchangeType
+		if n > 0 {
+			c.attempts = n
+		}
+	}
+}
+
+func WaitTime(d time.Duration) Option {
+	return func(c *Connection) {
+		if d > 0 {
+			c.waitTime = d
+		}
 	}
 }

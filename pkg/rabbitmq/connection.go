@@ -10,25 +10,24 @@ import (
 )
 
 const (
-	_defaultWaitTime     = 5 * time.Second
-	_defaultAttempts     = 5
-	_defaultExchangeType = "topic"
+	_defaultWaitTime = 5 * time.Second
+	_defaultAttempts = 5
 )
 
 type Connection struct {
-	URL          string
-	Exchange     string
-	ExchangeType string
+	url string
 
-	Conn    *amqp.Connection
-	Channel *amqp.Channel
+	attempts int
+	waitTime time.Duration
+
+	Conn *amqp.Connection
 }
 
-func newConnection(url, exchange string, opts ...Option) *Connection {
+func NewConnection(url string, opts ...Option) *Connection {
 	c := &Connection{
-		URL:          url,
-		Exchange:     exchange,
-		ExchangeType: _defaultExchangeType,
+		url:      url,
+		attempts: _defaultAttempts,
+		waitTime: _defaultWaitTime,
 	}
 
 	for _, opt := range opts {
@@ -38,72 +37,37 @@ func newConnection(url, exchange string, opts ...Option) *Connection {
 }
 
 func (c *Connection) Connect() error {
-	var err error
-	for i := _defaultAttempts; i > 0; i-- {
-		if err := c.dial(); err == nil {
-			break
+	var (
+		conn *amqp.Connection
+		err  error
+	)
+	for i := c.attempts; i > 0; i-- {
+		if conn, err = amqp.Dial(c.url); err == nil {
+			c.Conn = conn
+			return nil
 		}
 		log.Printf("rabbitmq connect retry, left=%d err=%v", i-1, err)
-		time.Sleep(_defaultWaitTime)
+		time.Sleep(c.waitTime)
 	}
-	if err != nil {
-		return fmt.Errorf("rabbitmq connect exhausted retries: %v", err)
-	}
-	return nil
+	return fmt.Errorf("rabbitmq connect exhausted retries: %v", err)
 }
 
-func (c *Connection) dial() error {
-	conn, err := amqp.Dial(c.URL)
-	if err != nil {
-		return fmt.Errorf("amqp.Dial: %w", err)
+func (c *Connection) Channel() (*amqp.Channel, error) {
+	if c.Conn == nil {
+		return nil, errors.New("rabbitmq: Channel opens before Connect")
 	}
 
-	var ch *amqp.Channel
-
-	defer func() {
-		if err != nil {
-			if ch != nil {
-				_ = ch.Close()
-			}
-			_ = conn.Close()
-		}
-	}()
-
-	ch, err = conn.Channel()
+	ch, err := c.Conn.Channel()
 	if err != nil {
-		return fmt.Errorf("conn.Channel: %w", err)
+		return nil, fmt.Errorf("rabbitmq: conn.Channel: %w", err)
 	}
 
-	err = ch.ExchangeDeclare(
-		c.Exchange,
-		c.ExchangeType,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("ch.ExchangeDeclare: %w", err)
-	}
-
-	c.Conn = conn
-	c.Channel = ch
-	return nil
+	return ch, nil
 }
 
 func (c *Connection) Close() error {
-	var errs []error
-	if c.Channel != nil {
-		if err := c.Channel.Close(); err != nil {
-			errs = append(errs, err)
-		}
+	if c.Conn == nil {
+		return nil
 	}
-
-	if c.Conn != nil {
-		if err := c.Conn.Close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Join(errs...)
+	return c.Conn.Close()
 }

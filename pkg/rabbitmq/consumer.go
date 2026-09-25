@@ -10,39 +10,54 @@ import (
 
 type HandlerFunc func(ctx context.Context, event Event) error
 
-type Consumer interface {
-	Start(ctx context.Context) error
-	Close() error
-}
-
-type consumer struct {
-	conn       *Connection
+type Consumer struct {
+	channel    *amqp.Channel
 	queueName  string
-	routingKey string
 	handler    HandlerFunc
 	deliveries <-chan amqp.Delivery
 }
 
 func NewConsumer(
-	url string,
-	exchange string,
-	queueName string,
-	routingKey string,
+	conn *amqp.Connection,
+	exchange, queueName, routingKey string,
 	handler HandlerFunc,
-	opts ...Option,
-) (_ Consumer, err error) {
-	c := newConnection(url, exchange, opts...)
-	if err = c.Connect(); err != nil {
-		return nil, fmt.Errorf("NewConsumer - c.Connect: %w", err)
-	}
+) (_ *Consumer, err error) {
+	return newConsumer(conn, exchange, ExchangeTypeTopic, queueName, routingKey, handler)
+}
 
+func NewFanoutConsumer(conn *amqp.Connection, exchange, queueName string, handler HandlerFunc) (*Consumer, error) {
+	return newConsumer(conn, exchange, ExchangeTypeFanout, queueName, "", handler)
+}
+
+func newConsumer(
+	conn *amqp.Connection,
+	exchange, exchangeType, queueName, routingKey string,
+	handler HandlerFunc,
+) (_ *Consumer, err error) {
+	ch, err := conn.Channel()
 	defer func() {
 		if err != nil {
-			_ = c.Conn.Close()
+			_ = ch.Close()
 		}
 	}()
 
-	q, err := c.Channel.QueueDeclare(
+	if err != nil {
+		return nil, fmt.Errorf("conn.Channel: %w", err)
+	}
+
+	if err := ch.ExchangeDeclare(
+		exchange,
+		exchangeType,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	); err != nil {
+		return nil, fmt.Errorf("NewConsumer - ExchangeDeclare: %w", err)
+	}
+
+	q, err := ch.QueueDeclare(
 		queueName,
 		true,
 		false,
@@ -54,10 +69,10 @@ func NewConsumer(
 		return nil, fmt.Errorf("NewConsumer - QueueDeclare: %w", err)
 	}
 
-	err = c.Channel.QueueBind(
+	err = ch.QueueBind(
 		q.Name,
 		routingKey,
-		c.Exchange,
+		exchange,
 		false,
 		nil,
 	)
@@ -65,7 +80,7 @@ func NewConsumer(
 		return nil, fmt.Errorf("NewConsumer - QueueBind: %w", err)
 	}
 
-	deliveries, err := c.Channel.Consume(
+	deliveries, err := ch.Consume(
 		q.Name,
 		"",
 		false,
@@ -78,23 +93,22 @@ func NewConsumer(
 		return nil, fmt.Errorf("NewConsumer - Consume: %w", err)
 	}
 
-	return &consumer{
-		conn:       c,
+	return &Consumer{
+		channel:    ch,
 		queueName:  q.Name,
-		routingKey: routingKey,
 		handler:    handler,
 		deliveries: deliveries,
 	}, nil
 }
 
-func (c *consumer) Start(ctx context.Context) error {
+func (c *Consumer) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case d, open := <-c.deliveries:
 			if !open {
-				return fmt.Errorf("consumer: delivery channel closed")
+				return fmt.Errorf("Consumer: delivery channel closed")
 			}
 			if err := c.handleOne(ctx, d); err != nil {
 				_ = d.Nack(false, true)
@@ -105,7 +119,7 @@ func (c *consumer) Start(ctx context.Context) error {
 	}
 }
 
-func (c *consumer) handleOne(ctx context.Context, deliveries amqp.Delivery) error {
+func (c *Consumer) handleOne(ctx context.Context, deliveries amqp.Delivery) error {
 	var event Event
 	if err := json.Unmarshal(deliveries.Body, &event); err != nil {
 		return fmt.Errorf("unmarshaling event: %w", err)
@@ -113,6 +127,6 @@ func (c *consumer) handleOne(ctx context.Context, deliveries amqp.Delivery) erro
 	return c.handler(ctx, event)
 }
 
-func (c *consumer) Close() error {
-	return c.conn.Close()
+func (c *Consumer) Close() error {
+	return c.channel.Close()
 }

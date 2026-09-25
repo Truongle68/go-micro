@@ -1,11 +1,16 @@
 package rabbitmq
 
-// Event type constants for inventory domain events.
 const (
-	EventStockReserved  = "stock.reserved"
-	EventStockConfirmed = "stock.confirmed"
-	EventStockReleased  = "stock.released"
-	EventStockAdjusted  = "stock.adjusted"
+	// Exchange name constants
+	ExchangeOrder       = "order.events"
+	ExchangeOrderPlaced = "order.placed.fanout"
+	ExchangeInventory   = "inventory.events"
+	ExchangeCatalog     = "catalog.events"
+	// Exchange type constants
+	ExchangeTypeDirect  = "direct"
+	ExchangeTypeTopic   = "topic"
+	ExchangeTypeFanout  = "fanout"
+	ExchangeTypeHeaders = "headers"
 )
 
 // SKUQtyItem represents a single SKU and its quantity in an event payload.

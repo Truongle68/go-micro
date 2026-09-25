@@ -3,8 +3,8 @@ package rabbitmq
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -23,28 +23,64 @@ type Publisher interface {
 	Close() error
 }
 
-type publisher struct {
-	conn *Connection
+type ExchangeBinding struct {
+	Exchange     string
+	ExchangeType string
 }
 
-// New creates a new RabbitMQ event publisher.
-// It connects to RabbitMQ and declares a topic exchange.
-func NewPublisher(url, exchange string, opts ...Option) (Publisher, error) {
-	c := newConnection(url, exchange, opts...)
+type publisher struct {
+	channel *amqp.Channel
+	mu      sync.Mutex
+	confirm bool
+	routes  map[string]ExchangeBinding
+}
 
-	if err := c.Connect(); err != nil {
-		return nil, fmt.Errorf("NewPublisher - c.Connect: %w", err)
+func NewPublisher(conn *amqp.Connection, withConfirm bool, routes map[string]ExchangeBinding) (Publisher, error) {
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, fmt.Errorf("NewPublisher - conn.Channel: %w", err)
+	}
+
+	defer func() {
+		if err != nil {
+			_ = ch.Close()
+		}
+	}()
+
+	declared := make(map[string]bool)
+	for eventType, b := range routes {
+		if declared[eventType] {
+			continue
+		}
+		if err := ch.ExchangeDeclare(b.Exchange, b.ExchangeType, true, false, false, false, nil); err != nil {
+			return nil, fmt.Errorf("NewPublisher - ExchangeDeclare(%s) for event %s: %w", b.Exchange, eventType, err)
+		}
+		declared[eventType] = true
+	}
+
+	if withConfirm {
+		if err := ch.Confirm(false); err != nil {
+			return nil, fmt.Errorf("NewPublisher - ch.Confirm: %w", err)
+		}
 	}
 
 	return &publisher{
-		conn: c,
+		channel: ch,
+		confirm: withConfirm,
+		routes:  routes,
 	}, nil
 }
 
 // Publish sends an event to the exchange with the event type as routing key.
 func (p *publisher) Publish(ctx context.Context, event Event) error {
-	if p.conn.Channel == nil {
-		return errors.New("publisher - Publish - channel is nil")
+	binding, ok := p.routes[event.Type]
+	if !ok {
+		return fmt.Errorf("publisher- Publish - no exchange bound for event type %s", event.Type)
+	}
+
+	routingKey := event.Type
+	if binding.ExchangeType == ExchangeTypeFanout {
+		routingKey = ""
 	}
 
 	body, err := json.Marshal(event)
@@ -52,15 +88,40 @@ func (p *publisher) Publish(ctx context.Context, event Event) error {
 		return fmt.Errorf("publisher - Publish - json.Marshal: %w", err)
 	}
 
-	err = p.conn.Channel.PublishWithContext(
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.confirm {
+		confirmation, err := p.channel.PublishWithDeferredConfirmWithContext(
+			ctx,
+			binding.Exchange,
+			routingKey,
+			false,
+			false,
+			amqpPublishing(event, body),
+		)
+		if err != nil {
+			return fmt.Errorf("publisher - Publish - PublishWithDeferredConfirmWithContext: %w", err)
+		}
+
+		ok, err := confirmation.WaitContext(ctx)
+		if err != nil {
+			return fmt.Errorf("publisher - Publish - confirmation.WaitContext: %w", err)
+		}
+		if !ok {
+			return fmt.Errorf("publisher - Publish - broker nacked event %s", event.Type)
+		}
+		return nil
+	}
+
+	if err := p.channel.PublishWithContext(
 		ctx,
-		p.conn.Exchange,
-		event.Type,
+		binding.Exchange,
+		routingKey,
 		false,
 		false,
 		amqpPublishing(event, body),
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("publisher - Publish - channel.PublishWithContext: %w", err)
 	}
 
@@ -78,5 +139,5 @@ func amqpPublishing(event Event, body []byte) amqp.Publishing {
 }
 
 func (p *publisher) Close() error {
-	return p.conn.Close()
+	return p.channel.Close()
 }
