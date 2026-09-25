@@ -8,7 +8,9 @@ import (
 	"syscall"
 
 	"inventory-service/config"
+	"inventory-service/internal/domain"
 	pgrepo "inventory-service/internal/repo/postgres"
+	"inventory-service/internal/usecase"
 	"inventory-service/internal/worker"
 	invpg "inventory-service/pkg/postgres"
 
@@ -37,26 +39,32 @@ func main() {
 	// init outbox repo
 	outboxRepo := pgrepo.NewOutboxRepo(pg.DB)
 
+	pubConn := rabbitmq.NewConnection(cfg.RMQ.URL)
+	if err := pubConn.Connect(); err != nil {
+		l.Fatal("failed to connect rabbitmq: %v", err)
+	}
+	defer pubConn.Close()
+
+	routes := map[string]rabbitmq.ExchangeBinding{
+		domain.EventGoodsReceived: {Exchange: rabbitmq.ExchangeInventory, ExchangeType: rabbitmq.ExchangeTypeTopic},
+		domain.EventOrderPlaced:   {Exchange: rabbitmq.ExchangeOrderPlaced, ExchangeType: rabbitmq.ExchangeTypeFanout},
+	}
+
 	// init RabbitMQ event publisher
-	exchangeName := cfg.RMQ.Exchange
-	if exchangeName == "" {
-		exchangeName = "inventory.events"
-	}
-	exchangeType := cfg.RMQ.ExchangeType
-	if exchangeType == "" {
-		exchangeType = "topic"
-	}
-	rmqPublisher, err := rabbitmq.NewPublisher(cfg.RMQ.URL, exchangeName, rabbitmq.ExchangeType(exchangeType))
+	var eventPublisher usecase.EventPublisher
+	rmqPublisher, err := rabbitmq.NewPublisher(pubConn.Conn, true, routes)
 	if err != nil {
-		l.Fatal("failed to initialize RabbitMQ publisher: %v", err)
+		l.Warn("failed to initialize RabbitMQ publisher (events disabled): %v", err)
+	} else {
+		eventPublisher = rmqPublisher
+		defer rmqPublisher.Close()
 	}
-	defer rmqPublisher.Close()
 
 	// init worker with functional options
 	outboxWorker := worker.NewOutboxPublisherWorker(
 		outboxRepo,
 		transactor,
-		rmqPublisher,
+		eventPublisher,
 		l,
 		worker.WithPollInterval(cfg.Outbox.PollInterval),
 		worker.WithBatchSize(cfg.Outbox.BatchSize),

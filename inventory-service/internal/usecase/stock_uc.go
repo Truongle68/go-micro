@@ -170,7 +170,7 @@ func (uc *StockUC) ReserveStock(ctx context.Context, orderID string, items []SKU
 		return err
 	}
 
-	uc.publishEvent(ctx, rabbitmq.EventStockReserved, rabbitmq.StockReservedPayload{
+	uc.publishEvent(ctx, domain.EventStockReserved, rabbitmq.StockReservedPayload{
 		OrderID: orderID,
 		Items:   eventItems,
 	})
@@ -244,7 +244,7 @@ func (uc *StockUC) ConfirmReservation(ctx context.Context, orderID string) error
 		return err
 	}
 
-	uc.publishEvent(ctx, rabbitmq.EventStockConfirmed, rabbitmq.StockConfirmedPayload{
+	uc.publishEvent(ctx, domain.EventStockConfirmed, rabbitmq.StockConfirmedPayload{
 		OrderID: orderID,
 		Items:   eventItems,
 	})
@@ -318,7 +318,7 @@ func (uc *StockUC) ReleaseReservation(ctx context.Context, orderID string) error
 		return err
 	}
 
-	uc.publishEvent(ctx, rabbitmq.EventStockReleased, rabbitmq.StockReleasedPayload{
+	uc.publishEvent(ctx, domain.EventStockReleased, rabbitmq.StockReleasedPayload{
 		OrderID: orderID,
 		Items:   eventItems,
 	})

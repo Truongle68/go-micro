@@ -18,6 +18,7 @@ import (
 	"github.com/TruongLe68/go-micro/pkg/logger"
 	"github.com/TruongLe68/go-micro/pkg/postgres"
 	"github.com/TruongLe68/go-micro/pkg/rabbitmq"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -37,9 +38,20 @@ func main() {
 	defer pg.Close()
 	transactor := invpg.NewPostgresTransactor(pg.DB)
 
+	pubConn := rabbitmq.NewConnection(cfg.RMQ.URL)
+	if err := pubConn.Connect(); err != nil {
+		l.Fatal("failed to connect rabbitmq: %v", err)
+	}
+	defer pubConn.Close()
+
+	routes := map[string]rabbitmq.ExchangeBinding{
+		domain.EventGoodsReceived: {Exchange: rabbitmq.ExchangeInventory, ExchangeType: rabbitmq.ExchangeTypeTopic},
+		domain.EventOrderPlaced:   {Exchange: rabbitmq.ExchangeOrderPlaced, ExchangeType: rabbitmq.ExchangeTypeFanout},
+	}
+
 	// init RabbitMQ event publisher
 	var eventPublisher usecase.EventPublisher
-	rmqPublisher, err := rabbitmq.NewPublisher(cfg.RMQ.URL, cfg.RMQ.Exchange)
+	rmqPublisher, err := rabbitmq.NewPublisher(pubConn.Conn, true, routes)
 	if err != nil {
 		l.Warn("failed to initialize RabbitMQ publisher (events disabled): %v", err)
 	} else {
@@ -71,53 +83,59 @@ func main() {
 		l,
 	)
 
-	// register handler
-	handler := worker.NewGoodsReceivedHandler(stockUC, l)
+	// init rabbitmq conn
+	conn := rabbitmq.NewConnection(cfg.RMQ.URL)
+	if err := conn.Connect(); err != nil {
+		l.Fatal("failed to connect rabbitmq: %v", err)
+	}
+	defer conn.Close()
 
-	exchange := cfg.RMQ.Exchange
-	if exchange == "" {
-		exchange = "inventory.events"
-	}
-
-	queueName := cfg.RMQ.QueueName
-	if queueName == "" {
-		queueName = "inventory.goods-received.q"
-	}
-
-	routingKey := cfg.RMQ.RoutingKey
-	if routingKey == "" {
-		routingKey = domain.EventGoodsReceived
-	}
-	// Create consumer
-	c, err := rabbitmq.NewConsumer(
-		cfg.RMQ.URL,
-		exchange,
-		queueName,
-		routingKey,
-		handler.Handle,
-	)
-	if err != nil {
-		l.Fatal("rabbitmq consumer: %v", err)
-	}
-	defer c.Close()
+	subs := worker.BuildSubscriptions(stockUC, l)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go func() {
-		if err := c.Start(ctx); err != nil && ctx.Err() == nil {
-			l.Error("consumer stopped: %v", err)
-			cancel()
+	g, gCtx := errgroup.WithContext(ctx)
+	consumers := make([]*rabbitmq.Consumer, 0, len(subs))
+
+	for _, s := range subs {
+		s := s
+		consumer, err := s.Register(conn.Conn)
+		if err != nil {
+			l.Fatal("failed to init consumer: %v", err)
 		}
-	}()
+
+		consumers = append(consumers, consumer)
+		g.Go(func() error {
+			l.Info("consumer %s started (queue=%s)", s.Name, s.Queue)
+			return consumer.Start(gCtx)
+		})
+	}
 
 	l.Info("inventory event consumer started")
 
 	// Graceful shutdown
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-	sig := <-interrupt
-	l.Info("consumer received signal: %s, shutting down...", sig.String())
+
+	select {
+	case sig := <-interrupt:
+		l.Info("consumer received signal: %s, shutting down...", sig.String())
+	case <-gCtx.Done():
+		l.Error("a consumer stopped unexpectedly, shutting down...")
+	}
+
 	cancel()
+
+	for _, c := range consumers {
+		if err := c.Close(); err != nil {
+			l.Error("error closing consumer: %v", err)
+		}
+	}
+
+	if err := g.Wait(); err != nil && ctx.Err() == nil {
+		l.Error("consumer group exited with error: %v", err)
+	}
+
 	l.Info("inventory event consumer stopped")
 }

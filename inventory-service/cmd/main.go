@@ -12,6 +12,7 @@ import (
 	grpcv1 "inventory-service/internal/delivery/grpc/v1"
 	"inventory-service/internal/delivery/http"
 	v1 "inventory-service/internal/delivery/http/v1"
+	"inventory-service/internal/domain"
 	pgrepo "inventory-service/internal/repo/postgres"
 	"inventory-service/internal/usecase"
 	invpg "inventory-service/pkg/postgres"
@@ -61,15 +62,27 @@ func main() {
 	// init cache
 	cache := redismanager.NewIdentityCache(redisClient.Client)
 
+	pubConn := rabbitmq.NewConnection(cfg.RMQ.URL)
+	if err := pubConn.Connect(); err != nil {
+		l.Fatal("failed to connect rabbitmq: %v", err)
+	}
+	defer pubConn.Close()
+
+	routes := map[string]rabbitmq.ExchangeBinding{
+		domain.EventGoodsReceived: {Exchange: rabbitmq.ExchangeInventory, ExchangeType: rabbitmq.ExchangeTypeTopic},
+		domain.EventOrderPlaced:   {Exchange: rabbitmq.ExchangeOrderPlaced, ExchangeType: rabbitmq.ExchangeTypeFanout},
+	}
+
 	// init RabbitMQ event publisher
 	var eventPublisher usecase.EventPublisher
-	rmqPublisher, err := rabbitmq.NewPublisher(cfg.RMQ.URL, cfg.RMQ.Exchange)
+	rmqPublisher, err := rabbitmq.NewPublisher(pubConn.Conn, true, routes)
 	if err != nil {
 		l.Warn("failed to initialize RabbitMQ publisher (events disabled): %v", err)
 	} else {
 		eventPublisher = rmqPublisher
 		defer rmqPublisher.Close()
 	}
+
 
 	// init repos
 	supplierRepo := pgrepo.NewSupplierRepo(pg.DB)

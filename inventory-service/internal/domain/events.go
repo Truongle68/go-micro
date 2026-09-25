@@ -9,7 +9,14 @@ import (
 )
 
 const (
-	EventGoodsReceived     = "goods.received"
+	// Event type constants for inventory domain events.
+	EventGoodsReceived  = "goods.received"
+	EventOrderPlaced    = "order.placed"
+	EventStockReserved  = "stock.reserved"
+	EventStockConfirmed = "stock.confirmed"
+	EventStockReleased  = "stock.released"
+	EventStockAdjusted  = "stock.adjusted"
+	// Aggregate type constants for inventory domain events.
 	AggregatePurchaseOrder = "purchase_order"
 )
 
