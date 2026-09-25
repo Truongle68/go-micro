@@ -146,10 +146,10 @@ services:
     container_name: catalog-service
     ports:
       - "4001:4001"
-      - "50050:50050"
+      - "50051:50051"
     environment:
       - HTTP_PORT=4001
-      - GRPC_PORT=50050
+      - GRPC_PORT=50051
       - DB_URL=mongodb://${CATALOG_MONGO_USER}:${CATALOG_MONGO_PW}@catalog-db:27017/${CATALOG_MONGO_DB}?authSource=catalog-db&directConnection=true
       - DB_NAME=${CATALOG_MONGO_DB}
       - REDIS_ADDR=redis:6379
@@ -183,7 +183,7 @@ services:
       - RMQ_RPC_SERVER=inventory_rpc_server
       - RMQ_RPC_CLIENT=inventory_rpc_client
       - RMQ_EXCHANGE=inventory.events
-      - CATALOG_SERVICE_ADDR=catalog-service:50050
+      - CATALOG_SERVICE_ADDR=catalog-service:50051
     env_file:
       - ./inventory-service/.env
     restart: unless-stopped
@@ -210,7 +210,7 @@ services:
       - RMQ_QUEUE_NAME=inventory.goods-received.q
       - RMQ_ROUTING_KEY=goods.received
       - LOG_LEVEL=info
-      - CATALOG_SERVICE_ADDR=catalog-service:50050
+      - CATALOG_SERVICE_ADDR=catalog-service:50051
     env_file:
       - ./inventory-service/.env
     restart: unless-stopped
@@ -259,7 +259,7 @@ services:
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=${REDIS_PW}
       - REDIS_DB=3
-      - CATALOG_SERVICE_GRPC_ADDR=catalog-service:50050
+      - CATALOG_SERVICE_GRPC_ADDR=catalog-service:50051
     env_file:
       - ./cart-service/.env
     restart: unless-stopped
@@ -280,7 +280,7 @@ services:
       - HTTP_PORT=4004
       - DB_URL=postgresql://${ORDER_POSTGRES_USER}:${ORDER_POSTGRES_PW}@order-db:5432/${ORDER_POSTGRES_DB}?sslmode=disable
       - CART_SERVICE_GRPC_ADDR=cart-service:50053
-      - CATALOG_SERVICE_GRPC_ADDR=catalog-service:50050
+      - CATALOG_SERVICE_GRPC_ADDR=catalog-service:50051
       - INVENTORY_SERVICE_GRPC_ADDR=inventory-service:50052
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=${REDIS_PW}

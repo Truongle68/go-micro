@@ -9,13 +9,13 @@ import (
 
 type (
 	Config struct {
-		HTTP  HTTP
-		GRPC  GRPC
+		HTTP     HTTP
+		GRPC     GRPC
 		Services Services
-		Redis Redis
-		JWT   JWT
-		Log   Log
-		Cart  Cart
+		Redis    Redis
+		JWT      JWT
+		Log      Log
+		Cart     Cart
 	}
 
 	HTTP struct {
@@ -27,7 +27,7 @@ type (
 	}
 
 	Services struct {
-		CatalogServiceGRPCAddr string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50050"`
+		CatalogServiceGRPCAddr string `env:"CATALOG_SERVICE_GRPC_ADDR" envDefault:"localhost:50051"`
 	}
 
 	Redis struct {

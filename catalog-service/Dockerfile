@@ -26,6 +26,6 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/bin/catalog-service /app/catalog-service
 
-EXPOSE 4001 50050
+EXPOSE 4001 50051
 
 ENTRYPOINT ["/app/catalog-service"]

@@ -55,7 +55,7 @@ type (
 	}
 
 	services struct {
-		CatalogServiceAddr string `env:"CATALOG_SERVICE_ADDR" envDefault:"localhost:50050"`
+		CatalogServiceAddr string `env:"CATALOG_SERVICE_ADDR" envDefault:"localhost:50051"`
 	}
 
 	pg struct {

@@ -21,7 +21,7 @@ type (
 	}
 
 	grpc struct {
-		Port string `env:"GRPC_PORT" envDefault:"50050"`
+		Port string `env:"GRPC_PORT" envDefault:"50051"`
 	}
 
 	mongodb struct {
